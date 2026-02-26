@@ -18,7 +18,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
-import { TrendingUp, TrendingDown, ChevronDown, ChevronUp, ChevronsUpDown, Check, Loader2, CalendarIcon, Pencil, Trash2, MessageSquarePlus, X, DollarSign, Package, Activity, ShieldCheck, Search, ListFilter, RefreshCw, Download, AlertCircle, CheckCircle2, Clock } from "lucide-react";
+import { TrendingUp, TrendingDown, ChevronDown, ChevronUp, ChevronsUpDown, Check, Loader2, CalendarIcon, Pencil, Trash2, MessageSquarePlus, X, DollarSign, Package, Activity, ShieldCheck, Search, ListFilter, RefreshCw, Download, AlertCircle, CheckCircle2, Clock, SlidersHorizontal } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -1760,6 +1760,32 @@ function MultiSelectFilter({
   );
 }
 
+const PO_COLUMNS = [
+  { key: "title", label: "Title" },
+  { key: "category", label: "Category" },
+  { key: "supplier", label: "Supplier" },
+  { key: "cost", label: "Cost" },
+  { key: "on_hand", label: "On Hand" },
+  { key: "available", label: "Available" },
+  { key: "incoming", label: "Incoming" },
+  { key: "lead_time", label: "Lead Time" },
+  { key: "moq", label: "MOQ" },
+  { key: "amzn", label: "Amazon Inv" },
+  { key: "wlmt", label: "Walmart Inv" },
+  { key: "in_kits", label: "In Kits" },
+  { key: "total", label: "Total Stock" },
+  { key: "proj_direct", label: "Proj. Direct", group: "projection" },
+  { key: "proj_kits", label: "Proj. Kits", group: "projection" },
+  { key: "proj_total", label: "Proj. Total", group: "projection" },
+  { key: "daily_vel_individual", label: "Daily Vel. Individual", group: "projection" },
+  { key: "daily_vel_kits", label: "Daily Vel. Kits", group: "projection" },
+  { key: "curr_individual", label: "Curr. Total Individual", group: "projection" },
+  { key: "curr_kits", label: "Curr. Total Kits", group: "projection" },
+  { key: "rec_purchase", label: "Rec. Purchase", group: "projection" },
+] as const;
+type PoColumnKey = (typeof PO_COLUMNS)[number]["key"];
+const PO_DEFAULT_COLUMNS: PoColumnKey[] = PO_COLUMNS.filter((c) => !("group" in c)).map((c) => c.key) as PoColumnKey[];
+
 function ColumnFilterPopover({
   isActive,
   children,
@@ -1840,6 +1866,18 @@ function PurchaseOrdersTab() {
   const { value: assembledFilter, setValue: setAssembledFilter } = useUserPreference<string>(
     "purchase-orders", "assembled-filter", "either", { debounceMs: 300 }
   );
+  const { value: visibleColumns, setValue: setVisibleColumns } = useUserPreference<string[]>(
+    "purchase-orders", "visible-columns", [...PO_DEFAULT_COLUMNS], { debounceMs: 300 }
+  );
+  const colVisible = useCallback((key: string) => visibleColumns.includes(key), [visibleColumns]);
+  const toggleColumn = useCallback((key: string) => {
+    if (visibleColumns.includes(key)) {
+      setVisibleColumns(visibleColumns.filter((k) => k !== key));
+    } else {
+      const allKeys = PO_COLUMNS.map((c) => c.key);
+      setVisibleColumns([...visibleColumns, key].sort((a, b) => allKeys.indexOf(a as PoColumnKey) - allKeys.indexOf(b as PoColumnKey)));
+    }
+  }, [visibleColumns, setVisibleColumns]);
 
   const readinessQuery = useQuery<{
     ready: boolean;
@@ -2308,6 +2346,74 @@ function PurchaseOrdersTab() {
             data-testid="input-po-search"
           />
         </div>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" size="sm" className="gap-1.5 shrink-0" data-testid="button-po-columns">
+              <SlidersHorizontal className="w-3.5 h-3.5" />
+              Columns
+              {visibleColumns.length < PO_DEFAULT_COLUMNS.length && (
+                <Badge variant="secondary" className="ml-0.5">{PO_DEFAULT_COLUMNS.length - visibleColumns.length} hidden</Badge>
+              )}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-[210px] p-2" align="start">
+            <div className="flex flex-col gap-0.5">
+              <p className="text-xs font-medium text-muted-foreground px-1 pb-1">Standard Columns</p>
+              <div className="flex flex-col gap-0.5 max-h-[260px] overflow-y-auto">
+                {PO_COLUMNS.filter((c) => !("group" in c)).map((c) => (
+                  <button
+                    key={c.key}
+                    type="button"
+                    className={`flex items-center gap-2 text-sm px-2 py-1 rounded hover-elevate ${colVisible(c.key) ? "" : "text-muted-foreground"}`}
+                    onClick={() => toggleColumn(c.key)}
+                  >
+                    <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 ${colVisible(c.key) ? "bg-primary border-primary" : "border-muted-foreground/40"}`}>
+                      {colVisible(c.key) && <Check className="w-2.5 h-2.5 text-primary-foreground" />}
+                    </div>
+                    {c.label}
+                  </button>
+                ))}
+              </div>
+              {hasProjection && (
+                <>
+                  <div className="border-t my-1" />
+                  <p className="text-xs font-medium text-muted-foreground px-1 pb-1">Projection Columns</p>
+                  <div className="flex flex-col gap-0.5 max-h-[180px] overflow-y-auto">
+                    {PO_COLUMNS.filter((c) => "group" in c && c.group === "projection").map((c) => (
+                      <button
+                        key={c.key}
+                        type="button"
+                        className={`flex items-center gap-2 text-sm px-2 py-1 rounded hover-elevate ${colVisible(c.key) ? "" : "text-muted-foreground"}`}
+                        onClick={() => toggleColumn(c.key)}
+                      >
+                        <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 ${colVisible(c.key) ? "bg-primary border-primary" : "border-muted-foreground/40"}`}>
+                          {colVisible(c.key) && <Check className="w-2.5 h-2.5 text-primary-foreground" />}
+                        </div>
+                        {c.label}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+              <div className="border-t mt-1 pt-1 flex gap-1">
+                <button
+                  type="button"
+                  className="text-xs text-muted-foreground hover:text-foreground px-2 py-0.5"
+                  onClick={() => setVisibleColumns(hasProjection ? PO_COLUMNS.map((c) => c.key) : [...PO_DEFAULT_COLUMNS])}
+                >
+                  Show all
+                </button>
+                <button
+                  type="button"
+                  className="text-xs text-muted-foreground hover:text-foreground px-2 py-0.5"
+                  onClick={() => setVisibleColumns(["title"])}
+                >
+                  Hide all
+                </button>
+              </div>
+            </div>
+          </PopoverContent>
+        </Popover>
         {hasActivePoFilters && (
           <Button
             variant="ghost"
@@ -2375,6 +2481,7 @@ function PurchaseOrdersTab() {
                     </div>
                   </TableHead>
                   {/* Title column — Assembled Product filter in header */}
+                  {colVisible("title") && (
                   <TableHead
                     style={{ width: 230, minWidth: 230 }}
                     className="sticky top-0 bg-card z-10 cursor-pointer select-none whitespace-nowrap"
@@ -2403,7 +2510,9 @@ function PurchaseOrdersTab() {
                       </ColumnFilterPopover>
                     </div>
                   </TableHead>
+                  )}
                   {/* Category column — multi-select filter in header */}
+                  {colVisible("category") && (
                   <TableHead
                     style={{ width: 130, minWidth: 130 }}
                     className="sticky top-0 bg-card z-10 cursor-pointer select-none whitespace-nowrap"
@@ -2454,7 +2563,9 @@ function PurchaseOrdersTab() {
                       </ColumnFilterPopover>
                     </div>
                   </TableHead>
+                  )}
                   {/* Supplier column — multi-select filter in header */}
+                  {colVisible("supplier") && (
                   <TableHead
                     style={{ width: 140, minWidth: 140 }}
                     className="sticky top-0 bg-card z-10 cursor-pointer select-none whitespace-nowrap"
@@ -2505,6 +2616,7 @@ function PurchaseOrdersTab() {
                       </ColumnFilterPopover>
                     </div>
                   </TableHead>
+                  )}
                   {/* Remaining sortable-only columns */}
                   {[
                     { key: "cost", label: "Cost", right: true, width: 70 },
@@ -2517,7 +2629,7 @@ function PurchaseOrdersTab() {
                     { key: "wlmt", label: "Wlmt", right: true, width: 65 },
                     { key: "in_kits", label: "In Kits", right: true, width: 70 },
                     { key: "total", label: "Total", right: true, width: 70 },
-                  ].map((col) => (
+                  ].filter((col) => colVisible(col.key)).map((col) => (
                     <TableHead
                       key={col.key}
                       style={{ width: col.width, minWidth: col.width }}
@@ -2540,7 +2652,7 @@ function PurchaseOrdersTab() {
                     { key: "curr_individual", label: "Curr. Total Individual", width: 90 },
                     { key: "curr_kits", label: "Curr. Total Kits", width: 90 },
                     { key: "rec_purchase", label: "Rec. Purchase", width: 90 },
-                  ].map((col) => (
+                  ].filter((col) => colVisible(col.key)).map((col) => (
                     <TableHead
                       key={col.key}
                       style={{ width: col.width, minWidth: col.width }}
@@ -2567,23 +2679,19 @@ function PurchaseOrdersTab() {
                         {row.is_kit && <Badge variant="outline" className="ml-1 text-[10px]">Kit</Badge>}
                         {row.is_assembled_product && <Badge variant="outline" className="ml-1 text-[10px]">Asm</Badge>}
                       </TableCell>
-                      <TableCell style={{ width: 230, minWidth: 230, maxWidth: 230 }} className="text-sm truncate" title={row.product_title}>
-                        {row.product_title || row.description || "—"}
-                      </TableCell>
-                      <TableCell style={{ width: 130, minWidth: 130, maxWidth: 130 }} className="text-xs truncate">{row.product_category || "—"}</TableCell>
-                      <TableCell style={{ width: 140, minWidth: 140, maxWidth: 140 }} className="text-xs truncate" title={row.supplier}>{row.supplier || "—"}</TableCell>
-                      <TableCell style={{ width: 70, minWidth: 70 }} className="text-right tabular-nums">{row.unit_cost ? `$${Number(row.unit_cost).toFixed(2)}` : "—"}</TableCell>
-                      <TableCell style={{ width: 75, minWidth: 75 }} className="text-right tabular-nums">{row.quantity_on_hand ?? "—"}</TableCell>
-                      <TableCell style={{ width: 80, minWidth: 80 }} className={`text-right tabular-nums ${isLow ? "text-red-600 dark:text-red-400 font-semibold" : ""}`}>
-                        {avail}
-                      </TableCell>
-                      <TableCell style={{ width: 80, minWidth: 80 }} className="text-right tabular-nums">{row.quantity_incoming ?? "—"}</TableCell>
-                      <TableCell style={{ width: 80, minWidth: 80 }} className="text-right tabular-nums">{row.lead_time != null ? `${row.lead_time}d` : "—"}</TableCell>
-                      <TableCell style={{ width: 65, minWidth: 65 }} className="text-right tabular-nums">{row.moq ?? "—"}</TableCell>
-                      <TableCell style={{ width: 65, minWidth: 65 }} className="text-right tabular-nums">{row.ext_amzn_inv ?? "—"}</TableCell>
-                      <TableCell style={{ width: 65, minWidth: 65 }} className="text-right tabular-nums">{row.ext_wlmt_inv ?? "—"}</TableCell>
-                      <TableCell style={{ width: 70, minWidth: 70 }} className="text-right tabular-nums">{row.quantity_in_kits ?? "—"}</TableCell>
-                      <TableCell style={{ width: 70, minWidth: 70 }} className="text-right tabular-nums">{row.total_stock ?? "—"}</TableCell>
+                      {colVisible("title") && <TableCell style={{ width: 230, minWidth: 230, maxWidth: 230 }} className="text-sm truncate" title={row.product_title}>{row.product_title || row.description || "—"}</TableCell>}
+                      {colVisible("category") && <TableCell style={{ width: 130, minWidth: 130, maxWidth: 130 }} className="text-xs truncate">{row.product_category || "—"}</TableCell>}
+                      {colVisible("supplier") && <TableCell style={{ width: 140, minWidth: 140, maxWidth: 140 }} className="text-xs truncate" title={row.supplier}>{row.supplier || "—"}</TableCell>}
+                      {colVisible("cost") && <TableCell style={{ width: 70, minWidth: 70 }} className="text-right tabular-nums">{row.unit_cost ? `$${Number(row.unit_cost).toFixed(2)}` : "—"}</TableCell>}
+                      {colVisible("on_hand") && <TableCell style={{ width: 75, minWidth: 75 }} className="text-right tabular-nums">{row.quantity_on_hand ?? "—"}</TableCell>}
+                      {colVisible("available") && <TableCell style={{ width: 80, minWidth: 80 }} className={`text-right tabular-nums ${isLow ? "text-red-600 dark:text-red-400 font-semibold" : ""}`}>{avail}</TableCell>}
+                      {colVisible("incoming") && <TableCell style={{ width: 80, minWidth: 80 }} className="text-right tabular-nums">{row.quantity_incoming ?? "—"}</TableCell>}
+                      {colVisible("lead_time") && <TableCell style={{ width: 80, minWidth: 80 }} className="text-right tabular-nums">{row.lead_time != null ? `${row.lead_time}d` : "—"}</TableCell>}
+                      {colVisible("moq") && <TableCell style={{ width: 65, minWidth: 65 }} className="text-right tabular-nums">{row.moq ?? "—"}</TableCell>}
+                      {colVisible("amzn") && <TableCell style={{ width: 65, minWidth: 65 }} className="text-right tabular-nums">{row.ext_amzn_inv ?? "—"}</TableCell>}
+                      {colVisible("wlmt") && <TableCell style={{ width: 65, minWidth: 65 }} className="text-right tabular-nums">{row.ext_wlmt_inv ?? "—"}</TableCell>}
+                      {colVisible("in_kits") && <TableCell style={{ width: 70, minWidth: 70 }} className="text-right tabular-nums">{row.quantity_in_kits ?? "—"}</TableCell>}
+                      {colVisible("total") && <TableCell style={{ width: 70, minWidth: 70 }} className="text-right tabular-nums">{row.total_stock ?? "—"}</TableCell>}
                       {hasProjection && (() => {
                         const direct = Number(row.projected_units_sold ?? 0);
                         const kits = Number(row.projected_units_sold_from_kits ?? 0);
@@ -2595,16 +2703,14 @@ function PurchaseOrdersTab() {
                         const maxTotal = Math.max(total, Math.round(currIndividual + currKits));
                         return (
                           <>
-                            <TableCell style={{ width: 90, minWidth: 90 }} className="text-right tabular-nums">{Math.round(direct).toLocaleString()}</TableCell>
-                            <TableCell style={{ width: 90, minWidth: 90 }} className="text-right tabular-nums">{Math.round(kits).toLocaleString()}</TableCell>
-                            <TableCell style={{ width: 90, minWidth: 90 }} className="text-right tabular-nums font-semibold">{total.toLocaleString()}</TableCell>
-                            <TableCell style={{ width: 90, minWidth: 90 }} className="text-right tabular-nums">{dailyVelIndividual.toFixed(1)}</TableCell>
-                            <TableCell style={{ width: 90, minWidth: 90 }} className="text-right tabular-nums">{dailyVelKits.toFixed(1)}</TableCell>
-                            <TableCell style={{ width: 90, minWidth: 90 }} className="text-right tabular-nums">{Math.round(currIndividual).toLocaleString()}</TableCell>
-                            <TableCell style={{ width: 90, minWidth: 90 }} className="text-right tabular-nums">{Math.round(currKits).toLocaleString()}</TableCell>
-                            <TableCell style={{ width: 90, minWidth: 90 }} className={`text-right tabular-nums font-semibold ${(maxTotal - (row.total_stock ?? 0)) > 0 ? "text-red-600 dark:text-red-400" : ""}`}>
-                              {Math.round(maxTotal - (row.total_stock ?? 0)).toLocaleString()}
-                            </TableCell>
+                            {colVisible("proj_direct") && <TableCell style={{ width: 90, minWidth: 90 }} className="text-right tabular-nums">{Math.round(direct).toLocaleString()}</TableCell>}
+                            {colVisible("proj_kits") && <TableCell style={{ width: 90, minWidth: 90 }} className="text-right tabular-nums">{Math.round(kits).toLocaleString()}</TableCell>}
+                            {colVisible("proj_total") && <TableCell style={{ width: 90, minWidth: 90 }} className="text-right tabular-nums font-semibold">{total.toLocaleString()}</TableCell>}
+                            {colVisible("daily_vel_individual") && <TableCell style={{ width: 90, minWidth: 90 }} className="text-right tabular-nums">{dailyVelIndividual.toFixed(1)}</TableCell>}
+                            {colVisible("daily_vel_kits") && <TableCell style={{ width: 90, minWidth: 90 }} className="text-right tabular-nums">{dailyVelKits.toFixed(1)}</TableCell>}
+                            {colVisible("curr_individual") && <TableCell style={{ width: 90, minWidth: 90 }} className="text-right tabular-nums">{Math.round(currIndividual).toLocaleString()}</TableCell>}
+                            {colVisible("curr_kits") && <TableCell style={{ width: 90, minWidth: 90 }} className="text-right tabular-nums">{Math.round(currKits).toLocaleString()}</TableCell>}
+                            {colVisible("rec_purchase") && <TableCell style={{ width: 90, minWidth: 90 }} className={`text-right tabular-nums font-semibold ${(maxTotal - (row.total_stock ?? 0)) > 0 ? "text-red-600 dark:text-red-400" : ""}`}>{Math.round(maxTotal - (row.total_stock ?? 0)).toLocaleString()}</TableCell>}
                           </>
                         );
                       })()}
