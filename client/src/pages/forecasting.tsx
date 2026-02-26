@@ -835,7 +835,7 @@ interface UrlBuildParams {
 function buildSearchString(p: UrlBuildParams): string {
   const params = new URLSearchParams();
   params.set("range", p.range);
-  if (p.channels !== null) {
+  if (p.channels !== null && p.channels.length > 0) {
     params.set("channels", p.channels.join(","));
   }
   if (p.range === TimeRangePreset.CUSTOM && p.startDate && p.endDate) {
@@ -1031,7 +1031,7 @@ function SalesTab() {
 
   const setChannels = useCallback((channels: string[] | null) => {
     setSavedChannels(channels);
-    buildUrl({ channels: channels ?? undefined });
+    buildUrl({ channels });
   }, [setSavedChannels, buildUrl]);
 
   const setCustomStart = useCallback((date: string) => {
@@ -1142,9 +1142,9 @@ function SalesTab() {
 
   const clearAllFilters = useCallback(() => {
     setSavedFilters(DEFAULT_FILTERS);
-    setChannels(null);
-    buildUrl({ filters: DEFAULT_FILTERS, channels: undefined });
-  }, [setSavedFilters, setChannels, buildUrl]);
+    setSavedChannels(null);
+    buildUrl({ filters: DEFAULT_FILTERS, channels: null });
+  }, [setSavedFilters, setSavedChannels, buildUrl]);
 
   return (
     <div className="space-y-3">
