@@ -20,6 +20,13 @@ interface PeakSeasonWindow {
   notes: string;
 }
 
+interface CurrentVelocityEntry {
+  qty: string | null;
+  rev: string | null;
+  kitQty: string | null;
+  kitRev: string | null;
+}
+
 function formatDateStr(d: Date): string {
   return format(d, 'yyyy-MM-dd');
 }
@@ -134,15 +141,102 @@ async function loadProductLookupMaps(): Promise<ProductLookupMaps> {
   return { productMap, kitComponentMap };
 }
 
-function buildForecastRow(sourceRow: any, targetDate: Date, sourceDate: string, lookups: ProductLookupMaps): any {
+async function loadCurrentVelocity(): Promise<Map<string, CurrentVelocityEntry>> {
+  const rows = await reportingSql`
+    SELECT
+      sku,
+      sales_channel,
+      AVG(daily_sales_quantity)     AS curr_daily_sales_quantity,
+      AVG(daily_sales_revenue)      AS curr_daily_sales_revenue,
+      AVG(kit_daily_sales_quantity) AS curr_kit_daily_sales_quantity,
+      AVG(kit_daily_sales_revenue)  AS curr_kit_daily_sales_revenue
+    FROM sales_metrics_lookup
+    WHERE order_date >= CURRENT_DATE - INTERVAL '14 days'
+      AND order_date < CURRENT_DATE
+    GROUP BY sku, sales_channel
+  `;
+
+  const map = new Map<string, CurrentVelocityEntry>();
+  for (const r of rows) {
+    const key = `${r.sku}::${r.sales_channel}`;
+    map.set(key, {
+      qty: r.curr_daily_sales_quantity != null ? String(r.curr_daily_sales_quantity) : null,
+      rev: r.curr_daily_sales_revenue != null ? String(r.curr_daily_sales_revenue) : null,
+      kitQty: r.curr_kit_daily_sales_quantity != null ? String(r.curr_kit_daily_sales_quantity) : null,
+      kitRev: r.curr_kit_daily_sales_revenue != null ? String(r.curr_kit_daily_sales_revenue) : null,
+    });
+  }
+
+  logger.info(`Current velocity loaded: ${map.size} sku+channel combinations from last 14 days`);
+  return map;
+}
+
+async function bulkUpdateCurrentVelocity(velocityMap: Map<string, CurrentVelocityEntry>): Promise<void> {
+  if (velocityMap.size === 0) {
+    logger.warn('Current velocity map is empty — skipping bulk update');
+    return;
+  }
+
+  const entries = Array.from(velocityMap.entries());
+  const UPDATE_BATCH_SIZE = 500;
+  let totalUpdated = 0;
+
+  for (let i = 0; i < entries.length; i += UPDATE_BATCH_SIZE) {
+    const batch = entries.slice(i, i + UPDATE_BATCH_SIZE);
+
+    const values = batch.map(([key, v]) => {
+      const [sku, channel] = key.split('::');
+      return sql`(
+        ${sku}::varchar,
+        ${channel}::varchar,
+        ${v.qty}::numeric,
+        ${v.rev}::numeric,
+        ${v.kitQty}::numeric,
+        ${v.kitRev}::numeric
+      )`;
+    });
+
+    const valuesSql = values.reduce((acc, cur, idx) =>
+      idx === 0 ? sql`${cur}` : sql`${acc}, ${cur}`
+    );
+
+    const result = await db.execute(sql`
+      UPDATE sales_forecasting sf
+      SET
+        curr_daily_sales_quantity     = v.qty,
+        curr_daily_sales_revenue      = v.rev,
+        curr_kit_daily_sales_quantity = v.kit_qty,
+        curr_kit_daily_sales_revenue  = v.kit_rev
+      FROM (
+        VALUES ${valuesSql}
+      ) AS v(sku, channel, qty, rev, kit_qty, kit_rev)
+      WHERE sf.sku = v.sku
+        AND sf.sales_channel = v.channel
+    `);
+
+    totalUpdated += result.rowCount ?? 0;
+  }
+
+  logger.info(`Current velocity bulk update complete: ${totalUpdated} rows updated across ${velocityMap.size} sku+channel combinations`);
+}
+
+function buildForecastRow(
+  sourceRow: any,
+  targetDate: Date,
+  sourceDate: string,
+  lookups: ProductLookupMaps,
+  velocityMap: Map<string, CurrentVelocityEntry>
+): any {
   const sku = sourceRow.sku;
+  const salesChannel = sourceRow.sales_channel;
   const product = lookups.productMap.get(sku);
   const parentKits = lookups.kitComponentMap.get(sku) || [];
+  const velocity = velocityMap.get(`${sku}::${salesChannel}`);
 
   return {
     sku,
     orderDate: targetDate,
-    salesChannel: sourceRow.sales_channel,
+    salesChannel,
     dailySalesQuantity: sourceRow.daily_sales_quantity?.toString() ?? null,
     dailySalesRevenue: sourceRow.daily_sales_revenue?.toString() ?? null,
     kitDailySalesQuantity: sourceRow.kit_daily_sales_quantity?.toString() ?? null,
@@ -186,6 +280,10 @@ function buildForecastRow(sourceRow: any, targetDate: Date, sourceDate: string, 
     yoyKitUnitsSold: sourceRow.yoy_kit_units_sold?.toString() ?? null,
     yoyKitRevenueSold: sourceRow.yoy_kit_revenue_sold?.toString() ?? null,
     kitSales1To14Days: sourceRow.kit_sales_1_to_14_days?.toString() ?? null,
+    currDailySalesQuantity: velocity?.qty ?? null,
+    currDailySalesRevenue: velocity?.rev ?? null,
+    currKitDailySalesQuantity: velocity?.kitQty ?? null,
+    currKitDailySalesRevenue: velocity?.kitRev ?? null,
     title: sourceRow.title ?? null,
     calculationDate: sourceRow.calculation_date ? new Date(sourceRow.calculation_date) : null,
     lastUpdated: sourceRow.last_updated ? new Date(sourceRow.last_updated) : null,
@@ -220,6 +318,10 @@ export async function generateForecasts(): Promise<{ totalRows: number; daysProc
 
     const deleted = await db.execute(sql`DELETE FROM sales_forecasting WHERE order_date < CURRENT_DATE`);
     logger.info(`Sales forecast cleanup: deleted ${deleted.rowCount ?? 0} past-dated rows`);
+
+    // Always refresh current velocity on every run, even if generation is skipped below
+    const velocityMap = await loadCurrentVelocity();
+    await bulkUpdateCurrentVelocity(velocityMap);
 
     const today = nowCentral();
     const targetYear = today.getFullYear();
@@ -293,7 +395,7 @@ export async function generateForecasts(): Promise<{ totalRows: number; daysProc
         }
 
         for (const row of sourceRows) {
-          batch.push(buildForecastRow(row, currentDate, sourceDateStr, productLookups));
+          batch.push(buildForecastRow(row, currentDate, sourceDateStr, productLookups, velocityMap));
 
           if (batch.length >= BATCH_SIZE) {
             await db.insert(salesForecasting).values(batch);
