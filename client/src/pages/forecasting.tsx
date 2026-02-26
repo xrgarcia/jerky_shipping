@@ -15,14 +15,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
@@ -1715,50 +1707,49 @@ function MultiSelectFilter({
         </Button>
       </PopoverTrigger>
       <PopoverContent className={`${popoverWidth} p-0`} align="start">
-        <Command shouldFilter={false}>
-          <CommandInput
-            placeholder={`Search ${label.toLowerCase()}s...`}
-            value={search}
-            onValueChange={setSearch}
-          />
-          <CommandList>
+        <div className="flex flex-col">
+          <div className="px-2 pt-2">
+            <input
+              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              placeholder={`Search ${label.toLowerCase()}s...`}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          <div className="max-h-64 overflow-y-auto py-1">
             {filtered.length === 0 && (
-              <CommandEmpty>No {label.toLowerCase()}s found.</CommandEmpty>
+              <div className="py-6 text-center text-sm text-muted-foreground">No {label.toLowerCase()}s found.</div>
             )}
-            <CommandGroup>
-              <CommandItem
-                onSelect={toggleAll}
-                className="flex items-center gap-2 cursor-pointer border-b mb-1 pb-2"
-                data-testid={`${testId}-select-all`}
+            <div
+              onClick={toggleAll}
+              className="flex items-center gap-2 cursor-pointer px-2 py-1.5 mx-1 rounded-sm hover-elevate border-b mb-1 pb-2"
+              data-testid={`${testId}-select-all`}
+            >
+              <Checkbox
+                checked={allFilteredSelected ? true : someFilteredSelected ? "indeterminate" : false}
+                className="pointer-events-none"
+              />
+              <span className="text-sm font-medium">Select all</span>
+            </div>
+            {filtered.map((option) => (
+              <div
+                key={option.value}
+                onClick={() => toggle(option.value)}
+                className="flex items-center gap-2 cursor-pointer px-2 py-1.5 mx-1 rounded-sm hover-elevate"
               >
                 <Checkbox
-                  checked={allFilteredSelected ? true : someFilteredSelected ? "indeterminate" : false}
-                  onCheckedChange={toggleAll}
+                  checked={selected.includes(option.value)}
                   className="pointer-events-none"
                 />
-                <span className="text-sm font-medium">Select all</span>
-              </CommandItem>
-              {filtered.map((option) => (
-                <CommandItem
-                  key={option.value}
-                  onSelect={() => toggle(option.value)}
-                  className="flex items-center gap-2 cursor-pointer"
-                >
-                  <Checkbox
-                    checked={selected.includes(option.value)}
-                    onCheckedChange={() => toggle(option.value)}
-                    className="pointer-events-none"
-                  />
-                  <div className="flex flex-col min-w-0">
-                    <span className="truncate text-sm">{option.label}</span>
-                    {option.sublabel && option.sublabel !== option.label && (
-                      <span className="truncate text-xs text-muted-foreground">{option.sublabel}</span>
-                    )}
-                  </div>
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
+                <div className="flex flex-col min-w-0">
+                  <span className="truncate text-sm">{option.label}</span>
+                  {option.sublabel && option.sublabel !== option.label && (
+                    <span className="truncate text-xs text-muted-foreground">{option.sublabel}</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
           {selected.length > 0 && (
             <div className="border-t px-2 py-1.5">
               <Button
@@ -1771,7 +1762,7 @@ function MultiSelectFilter({
               </Button>
             </div>
           )}
-        </Command>
+        </div>
       </PopoverContent>
     </Popover>
   );
