@@ -2670,7 +2670,7 @@ function PurchaseOrdersTab() {
                                 <Info className="w-3 h-3 text-muted-foreground/60 hover:text-muted-foreground transition-colors shrink-0" />
                               </span>
                             </HoverTooltipTrigger>
-                            <HoverTooltipContent side="top" align="end" className="max-w-[240px] normal-case font-normal tracking-normal" style={{ fontSize: '0.75rem', lineHeight: '1.4', color: 'hsl(var(--popover-foreground))', textAlign: 'left' }}>
+                            <HoverTooltipContent side="top" align="end" className="normal-case font-normal tracking-normal" style={{ fontSize: '0.75rem', lineHeight: '1.4', color: 'hsl(var(--popover-foreground))', textAlign: 'left', maxWidth: '220px', whiteSpace: 'normal', wordBreak: 'break-word' }}>
                               {col.tooltip}
                             </HoverTooltipContent>
                           </HoverTooltip>
