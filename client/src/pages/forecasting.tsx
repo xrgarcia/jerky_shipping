@@ -183,6 +183,7 @@ function TimeRangeSelector({ value, onChange, peakSeasons, onPeakSeasonSelect, a
     TimeRangePreset.LAST_60_DAYS,
     TimeRangePreset.LAST_90_DAYS,
     TimeRangePreset.LAST_12_MONTHS,
+    TimeRangePreset.LAST_YEAR,
     TimeRangePreset.YEAR_TO_DATE,
     TimeRangePreset.CURRENT_MONTH,
   ];
