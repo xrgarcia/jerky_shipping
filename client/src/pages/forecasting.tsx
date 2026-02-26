@@ -18,7 +18,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
-import { TrendingUp, TrendingDown, ChevronDown, ChevronUp, ChevronsUpDown, Check, Loader2, CalendarIcon, Pencil, Trash2, MessageSquarePlus, X, DollarSign, Package, Activity, ShieldCheck, Search, ListFilter, RefreshCw, Download, AlertCircle, CheckCircle2, Clock, SlidersHorizontal } from "lucide-react";
+import { TrendingUp, TrendingDown, ChevronDown, ChevronUp, ChevronsUpDown, Check, Loader2, CalendarIcon, Pencil, Trash2, MessageSquarePlus, X, DollarSign, Package, Activity, ShieldCheck, Search, ListFilter, RefreshCw, Download, AlertCircle, CheckCircle2, Clock, SlidersHorizontal, Copy } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -1849,6 +1849,7 @@ function PurchaseOrdersTab() {
   const [velocityEndPopoverOpen, setVelocityEndPopoverOpen] = useState(false);
   const [sortCol, setSortCol] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const [copiedSku, setCopiedSku] = useState<string | null>(null);
 
   const toggleSort = useCallback((col: string) => {
     if (sortCol === col) {
@@ -2673,11 +2674,28 @@ function PurchaseOrdersTab() {
                   const avail = row.available_quantity ?? 0;
                   const isLow = avail <= 0 && !row.is_kit;
                   return (
-                    <TableRow key={row.id} data-testid={`row-po-${row.sku}`}>
-                      <TableCell style={{ width: 145, minWidth: 145 }} className="font-mono text-xs whitespace-nowrap overflow-hidden text-ellipsis">
-                        {row.sku}
-                        {row.is_kit && <Badge variant="outline" className="ml-1 text-[10px]">Kit</Badge>}
-                        {row.is_assembled_product && <Badge variant="outline" className="ml-1 text-[10px]">Asm</Badge>}
+                    <TableRow key={row.id} data-testid={`row-po-${row.sku}`} className="group/row">
+                      <TableCell style={{ width: 145, minWidth: 145 }} className="font-mono text-xs whitespace-nowrap">
+                        <div className="flex items-center gap-1">
+                          <span className="truncate">{row.sku}</span>
+                          {row.is_kit && <Badge variant="outline" className="text-[10px] shrink-0">Kit</Badge>}
+                          {row.is_assembled_product && <Badge variant="outline" className="text-[10px] shrink-0">Asm</Badge>}
+                          <button
+                            type="button"
+                            data-testid={`button-copy-sku-${row.sku}`}
+                            className="invisible group-hover/row:visible shrink-0 p-0.5 rounded text-muted-foreground hover:text-foreground transition-colors"
+                            onClick={() => {
+                              navigator.clipboard.writeText(row.sku);
+                              setCopiedSku(row.sku);
+                              setTimeout(() => setCopiedSku(null), 1500);
+                            }}
+                            title="Copy SKU"
+                          >
+                            {copiedSku === row.sku
+                              ? <Check className="w-3 h-3 text-green-600 dark:text-green-400" />
+                              : <Copy className="w-3 h-3" />}
+                          </button>
+                        </div>
                       </TableCell>
                       {colVisible("title") && <TableCell style={{ width: 230, minWidth: 230, maxWidth: 230 }} className="text-sm truncate" title={row.product_title}>{row.product_title || row.description || "—"}</TableCell>}
                       {colVisible("category") && <TableCell style={{ width: 130, minWidth: 130, maxWidth: 130 }} className="text-xs truncate">{row.product_category || "—"}</TableCell>}
