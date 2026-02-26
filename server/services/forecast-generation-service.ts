@@ -142,32 +142,71 @@ async function loadProductLookupMaps(): Promise<ProductLookupMaps> {
 }
 
 async function loadCurrentVelocity(): Promise<Map<string, CurrentVelocityEntry>> {
+  // Find the most recent consecutive 14-day window where every day is event_type = 'baseline'.
+  // event_type is global per date (all SKUs share the same type on a given day), so we
+  // determine the window date range once, then average per sku+channel over that range.
   const rows = await reportingSql`
+    WITH distinct_baseline_dates AS (
+      SELECT DISTINCT order_date::date AS d
+      FROM sales_metrics_lookup
+      WHERE event_type = 'baseline'
+        AND order_date < CURRENT_DATE
+        AND order_date >= CURRENT_DATE - INTERVAL '180 days'
+    ),
+    baseline_dates AS (
+      SELECT d,
+        d - (ROW_NUMBER() OVER (ORDER BY d))::int AS grp
+      FROM distinct_baseline_dates
+    ),
+    consecutive_groups AS (
+      SELECT grp, COUNT(*) AS cnt, MAX(d) AS end_date
+      FROM baseline_dates
+      GROUP BY grp
+      HAVING COUNT(*) >= 14
+      ORDER BY end_date DESC
+      LIMIT 1
+    )
     SELECT
-      sku,
-      sales_channel,
-      AVG(daily_sales_quantity)     AS curr_daily_sales_quantity,
-      AVG(daily_sales_revenue)      AS curr_daily_sales_revenue,
-      AVG(kit_daily_sales_quantity) AS curr_kit_daily_sales_quantity,
-      AVG(kit_daily_sales_revenue)  AS curr_kit_daily_sales_revenue
-    FROM sales_metrics_lookup
-    WHERE order_date >= CURRENT_DATE - INTERVAL '14 days'
-      AND order_date < CURRENT_DATE
-    GROUP BY sku, sales_channel
+      sml.sku,
+      sml.sales_channel,
+      cg.end_date - 13                  AS window_start,
+      cg.end_date                       AS window_end,
+      AVG(sml.daily_sales_quantity)     AS curr_daily_sales_quantity,
+      AVG(sml.daily_sales_revenue)      AS curr_daily_sales_revenue,
+      AVG(sml.kit_daily_sales_quantity) AS curr_kit_daily_sales_quantity,
+      AVG(sml.kit_daily_sales_revenue)  AS curr_kit_daily_sales_revenue
+    FROM sales_metrics_lookup sml, consecutive_groups cg
+    WHERE sml.order_date::date >= cg.end_date - 13
+      AND sml.order_date::date <= cg.end_date
+      AND sml.event_type = 'baseline'
+    GROUP BY sml.sku, sml.sales_channel, cg.end_date
   `;
+
+  if (rows.length === 0) {
+    logger.warn('Current velocity: no consecutive 14-day baseline window found in the last 180 days — skipping velocity update');
+    return new Map();
+  }
+
+  const first = rows[0] as any;
+  const windowStart = first.window_start instanceof Date
+    ? format(first.window_start, 'yyyy-MM-dd')
+    : String(first.window_start).slice(0, 10);
+  const windowEnd = first.window_end instanceof Date
+    ? format(first.window_end, 'yyyy-MM-dd')
+    : String(first.window_end).slice(0, 10);
 
   const map = new Map<string, CurrentVelocityEntry>();
   for (const r of rows) {
-    const key = `${r.sku}::${r.sales_channel}`;
+    const key = `${(r as any).sku}::${(r as any).sales_channel}`;
     map.set(key, {
-      qty: r.curr_daily_sales_quantity != null ? String(r.curr_daily_sales_quantity) : null,
-      rev: r.curr_daily_sales_revenue != null ? String(r.curr_daily_sales_revenue) : null,
-      kitQty: r.curr_kit_daily_sales_quantity != null ? String(r.curr_kit_daily_sales_quantity) : null,
-      kitRev: r.curr_kit_daily_sales_revenue != null ? String(r.curr_kit_daily_sales_revenue) : null,
+      qty: (r as any).curr_daily_sales_quantity != null ? String((r as any).curr_daily_sales_quantity) : null,
+      rev: (r as any).curr_daily_sales_revenue != null ? String((r as any).curr_daily_sales_revenue) : null,
+      kitQty: (r as any).curr_kit_daily_sales_quantity != null ? String((r as any).curr_kit_daily_sales_quantity) : null,
+      kitRev: (r as any).curr_kit_daily_sales_revenue != null ? String((r as any).curr_kit_daily_sales_revenue) : null,
     });
   }
 
-  logger.info(`Current velocity loaded: ${map.size} sku+channel combinations from last 14 days`);
+  logger.info(`Current velocity loaded: ${map.size} sku+channel combinations using baseline window ${windowStart} → ${windowEnd}`);
   return map;
 }
 
@@ -212,12 +251,33 @@ async function bulkUpdateCurrentVelocity(velocityMap: Map<string, CurrentVelocit
       ) AS v(sku, channel, qty, rev, kit_qty, kit_rev)
       WHERE sf.sku = v.sku
         AND sf.sales_channel = v.channel
+        AND sf.event_type = 'baseline'
     `);
 
     totalUpdated += result.rowCount ?? 0;
   }
 
-  logger.info(`Current velocity bulk update complete: ${totalUpdated} rows updated across ${velocityMap.size} sku+channel combinations`);
+  logger.info(`Current velocity bulk update complete: ${totalUpdated} baseline rows updated across ${velocityMap.size} sku+channel combinations`);
+
+  // NULL out any non-baseline rows that have stale velocity values
+  const nulled = await db.execute(sql`
+    UPDATE sales_forecasting
+    SET
+      curr_daily_sales_quantity     = NULL,
+      curr_daily_sales_revenue      = NULL,
+      curr_kit_daily_sales_quantity = NULL,
+      curr_kit_daily_sales_revenue  = NULL
+    WHERE event_type IS DISTINCT FROM 'baseline'
+      AND (
+        curr_daily_sales_quantity IS NOT NULL
+        OR curr_daily_sales_revenue IS NOT NULL
+        OR curr_kit_daily_sales_quantity IS NOT NULL
+        OR curr_kit_daily_sales_revenue IS NOT NULL
+      )
+  `);
+  if ((nulled.rowCount ?? 0) > 0) {
+    logger.info(`Current velocity: nulled out ${nulled.rowCount} non-baseline rows`);
+  }
 }
 
 function buildForecastRow(
@@ -231,7 +291,8 @@ function buildForecastRow(
   const salesChannel = sourceRow.sales_channel;
   const product = lookups.productMap.get(sku);
   const parentKits = lookups.kitComponentMap.get(sku) || [];
-  const velocity = velocityMap.get(`${sku}::${salesChannel}`);
+  const isBaseline = sourceRow.event_type === 'baseline';
+  const velocity = isBaseline ? velocityMap.get(`${sku}::${salesChannel}`) : undefined;
 
   return {
     sku,
