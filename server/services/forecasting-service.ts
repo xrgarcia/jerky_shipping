@@ -228,8 +228,8 @@ export class ForecastingService {
     const rows = await reportingSql`
       SELECT peak_season_type_id, year, start_date, end_date
       FROM peak_season_dates
-      WHERE start_date >= ${today}
-      ORDER BY start_date ASC
+      WHERE end_date < ${today}
+      ORDER BY end_date DESC
       LIMIT ${limit}
     `;
     return rows.map((r: any) => ({

@@ -232,7 +232,7 @@ function TimeRangeSelector({ value, onChange, peakSeasons, onPeakSeasonSelect, a
         {peakSeasons && peakSeasons.length > 0 && (
           <>
             <div className="my-1 border-t" />
-            <div className="px-2 py-1 text-xs font-medium text-muted-foreground">Peak Seasons</div>
+            <div className="px-2 py-1 text-xs font-medium text-muted-foreground">Recent Peak Seasons</div>
             {peakSeasons.map((season) => {
               const key = `peak_${season.peakSeasonTypeId}_${season.year}`;
               const startFormatted = format(parseISO(season.startDate), 'MMM d');
