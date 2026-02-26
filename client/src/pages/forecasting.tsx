@@ -496,7 +496,7 @@ function CategoryFilter({ categories, selected, onChange }: CategoryFilterProps)
     return categories.filter((c) => c.toLowerCase().includes(q));
   }, [categories, searchQuery]);
 
-  const allSelected = selected.length === 0;
+  const allSelected = selected.length === categories.length;
 
   const visibleSelected = filtered.filter((c) => selected.includes(c));
   const allFilteredSelected = filtered.length > 0 && visibleSelected.length === filtered.length;
@@ -512,21 +512,23 @@ function CategoryFilter({ categories, selected, onChange }: CategoryFilterProps)
 
   const toggleAll = () => {
     if (allFilteredSelected) {
-      const newSelected = selected.filter((c) => !filtered.includes(c));
-      onChange(newSelected);
+      onChange(selected.filter((c) => !filtered.includes(c)));
     } else {
-      const newSelected = Array.from(new Set([...selected, ...filtered]));
-      onChange(newSelected.length === categories.length ? [] : newSelected);
+      onChange(Array.from(new Set([...selected, ...filtered])));
     }
   };
 
   const clearAll = () => onChange([]);
 
+  const isFiltered = !allSelected;
+
   const label = allSelected
     ? "All Categories"
-    : selected.length === 1
-      ? selected[0]
-      : `${selected.length} Categories`;
+    : selected.length === 0
+      ? "No Categories"
+      : selected.length === 1
+        ? selected[0]
+        : `${selected.length} Categories`;
 
   return (
     <Popover onOpenChange={(open) => {
@@ -542,7 +544,7 @@ function CategoryFilter({ categories, selected, onChange }: CategoryFilterProps)
           className="w-[180px] sm:w-[200px] justify-between"
           data-testid="button-category-filter"
         >
-          {!allSelected && <ListFilter className="mr-1 h-3.5 w-3.5 shrink-0 text-primary" />}
+          {isFiltered && <ListFilter className="mr-1 h-3.5 w-3.5 shrink-0 text-primary" />}
           <span className="truncate">{label}</span>
           <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
@@ -559,7 +561,7 @@ function CategoryFilter({ categories, selected, onChange }: CategoryFilterProps)
             data-testid="input-category-search"
           />
         </div>
-        {!allSelected && (
+        {isFiltered && (
           <>
             <button
               className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover-elevate active-elevate-2"
@@ -1564,8 +1566,8 @@ function SalesTab() {
               {filterCategories.length > 0 && (
                 <CategoryFilter
                   categories={filterCategories}
-                  selected={activeFilters.categories ?? []}
-                  onChange={(cats) => updateFilter('categories', cats.length > 0 ? cats : undefined)}
+                  selected={activeFilters.categories ?? filterCategories}
+                  onChange={(cats) => updateFilter('categories', cats.length === filterCategories.length ? undefined : cats.length > 0 ? cats : undefined)}
                 />
               )}
               <Select
