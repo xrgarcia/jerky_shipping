@@ -1132,6 +1132,20 @@ function SalesTab() {
     return buildChartData(salesResponse.data, displayChannels);
   }, [salesResponse?.data, displayChannels]);
 
+  const hasActiveFilters =
+    selectedChannels !== null ||
+    (activeFilters.skus?.length ?? 0) > 0 ||
+    (activeFilters.categories?.length ?? 0) > 0 ||
+    !!activeFilters.eventType ||
+    (activeFilters.isPeakSeason !== undefined && activeFilters.isPeakSeason !== 'either') ||
+    (activeFilters.isAssembledProduct !== undefined && activeFilters.isAssembledProduct !== 'either');
+
+  const clearAllFilters = useCallback(() => {
+    setSavedFilters(DEFAULT_FILTERS);
+    setChannels(null);
+    buildUrl({ filters: DEFAULT_FILTERS, channels: undefined });
+  }, [setSavedFilters, setChannels, buildUrl]);
+
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-end gap-3">
@@ -1157,7 +1171,7 @@ function SalesTab() {
                 value={activeFilters.eventType ?? '__all__'}
                 onValueChange={(v) => updateFilter('eventType', v === '__all__' ? undefined : v)}
               >
-                <SelectTrigger className="w-[140px] sm:w-[180px]" data-testid="select-event-type">
+                <SelectTrigger className={`w-[140px] sm:w-[180px] transition-all${activeFilters.eventType ? " ring-1 ring-primary/50 border-primary/50" : ""}`} data-testid="select-event-type">
                   {activeFilters.eventType && <ListFilter className="mr-1 h-3.5 w-3.5 shrink-0 text-primary" />}
                   <SelectValue />
                 </SelectTrigger>
@@ -1174,7 +1188,7 @@ function SalesTab() {
                 value={activeFilters.isPeakSeason ?? 'either'}
                 onValueChange={(v) => updateFilter('isPeakSeason', v as BooleanFilter)}
               >
-                <SelectTrigger className="w-[120px] sm:w-[150px]" data-testid="select-peak-season">
+                <SelectTrigger className={`w-[120px] sm:w-[150px] transition-all${activeFilters.isPeakSeason && activeFilters.isPeakSeason !== 'either' ? " ring-1 ring-primary/50 border-primary/50" : ""}`} data-testid="select-peak-season">
                   {activeFilters.isPeakSeason && activeFilters.isPeakSeason !== 'either' && <ListFilter className="mr-1 h-3.5 w-3.5 shrink-0 text-primary" />}
                   <SelectValue />
                 </SelectTrigger>
@@ -1215,7 +1229,7 @@ function SalesTab() {
                 value={activeFilters.isAssembledProduct ?? 'either'}
                 onValueChange={(v) => updateFilter('isAssembledProduct', v as BooleanFilter)}
               >
-                <SelectTrigger className="w-[120px] sm:w-[150px]" data-testid="select-assembled">
+                <SelectTrigger className={`w-[120px] sm:w-[150px] transition-all${activeFilters.isAssembledProduct && activeFilters.isAssembledProduct !== 'either' ? " ring-1 ring-primary/50 border-primary/50" : ""}`} data-testid="select-assembled">
                   {activeFilters.isAssembledProduct && activeFilters.isAssembledProduct !== 'either' && <ListFilter className="mr-1 h-3.5 w-3.5 shrink-0 text-primary" />}
                   <SelectValue />
                 </SelectTrigger>
@@ -1244,6 +1258,21 @@ function SalesTab() {
               )}
             </div>
           </div>
+
+          {hasActiveFilters && (
+            <div className="ml-auto flex items-end pb-0.5">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={clearAllFilters}
+                className="text-muted-foreground gap-1.5"
+                data-testid="button-clear-all-filters"
+              >
+                <X className="h-3.5 w-3.5" />
+                Clear filters
+              </Button>
+            </div>
+          )}
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-8 gap-3">
@@ -1666,7 +1695,7 @@ function MultiSelectFilter({
         <Button
           variant="outline"
           size="default"
-          className="justify-between gap-2"
+          className={`justify-between gap-2 transition-all${selected.length > 0 ? " ring-1 ring-primary/50 border-primary/50" : ""}`}
           data-testid={testId}
         >
           {selected.length > 0 && <ListFilter className="h-3.5 w-3.5 shrink-0 text-primary" />}
