@@ -17,11 +17,11 @@ import type {
   SummaryMetricsResponse,
 } from '@shared/forecasting-types';
 import { TimeRangePreset, TIME_RANGE_DAYS } from '@shared/forecasting-types';
-import { subDays, addDays, format } from 'date-fns';
+import { subDays, addDays, format, differenceInDays } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
 import { getRedisClient } from '../utils/queue';
 
-const CACHE_TTL_SECONDS = 3600;
+const CACHE_TTL_SECONDS = 43200;
 const CST_TIMEZONE = 'America/Chicago';
 
 export async function invalidateForecastingCache(): Promise<number> {
@@ -672,10 +672,16 @@ export class ForecastingService {
         ? ((totalUnits - yoyTotalUnits) / yoyTotalUnits) * 100
         : null;
 
+      const dayCount = Math.max(1, differenceInDays(endDate, startDate) + 1);
+      const avgDailyRevenue = totalRevenue / dayCount;
+      const avgDailyUnits = totalUnits / dayCount;
+
       return {
         data: {
           totalRevenue,
           totalUnits,
+          avgDailyRevenue,
+          avgDailyUnits,
           yoyTotalRevenue,
           yoyTotalUnits,
           yoyRevenueChangePct,

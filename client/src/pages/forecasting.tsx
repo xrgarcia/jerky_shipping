@@ -1269,7 +1269,7 @@ function SalesTab() {
           )}
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-8 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-9 gap-3">
         <MetricCard
           title="Total Revenue"
           value={summaryResponse?.data.totalRevenue}
@@ -1281,6 +1281,20 @@ function SalesTab() {
           title="Total Units Sold"
           value={summaryResponse?.data.totalUnits}
           formatter={(v) => v.toLocaleString()}
+          icon={Package}
+          isLoading={summaryLoading}
+        />
+        <MetricCard
+          title="Avg Daily Revenue"
+          value={summaryResponse?.data.avgDailyRevenue}
+          formatter={formatCurrency}
+          icon={DollarSign}
+          isLoading={summaryLoading}
+        />
+        <MetricCard
+          title="Avg Daily Units"
+          value={summaryResponse?.data.avgDailyUnits}
+          formatter={(v) => v.toLocaleString(undefined, { maximumFractionDigits: 1 })}
           icon={Package}
           isLoading={summaryLoading}
         />

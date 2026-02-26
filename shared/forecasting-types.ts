@@ -135,6 +135,8 @@ export interface ChannelConfidence {
 export interface SummaryMetrics {
   totalRevenue: number;
   totalUnits: number;
+  avgDailyRevenue: number;
+  avgDailyUnits: number;
   yoyTotalRevenue: number;
   yoyTotalUnits: number;
   yoyRevenueChangePct: number | null;
