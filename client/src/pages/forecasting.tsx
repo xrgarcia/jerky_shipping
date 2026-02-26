@@ -18,7 +18,8 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
-import { TrendingUp, TrendingDown, ChevronDown, ChevronUp, ChevronsUpDown, Check, Loader2, CalendarIcon, Pencil, Trash2, MessageSquarePlus, X, DollarSign, Package, Activity, ShieldCheck, Search, ListFilter, RefreshCw, Download, AlertCircle, CheckCircle2, Clock, SlidersHorizontal, Copy } from "lucide-react";
+import { TrendingUp, TrendingDown, ChevronDown, ChevronUp, ChevronsUpDown, Check, Loader2, CalendarIcon, Pencil, Trash2, MessageSquarePlus, X, DollarSign, Package, Activity, ShieldCheck, Search, ListFilter, RefreshCw, Download, AlertCircle, CheckCircle2, Clock, SlidersHorizontal, Copy, Info } from "lucide-react";
+import { Tooltip as HoverTooltip, TooltipTrigger as HoverTooltipTrigger, TooltipContent as HoverTooltipContent } from "@/components/ui/tooltip";
 import {
   Table,
   TableBody,
@@ -2645,14 +2646,14 @@ function PurchaseOrdersTab() {
                     </TableHead>
                   ))}
                   {hasProjection && [
-                    { key: "proj_direct", label: "Proj. Direct", width: 90 },
-                    { key: "proj_kits", label: "Proj. Kits", width: 90 },
-                    { key: "proj_total", label: "Proj. Total", width: 90 },
-                    { key: "daily_vel_individual", label: "Daily Vel. Individual", width: 90 },
-                    { key: "daily_vel_kits", label: "Daily Vel. Kits", width: 90 },
-                    { key: "curr_individual", label: "Curr. Total Individual", width: 90 },
-                    { key: "curr_kits", label: "Curr. Total Kits", width: 90 },
-                    { key: "rec_purchase", label: "Rec. Purchase", width: 90 },
+                    { key: "proj_direct", label: "Proj. Direct", width: 90, tooltip: "Forecasted direct sales (sold individually, not as part of a kit) from today through the projection date, based on last year's actuals aligned to peak seasons." },
+                    { key: "proj_kits", label: "Proj. Kits", width: 90, tooltip: "Forecasted kit-driven units (this SKU ships inside a kit) from today through the projection date, based on last year's actuals." },
+                    { key: "proj_total", label: "Proj. Total", width: 90, tooltip: "Total forecast-based units needed (direct + kit-driven), based on last year's actuals." },
+                    { key: "daily_vel_individual", label: "Daily Vel. Individual", width: 90, tooltip: "Average daily units sold individually (not as part of a kit) over your configured velocity window." },
+                    { key: "daily_vel_kits", label: "Daily Vel. Kits", width: 90, tooltip: "Average daily kit-driven units over your configured velocity window." },
+                    { key: "curr_individual", label: "Curr. Total Individual", width: 90, tooltip: "Velocity-based projection of individual units from today to the projection date (daily individual velocity × days remaining)." },
+                    { key: "curr_kits", label: "Curr. Total Kits", width: 90, tooltip: "Velocity-based projection of kit-driven units from today to the projection date (daily kit velocity × days remaining)." },
+                    { key: "rec_purchase", label: "Rec. Purchase", width: 90, tooltip: "Recommended purchase qty: the higher of the forecast-based or velocity-based total, minus current total inventory. Negative means you have sufficient stock." },
                   ].filter((col) => colVisible(col.key)).map((col) => (
                     <TableHead
                       key={col.key}
@@ -2662,6 +2663,18 @@ function PurchaseOrdersTab() {
                       data-testid={`sort-${col.key}`}
                     >
                       <span className="inline-flex items-center gap-1 justify-end">
+                        {col.tooltip && (
+                          <HoverTooltip>
+                            <HoverTooltipTrigger asChild>
+                              <span onClick={(e) => e.stopPropagation()} className="cursor-default">
+                                <Info className="w-3 h-3 text-muted-foreground/60 hover:text-muted-foreground transition-colors shrink-0" />
+                              </span>
+                            </HoverTooltipTrigger>
+                            <HoverTooltipContent side="top" className="max-w-[240px] text-xs text-left">
+                              {col.tooltip}
+                            </HoverTooltipContent>
+                          </HoverTooltip>
+                        )}
                         {col.label}
                         {sortCol === col.key ? (sortDir === "asc" ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />) : <ChevronsUpDown className="w-3 h-3 opacity-30" />}
                       </span>
