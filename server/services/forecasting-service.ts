@@ -189,6 +189,13 @@ export class ForecastingService {
     }
     const today = nowCentral();
     const yesterday = subDays(today, 1);
+    if (params.preset === TimeRangePreset.LAST_YEAR) {
+      const lastYear = yesterday.getFullYear() - 1;
+      return {
+        startDate: new Date(lastYear, 0, 1),
+        endDate: new Date(lastYear, 11, 31, 23, 59, 59),
+      };
+    }
     if (params.preset === TimeRangePreset.YEAR_TO_DATE) {
       return {
         startDate: new Date(yesterday.getFullYear(), 0, 1),
