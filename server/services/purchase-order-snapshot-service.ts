@@ -1,7 +1,7 @@
 import { reportingSql } from '../reporting-db';
 import { db } from '../db';
 import { purchaseOrderSnapshots, skuvaultProducts } from '@shared/schema';
-import { sql, desc, eq, isNull } from 'drizzle-orm';
+import { sql, isNull } from 'drizzle-orm';
 import logger from '../utils/logger';
 
 interface SnapshotReadiness {
@@ -141,124 +141,6 @@ export async function createSnapshot(): Promise<{ rowCount: number; stockCheckDa
   return { rowCount: totalRows, stockCheckDate: snapshotDate, ifdMatches };
 }
 
-export async function projectSales(snapshotDate: string, projectionDate: string): Promise<{ updatedCount: number }> {
-  logger.info(`Projecting sales for snapshot ${snapshotDate} through ${projectionDate}`);
-
-  const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
-
-  const result = await db.execute(sql`
-    WITH sales_agg AS (
-      SELECT
-        COALESCE(parent_sku, sku) AS rollup_sku,
-        SUM(COALESCE(daily_sales_quantity::numeric, 0)) AS total_direct,
-        SUM(COALESCE(kit_daily_sales_quantity::numeric, 0)) AS total_from_kits
-      FROM sales_forecasting
-      WHERE order_date::date >= ${todayStr}::date
-        AND order_date::date <= ${projectionDate}::date
-      GROUP BY COALESCE(parent_sku, sku)
-    )
-    UPDATE purchase_order_snapshots pos
-    SET
-      projected_units_sold = COALESCE(sa.total_direct, 0),
-      projected_units_sold_from_kits = COALESCE(sa.total_from_kits, 0),
-      sales_projection_date = ${projectionDate}::timestamp
-    FROM sales_agg sa
-    WHERE pos.sku = sa.rollup_sku
-      AND pos.stock_check_date::date = ${snapshotDate}::date
-  `);
-
-  const zeroResult = await db.execute(sql`
-    UPDATE purchase_order_snapshots
-    SET
-      projected_units_sold = 0,
-      projected_units_sold_from_kits = 0,
-      sales_projection_date = ${projectionDate}::timestamp
-    WHERE stock_check_date::date = ${snapshotDate}::date
-      AND projected_units_sold IS NULL
-  `);
-
-  const totalUpdated = (result.rowCount || 0) + (zeroResult.rowCount || 0);
-  logger.info(`Sales projection complete: ${result.rowCount} SKUs matched sales data, ${zeroResult.rowCount} SKUs zeroed, total ${totalUpdated}`);
-  return { updatedCount: totalUpdated };
-}
-
-export async function projectCurrentVelocity(
-  snapshotDate: string,
-  projectionDate: string,
-  velocityWindowStart: string,
-  velocityWindowEnd: string
-): Promise<{ updatedCount: number }> {
-  logger.info(`Projecting current velocity for snapshot ${snapshotDate}: window ${velocityWindowStart}→${velocityWindowEnd}, project to ${projectionDate}`);
-
-  const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
-
-  const windowStart = new Date(velocityWindowStart + 'T00:00:00');
-  const windowEnd = new Date(velocityWindowEnd + 'T00:00:00');
-  const windowDays = Math.max(1, Math.round((windowEnd.getTime() - windowStart.getTime()) / (1000 * 60 * 60 * 24)) + 1);
-
-  const today = new Date(todayStr + 'T00:00:00');
-  const projEnd = new Date(projectionDate + 'T00:00:00');
-  const projectionDays = Math.max(1, Math.round((projEnd.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)));
-
-  const result = await db.execute(sql`
-    WITH velocity AS (
-      SELECT
-        COALESCE(parent_sku, sku) AS rollup_sku,
-        SUM(COALESCE(daily_sales_quantity::numeric, 0)) / ${windowDays} AS daily_direct,
-        SUM(COALESCE(kit_daily_sales_quantity::numeric, 0)) / ${windowDays} AS daily_kits
-      FROM sales_forecasting
-      WHERE order_date::date >= ${velocityWindowStart}::date
-        AND order_date::date <= ${velocityWindowEnd}::date
-      GROUP BY COALESCE(parent_sku, sku)
-    )
-    UPDATE purchase_order_snapshots pos
-    SET
-      daily_velocity_individual = ROUND(v.daily_direct, 2),
-      daily_velocity_kits = ROUND(v.daily_kits, 2),
-      current_velocity_individual = ROUND(v.daily_direct * ${projectionDays}, 0),
-      current_velocity_kits = ROUND(v.daily_kits * ${projectionDays}, 0),
-      velocity_window_start = ${velocityWindowStart}::timestamp,
-      velocity_window_end = ${velocityWindowEnd}::timestamp
-    FROM velocity v
-    WHERE pos.sku = v.rollup_sku
-      AND pos.stock_check_date::date = ${snapshotDate}::date
-  `);
-
-  const zeroResult = await db.execute(sql`
-    UPDATE purchase_order_snapshots
-    SET
-      daily_velocity_individual = 0,
-      daily_velocity_kits = 0,
-      current_velocity_individual = 0,
-      current_velocity_kits = 0,
-      velocity_window_start = ${velocityWindowStart}::timestamp,
-      velocity_window_end = ${velocityWindowEnd}::timestamp
-    WHERE stock_check_date::date = ${snapshotDate}::date
-      AND current_velocity_individual IS NULL
-  `);
-
-  const totalUpdated = (result.rowCount || 0) + (zeroResult.rowCount || 0);
-  logger.info(`Velocity projection complete: ${result.rowCount} SKUs matched, ${zeroResult.rowCount} zeroed (window=${windowDays}d, projection=${projectionDays}d)`);
-  return { updatedCount: totalUpdated };
-}
-
-export async function clearProjection(snapshotDate: string): Promise<void> {
-  await db.execute(sql`
-    UPDATE purchase_order_snapshots
-    SET projected_units_sold = NULL,
-        projected_units_sold_from_kits = NULL,
-        sales_projection_date = NULL,
-        daily_velocity_individual = NULL,
-        daily_velocity_kits = NULL,
-        current_velocity_individual = NULL,
-        current_velocity_kits = NULL,
-        velocity_window_start = NULL,
-        velocity_window_end = NULL
-    WHERE stock_check_date::date = ${snapshotDate}::date
-  `);
-  logger.info(`Cleared sales projection for snapshot ${snapshotDate}`);
-}
-
 export async function getSnapshotDates(): Promise<string[]> {
   const rows = await db.execute(sql`
     SELECT DISTINCT stock_check_date::date::text AS d
@@ -268,20 +150,55 @@ export async function getSnapshotDates(): Promise<string[]> {
   return rows.rows.map((r: any) => r.d);
 }
 
-export async function getSnapshot(date?: string): Promise<any[]> {
-  if (date) {
+export async function getSnapshot(date?: string, method?: string, windowStart?: string, windowEnd?: string): Promise<any[]> {
+  const dateClause = date
+    ? sql`pos.stock_check_date::date = ${date}::date`
+    : sql`pos.stock_check_date = (SELECT MAX(stock_check_date) FROM purchase_order_snapshots)`;
+
+  if (method && windowStart && windowEnd) {
+    let directExpr: string;
+    let kitsExpr: string;
+
+    if (method === 'velocity') {
+      directExpr = 'SUM(COALESCE(sf.curr_daily_sales_quantity::numeric, 0))';
+      kitsExpr = 'SUM(COALESCE(sf.curr_kit_daily_sales_quantity::numeric, 0))';
+    } else if (method === 'smart') {
+      directExpr = 'SUM(COALESCE(sf.curr_daily_sales_quantity, sf.daily_sales_quantity)::numeric)';
+      kitsExpr = 'SUM(COALESCE(sf.curr_kit_daily_sales_quantity, sf.kit_daily_sales_quantity)::numeric)';
+    } else {
+      directExpr = 'SUM(COALESCE(sf.daily_sales_quantity::numeric, 0))';
+      kitsExpr = 'SUM(COALESCE(sf.kit_daily_sales_quantity::numeric, 0))';
+    }
+
+    logger.info(`getSnapshot: method=${method}, window=${windowStart}→${windowEnd}, date=${date ?? 'latest'}`);
+
     const rows = await db.execute(sql`
-      SELECT * FROM purchase_order_snapshots
-      WHERE stock_check_date::date = ${date}::date
-      ORDER BY sku
+      SELECT pos.*,
+        ROUND(COALESCE(proj.proj_direct, 0)) AS proj_direct,
+        ROUND(COALESCE(proj.proj_kits, 0)) AS proj_kits,
+        ROUND(COALESCE(proj.proj_direct, 0) + COALESCE(proj.proj_kits, 0)) AS proj_total,
+        ROUND(COALESCE(proj.proj_direct, 0) + COALESCE(proj.proj_kits, 0)) - COALESCE(pos.total_stock, 0) AS rec_purchase
+      FROM purchase_order_snapshots pos
+      LEFT JOIN (
+        SELECT COALESCE(sf.parent_sku, sf.sku) AS rollup_sku,
+          ${sql.raw(directExpr)} AS proj_direct,
+          ${sql.raw(kitsExpr)} AS proj_kits
+        FROM sales_forecasting sf
+        WHERE sf.order_date::date >= ${windowStart}::date
+          AND sf.order_date::date <= ${windowEnd}::date
+        GROUP BY COALESCE(sf.parent_sku, sf.sku)
+      ) proj ON pos.sku = proj.rollup_sku
+      WHERE ${dateClause}
+      ORDER BY pos.sku
     `);
     return rows.rows;
   }
 
   const rows = await db.execute(sql`
-    SELECT * FROM purchase_order_snapshots
-    WHERE stock_check_date = (SELECT MAX(stock_check_date) FROM purchase_order_snapshots)
-    ORDER BY sku
+    SELECT pos.*
+    FROM purchase_order_snapshots pos
+    WHERE ${dateClause}
+    ORDER BY pos.sku
   `);
   return rows.rows;
 }

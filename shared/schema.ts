@@ -2143,17 +2143,6 @@ export const purchaseOrderSnapshots = pgTable("purchase_order_snapshots", {
   caseCount: text("case_count"),
   moq: numeric("moq"),
   moqInfo: text("moq_info"),
-  // -- sales projection fields --
-  projectedUnitsSold: numeric("projected_units_sold"),
-  projectedUnitsSoldFromKits: numeric("projected_units_sold_from_kits"),
-  salesProjectionDate: timestamp("sales_projection_date"),
-  // -- current velocity projection fields --
-  dailyVelocityIndividual: numeric("daily_velocity_individual"),
-  dailyVelocityKits: numeric("daily_velocity_kits"),
-  currentVelocityIndividual: numeric("current_velocity_individual"),
-  currentVelocityKits: numeric("current_velocity_kits"),
-  velocityWindowStart: timestamp("velocity_window_start"),
-  velocityWindowEnd: timestamp("velocity_window_end"),
   // -- metadata --
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => ({
@@ -2183,6 +2172,7 @@ export const purchaseOrderConfig = pgTable("purchase_order_config", {
   lowStockThreshold: integer("low_stock_threshold").notNull().default(0),
   defaultLeadTime: integer("default_lead_time"),
   safetyStockDays: integer("safety_stock_days").notNull().default(0),
+  activeProjectionMethod: varchar("active_projection_method", { length: 20 }).notNull().default("yoy"),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 

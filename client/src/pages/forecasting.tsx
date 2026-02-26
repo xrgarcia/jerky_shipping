@@ -1830,10 +1830,6 @@ const PO_COLUMNS = [
   { key: "proj_direct", label: "Proj. Direct", group: "projection" },
   { key: "proj_kits", label: "Proj. Kits", group: "projection" },
   { key: "proj_total", label: "Proj. Total", group: "projection" },
-  { key: "daily_vel_individual", label: "Daily Vel. Individual", group: "projection" },
-  { key: "daily_vel_kits", label: "Daily Vel. Kits", group: "projection" },
-  { key: "curr_individual", label: "Curr. Total Individual", group: "projection" },
-  { key: "curr_kits", label: "Curr. Total Kits", group: "projection" },
   { key: "rec_purchase", label: "Rec. Purchase", group: "projection" },
 ] as const;
 type PoColumnKey = (typeof PO_COLUMNS)[number]["key"];
@@ -1886,16 +1882,15 @@ function PurchaseOrdersTab() {
   const { value: supplierFilter, setValue: setSupplierFilter } = useUserPreference<string[]>(
     "purchase-orders", "supplier-filter", [], { debounceMs: 300 }
   );
-  const [projectionDate, setProjectionDate] = useState<Date | undefined>();
-  const [projectionPopoverOpen, setProjectionPopoverOpen] = useState(false);
+  const [activeProjectionMethod, setActiveProjectionMethod] = useState<string>("yoy");
   const [velocityStart, setVelocityStart] = useState<Date>(() => {
     const d = new Date();
-    d.setDate(d.getDate() - 14);
+    d.setHours(0, 0, 0, 0);
     return d;
   });
   const [velocityEnd, setVelocityEnd] = useState<Date>(() => {
     const d = new Date();
-    d.setDate(d.getDate() - 1);
+    d.setDate(d.getDate() + 30);
     return d;
   });
   const [velocityStartPopoverOpen, setVelocityStartPopoverOpen] = useState(false);
@@ -1948,13 +1943,18 @@ function PurchaseOrdersTab() {
     queryKey: ["/api/purchase-orders/dates"],
   });
 
+  const windowStartStr = velocityStart.toLocaleDateString('en-CA');
+  const windowEndStr = velocityEnd.toLocaleDateString('en-CA');
+
   const snapshotQuery = useQuery<any[]>({
-    queryKey: ["/api/purchase-orders/snapshot", selectedDate],
+    queryKey: ["/api/purchase-orders/snapshot", selectedDate, activeProjectionMethod, windowStartStr, windowEndStr],
     queryFn: async () => {
-      const url = selectedDate
-        ? `/api/purchase-orders/snapshot?date=${selectedDate}`
-        : "/api/purchase-orders/snapshot";
-      const res = await fetch(url, { credentials: "include" });
+      const params = new URLSearchParams();
+      if (selectedDate) params.set('date', selectedDate);
+      params.set('method', activeProjectionMethod);
+      params.set('windowStart', windowStartStr);
+      params.set('windowEnd', windowEndStr);
+      const res = await fetch(`/api/purchase-orders/snapshot?${params}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch snapshot");
       return res.json();
     },
@@ -1984,39 +1984,6 @@ function PurchaseOrdersTab() {
     },
   });
 
-  const projectSalesMutation = useMutation({
-    mutationFn: async ({ snapshotDate, projectionDate: projDate, velocityWindowStart, velocityWindowEnd }: { snapshotDate: string; projectionDate: string; velocityWindowStart: string; velocityWindowEnd: string }) => {
-      const res = await apiRequest("POST", "/api/purchase-orders/project-sales", { snapshotDate, projectionDate: projDate, velocityWindowStart, velocityWindowEnd });
-      return res.json();
-    },
-    onSuccess: (data) => {
-      toast({
-        title: "Sales Projected",
-        description: `${data.updatedCount} products updated with projected demand`,
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/purchase-orders/snapshot"] });
-    },
-    onError: (err: any) => {
-      toast({ title: "Projection Failed", description: err.message, variant: "destructive" });
-    },
-  });
-
-  const clearProjectionMutation = useMutation({
-    mutationFn: async (snapshotDate: string) => {
-      const res = await apiRequest("POST", "/api/purchase-orders/clear-projection", { snapshotDate });
-      return res.json();
-    },
-    onSuccess: () => {
-      toast({ title: "Projection Cleared" });
-      setProjectionDate(undefined);
-      saveConfigMutation.mutate({ projectionDate: null });
-      queryClient.invalidateQueries({ queryKey: ["/api/purchase-orders/snapshot"] });
-    },
-    onError: (err: any) => {
-      toast({ title: "Clear Failed", description: err.message, variant: "destructive" });
-    },
-  });
-
   const configQuery = useQuery<PurchaseOrderConfig>({
     queryKey: ["/api/purchase-orders/config"],
   });
@@ -2036,16 +2003,21 @@ function PurchaseOrdersTab() {
     if (!configInitialized.current && configQuery.data) {
       const cfg = configQuery.data;
       if (cfg.activeSnapshotDate) setSelectedDate(cfg.activeSnapshotDate);
-      if (cfg.projectionDate) setProjectionDate(new Date(cfg.projectionDate));
-      if (cfg.velocityWindowStart) setVelocityStart(new Date(cfg.velocityWindowStart));
-      if (cfg.velocityWindowEnd) setVelocityEnd(new Date(cfg.velocityWindowEnd));
+      if (cfg.activeProjectionMethod) setActiveProjectionMethod(cfg.activeProjectionMethod);
+      if (cfg.velocityWindowStart) {
+        const d = new Date(cfg.velocityWindowStart);
+        if (!isNaN(d.getTime())) setVelocityStart(d);
+      }
+      if (cfg.velocityWindowEnd) {
+        const d = new Date(cfg.velocityWindowEnd);
+        if (!isNaN(d.getTime())) setVelocityEnd(d);
+      }
       configInitialized.current = true;
     }
   }, [configQuery.data]);
 
   const snapshot = snapshotQuery.data ?? [];
-  const hasProjection = snapshot.length > 0 && snapshot[0]?.sales_projection_date != null;
-  const activeProjectionDate = hasProjection ? snapshot[0].sales_projection_date : null;
+  const hasProjection = snapshot.length > 0;
 
   const categories = useMemo(() => {
     const set = new Set<string>();
@@ -2103,22 +2075,10 @@ function PurchaseOrdersTab() {
           case "wlmt": aVal = a.ext_wlmt_inv ?? 0; bVal = b.ext_wlmt_inv ?? 0; break;
           case "in_kits": aVal = a.quantity_in_kits ?? 0; bVal = b.quantity_in_kits ?? 0; break;
           case "total": aVal = a.total_stock ?? 0; bVal = b.total_stock ?? 0; break;
-          case "proj_direct": aVal = Number(a.projected_units_sold ?? 0); bVal = Number(b.projected_units_sold ?? 0); break;
-          case "proj_kits": aVal = Number(a.projected_units_sold_from_kits ?? 0); bVal = Number(b.projected_units_sold_from_kits ?? 0); break;
-          case "proj_total": aVal = Number(a.projected_units_sold ?? 0) + Number(a.projected_units_sold_from_kits ?? 0); bVal = Number(b.projected_units_sold ?? 0) + Number(b.projected_units_sold_from_kits ?? 0); break;
-          case "daily_vel_individual": aVal = Number(a.daily_velocity_individual ?? 0); bVal = Number(b.daily_velocity_individual ?? 0); break;
-          case "daily_vel_kits": aVal = Number(a.daily_velocity_kits ?? 0); bVal = Number(b.daily_velocity_kits ?? 0); break;
-          case "curr_individual": aVal = Number(a.current_velocity_individual ?? 0); bVal = Number(b.current_velocity_individual ?? 0); break;
-          case "curr_kits": aVal = Number(a.current_velocity_kits ?? 0); bVal = Number(b.current_velocity_kits ?? 0); break;
-          case "rec_purchase": {
-            const aForecast = Number(a.projected_units_sold ?? 0) + Number(a.projected_units_sold_from_kits ?? 0);
-            const bForecast = Number(b.projected_units_sold ?? 0) + Number(b.projected_units_sold_from_kits ?? 0);
-            const aVelocity = Number(a.current_velocity_individual ?? 0) + Number(a.current_velocity_kits ?? 0);
-            const bVelocity = Number(b.current_velocity_individual ?? 0) + Number(b.current_velocity_kits ?? 0);
-            aVal = Math.max(Math.round(aForecast), Math.round(aVelocity)) - (a.total_stock ?? 0);
-            bVal = Math.max(Math.round(bForecast), Math.round(bVelocity)) - (b.total_stock ?? 0);
-            break;
-          }
+          case "proj_direct": aVal = Number(a.proj_direct ?? 0); bVal = Number(b.proj_direct ?? 0); break;
+          case "proj_kits": aVal = Number(a.proj_kits ?? 0); bVal = Number(b.proj_kits ?? 0); break;
+          case "proj_total": aVal = Number(a.proj_total ?? 0); bVal = Number(b.proj_total ?? 0); break;
+          case "rec_purchase": aVal = Number(a.rec_purchase ?? 0); bVal = Number(b.rec_purchase ?? 0); break;
           default: aVal = 0; bVal = 0;
         }
         if (typeof aVal === "string") {
@@ -2159,7 +2119,7 @@ function PurchaseOrdersTab() {
   const exportCsv = useCallback(() => {
     if (filtered.length === 0) return;
     const headers = ["SKU", "Title", "Category", "Supplier", "Unit Cost", "On Hand", "Available", "Incoming", "Lead Time (days)", "MOQ", "Amazon Inv", "Walmart Inv", "In Kits", "Total Stock"];
-    if (hasProjection) headers.push("Proj. Direct", "Proj. Kits", "Proj. Total", "Daily Vel. Individual", "Daily Vel. Kits", "Curr. Total Individual", "Curr. Total Kits", "Rec. Purchase");
+    if (hasProjection) headers.push("Proj. Direct", "Proj. Kits", "Proj. Total", "Rec. Purchase");
     const csvRows = [headers.join(",")];
     for (const r of filtered) {
       const row = [
@@ -2171,16 +2131,12 @@ function PurchaseOrdersTab() {
         r.total_stock ?? ''
       ];
       if (hasProjection) {
-        const direct = Math.round(Number(r.projected_units_sold ?? 0));
-        const kits = Math.round(Number(r.projected_units_sold_from_kits ?? 0));
-        const projTotal = direct + kits;
-        const dailyVelIndividual = Number(r.daily_velocity_individual ?? 0).toFixed(1);
-        const dailyVelKits = Number(r.daily_velocity_kits ?? 0).toFixed(1);
-        const currIndividual = Math.round(Number(r.current_velocity_individual ?? 0));
-        const currKits = Math.round(Number(r.current_velocity_kits ?? 0));
-        const maxTotal = Math.max(projTotal, currIndividual + currKits);
-        const recPurchase = maxTotal - (r.total_stock ?? 0);
-        row.push(String(direct), String(kits), String(projTotal), dailyVelIndividual, dailyVelKits, String(currIndividual), String(currKits), String(Math.round(recPurchase)));
+        row.push(
+          String(Math.round(Number(r.proj_direct ?? 0))),
+          String(Math.round(Number(r.proj_kits ?? 0))),
+          String(Math.round(Number(r.proj_total ?? 0))),
+          String(Math.round(Number(r.rec_purchase ?? 0))),
+        );
       }
       csvRows.push(row.join(","));
     }
@@ -2247,11 +2203,28 @@ function PurchaseOrdersTab() {
 
         {snapshot.length > 0 && (
           <>
-            <div className="flex items-center gap-2 border rounded-md px-3 py-1.5 bg-card" data-testid="velocity-window">
-              <span className="text-xs text-muted-foreground whitespace-nowrap">Velocity Window:</span>
+            <Select
+              value={activeProjectionMethod}
+              onValueChange={(val) => {
+                setActiveProjectionMethod(val);
+                saveConfigMutation.mutate({ activeProjectionMethod: val });
+              }}
+            >
+              <SelectTrigger className="w-[170px]" data-testid="select-projection-method">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="yoy">YoY (Last Year)</SelectItem>
+                <SelectItem value="velocity">14-Day Velocity</SelectItem>
+                <SelectItem value="smart">Smart Blend</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <div className="flex items-center gap-2 border rounded-md px-3 py-1.5 bg-card" data-testid="projection-window">
+              <span className="text-xs text-muted-foreground whitespace-nowrap">Projection Window:</span>
               <Popover open={velocityStartPopoverOpen} onOpenChange={setVelocityStartPopoverOpen}>
                 <PopoverTrigger asChild>
-                  <Button variant="ghost" size="sm" className="text-xs font-mono px-2" data-testid="button-velocity-start">
+                  <Button variant="ghost" size="sm" className="text-xs font-mono px-2" data-testid="button-window-start">
                     {velocityStart.toLocaleDateString('en-CA')}
                   </Button>
                 </PopoverTrigger>
@@ -2266,7 +2239,7 @@ function PurchaseOrdersTab() {
                         saveConfigMutation.mutate({ velocityWindowStart: date.toLocaleDateString('en-CA') });
                       }
                     }}
-                    disabled={(date) => date >= velocityEnd || date > new Date()}
+                    disabled={(date) => date >= velocityEnd}
                     initialFocus
                   />
                 </PopoverContent>
@@ -2274,7 +2247,7 @@ function PurchaseOrdersTab() {
               <span className="text-xs text-muted-foreground">to</span>
               <Popover open={velocityEndPopoverOpen} onOpenChange={setVelocityEndPopoverOpen}>
                 <PopoverTrigger asChild>
-                  <Button variant="ghost" size="sm" className="text-xs font-mono px-2" data-testid="button-velocity-end">
+                  <Button variant="ghost" size="sm" className="text-xs font-mono px-2" data-testid="button-window-end">
                     {velocityEnd.toLocaleDateString('en-CA')}
                   </Button>
                 </PopoverTrigger>
@@ -2289,75 +2262,12 @@ function PurchaseOrdersTab() {
                         saveConfigMutation.mutate({ velocityWindowEnd: date.toLocaleDateString('en-CA') });
                       }
                     }}
-                    disabled={(date) => date <= velocityStart || date > new Date()}
+                    disabled={(date) => date <= velocityStart}
                     initialFocus
                   />
                 </PopoverContent>
               </Popover>
             </div>
-
-            <Popover open={projectionPopoverOpen} onOpenChange={setProjectionPopoverOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant={hasProjection ? "default" : "outline"}
-                  disabled={projectSalesMutation.isPending}
-                  data-testid="button-project-sales"
-                >
-                  {projectSalesMutation.isPending ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : (
-                    <TrendingUp className="w-4 h-4 mr-2" />
-                  )}
-                  {hasProjection
-                    ? `Projected to ${new Date(activeProjectionDate).toLocaleDateString('en-CA')}`
-                    : "Project Sales"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="end">
-                <Calendar
-                  mode="single"
-                  selected={projectionDate}
-                  onSelect={(date) => {
-                    if (date) {
-                      setProjectionDate(date);
-                      const dateStr = date.toLocaleDateString('en-CA');
-                      const snapDate = selectedDate || (datesQuery.data?.[0] ?? '');
-                      setProjectionPopoverOpen(false);
-                      const velStart = velocityStart.toLocaleDateString('en-CA');
-                      const velEnd = velocityEnd.toLocaleDateString('en-CA');
-                      projectSalesMutation.mutate({
-                        snapshotDate: snapDate,
-                        projectionDate: dateStr,
-                        velocityWindowStart: velStart,
-                        velocityWindowEnd: velEnd,
-                      });
-                      saveConfigMutation.mutate({
-                        projectionDate: dateStr,
-                        velocityWindowStart: velStart,
-                        velocityWindowEnd: velEnd,
-                      });
-                    }
-                  }}
-                  disabled={(date) => date < new Date()}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
-            {hasProjection && (
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => {
-                  const snapDate = selectedDate || (datesQuery.data?.[0] ?? '');
-                  clearProjectionMutation.mutate(snapDate);
-                }}
-                disabled={clearProjectionMutation.isPending}
-                data-testid="button-clear-projection"
-                title="Clear projection"
-              >
-                <X className="w-4 h-4" />
-              </Button>
-            )}
           </>
         )}
       </div>
@@ -2698,14 +2608,10 @@ function PurchaseOrdersTab() {
                     </TableHead>
                   ))}
                   {hasProjection && [
-                    { key: "proj_direct", label: "Proj. Direct", width: 90, tooltip: "Forecasted direct sales (sold individually, not as part of a kit) from today through the projection date, based on last year's actuals aligned to peak seasons." },
-                    { key: "proj_kits", label: "Proj. Kits", width: 90, tooltip: "Forecasted kit-driven units (this SKU ships inside a kit) from today through the projection date, based on last year's actuals." },
-                    { key: "proj_total", label: "Proj. Total", width: 90, tooltip: "Total forecast-based units needed (direct + kit-driven), based on last year's actuals." },
-                    { key: "daily_vel_individual", label: "Daily Vel. Individual", width: 90, tooltip: "Average daily units sold individually (not as part of a kit) over your configured velocity window." },
-                    { key: "daily_vel_kits", label: "Daily Vel. Kits", width: 90, tooltip: "Average daily kit-driven units over your configured velocity window." },
-                    { key: "curr_individual", label: "Curr. Total Individual", width: 90, tooltip: "Velocity-based projection of individual units from today to the projection date (daily individual velocity × days remaining)." },
-                    { key: "curr_kits", label: "Curr. Total Kits", width: 90, tooltip: "Velocity-based projection of kit-driven units from today to the projection date (daily kit velocity × days remaining)." },
-                    { key: "rec_purchase", label: "Rec. Purchase", width: 90, tooltip: "Recommended purchase qty: the higher of the forecast-based or velocity-based total, minus current total inventory. Negative means you have sufficient stock." },
+                    { key: "proj_direct", label: "Proj. Direct", width: 90, tooltip: "Projected individual units sold (not part of a kit) over the selected window, using the chosen algorithm." },
+                    { key: "proj_kits", label: "Proj. Kits", width: 90, tooltip: "Projected kit-driven units (this SKU ships inside a kit) over the selected window, using the chosen algorithm." },
+                    { key: "proj_total", label: "Proj. Total", width: 90, tooltip: "Total projected units needed (direct + kit-driven) over the selected window." },
+                    { key: "rec_purchase", label: "Rec. Purchase", width: 90, tooltip: "Recommended purchase qty: projected total minus current total stock. Negative means you have sufficient stock." },
                   ].filter((col) => colVisible(col.key)).map((col) => (
                     <TableHead
                       key={col.key}
@@ -2776,24 +2682,16 @@ function PurchaseOrdersTab() {
                       {colVisible("in_kits") && <TableCell style={{ width: 70, minWidth: 70 }} className="text-right tabular-nums">{row.quantity_in_kits ?? "—"}</TableCell>}
                       {colVisible("total") && <TableCell style={{ width: 70, minWidth: 70 }} className="text-right tabular-nums">{row.total_stock ?? "—"}</TableCell>}
                       {hasProjection && (() => {
-                        const direct = Number(row.projected_units_sold ?? 0);
-                        const kits = Number(row.projected_units_sold_from_kits ?? 0);
-                        const total = Math.round(direct + kits);
-                        const dailyVelIndividual = Number(row.daily_velocity_individual ?? 0);
-                        const dailyVelKits = Number(row.daily_velocity_kits ?? 0);
-                        const currIndividual = Number(row.current_velocity_individual ?? 0);
-                        const currKits = Number(row.current_velocity_kits ?? 0);
-                        const maxTotal = Math.max(total, Math.round(currIndividual + currKits));
+                        const direct = Math.round(Number(row.proj_direct ?? 0));
+                        const kits = Math.round(Number(row.proj_kits ?? 0));
+                        const total = Math.round(Number(row.proj_total ?? 0));
+                        const rec = Math.round(Number(row.rec_purchase ?? 0));
                         return (
                           <>
-                            {colVisible("proj_direct") && <TableCell style={{ width: 90, minWidth: 90 }} className="text-right tabular-nums">{Math.round(direct).toLocaleString()}</TableCell>}
-                            {colVisible("proj_kits") && <TableCell style={{ width: 90, minWidth: 90 }} className="text-right tabular-nums">{Math.round(kits).toLocaleString()}</TableCell>}
+                            {colVisible("proj_direct") && <TableCell style={{ width: 90, minWidth: 90 }} className="text-right tabular-nums">{direct.toLocaleString()}</TableCell>}
+                            {colVisible("proj_kits") && <TableCell style={{ width: 90, minWidth: 90 }} className="text-right tabular-nums">{kits.toLocaleString()}</TableCell>}
                             {colVisible("proj_total") && <TableCell style={{ width: 90, minWidth: 90 }} className="text-right tabular-nums font-semibold">{total.toLocaleString()}</TableCell>}
-                            {colVisible("daily_vel_individual") && <TableCell style={{ width: 90, minWidth: 90 }} className="text-right tabular-nums">{dailyVelIndividual.toFixed(1)}</TableCell>}
-                            {colVisible("daily_vel_kits") && <TableCell style={{ width: 90, minWidth: 90 }} className="text-right tabular-nums">{dailyVelKits.toFixed(1)}</TableCell>}
-                            {colVisible("curr_individual") && <TableCell style={{ width: 90, minWidth: 90 }} className="text-right tabular-nums">{Math.round(currIndividual).toLocaleString()}</TableCell>}
-                            {colVisible("curr_kits") && <TableCell style={{ width: 90, minWidth: 90 }} className="text-right tabular-nums">{Math.round(currKits).toLocaleString()}</TableCell>}
-                            {colVisible("rec_purchase") && <TableCell style={{ width: 90, minWidth: 90 }} className={`text-right tabular-nums font-semibold ${(maxTotal - (row.total_stock ?? 0)) > 0 ? "text-red-600 dark:text-red-400" : ""}`}>{Math.round(maxTotal - (row.total_stock ?? 0)).toLocaleString()}</TableCell>}
+                            {colVisible("rec_purchase") && <TableCell style={{ width: 90, minWidth: 90 }} className={`text-right tabular-nums font-semibold ${rec > 0 ? "text-red-600 dark:text-red-400" : ""}`}>{rec.toLocaleString()}</TableCell>}
                           </>
                         );
                       })()}
