@@ -48,7 +48,7 @@ export function useProducts() {
 export interface SalesDataFilters {
   isAssembledProduct?: BooleanFilter;
   categories?: string[];
-  eventType?: string;
+  eventTypes?: string[];
   isPeakSeason?: BooleanFilter;
   skus?: string[];
 }
@@ -80,8 +80,8 @@ function buildFilterParams(
     params.set("categories", filters.categories.join(","));
   }
 
-  if (filters?.eventType) {
-    params.set("eventType", filters.eventType);
+  if (filters?.eventTypes && filters.eventTypes.length > 0) {
+    params.set("eventType", filters.eventTypes.join(","));
   }
 
   if (filters?.isPeakSeason && filters.isPeakSeason !== 'either') {

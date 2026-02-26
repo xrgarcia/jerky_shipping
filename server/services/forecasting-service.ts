@@ -56,7 +56,7 @@ function buildCacheKey(prefix: string, params?: ForecastingSalesParams): string 
     params.endDate ?? '_',
     params.isAssembledProduct ?? '_',
     params.categories?.join(',') ?? '_',
-    params.eventType ?? '_',
+    params.eventTypes?.join(',') ?? '_',
     params.isPeakSeason ?? '_',
   ];
   return parts.join(':');
@@ -148,8 +148,8 @@ function buildLocalWhereConditions(params: ForecastingSalesParams, startDate: Da
   if (params.categories && params.categories.length > 0) {
     conditions.push(inArray(salesForecasting.category, params.categories));
   }
-  if (params.eventType) {
-    conditions.push(eq(salesForecasting.eventType, params.eventType));
+  if (params.eventTypes && params.eventTypes.length > 0) {
+    conditions.push(inArray(salesForecasting.eventType, params.eventTypes));
   }
   if (params.isPeakSeason && params.isPeakSeason !== 'either') {
     conditions.push(eq(salesForecasting.isPeakSeason, params.isPeakSeason === 'true'));
@@ -165,8 +165,8 @@ export class ForecastingService {
     const categoryFilter = params.categories && params.categories.length > 0
       ? reportingSql`AND category IN ${reportingSql(params.categories)}`
       : reportingSql``;
-    const eventTypeFilter = params.eventType
-      ? reportingSql`AND event_type = ${params.eventType}`
+    const eventTypeFilter = params.eventTypes && params.eventTypes.length > 0
+      ? reportingSql`AND event_type IN ${reportingSql(params.eventTypes)}`
       : reportingSql``;
     const peakSeasonFilter = params.isPeakSeason && params.isPeakSeason !== 'either'
       ? reportingSql`AND is_peak_season = ${params.isPeakSeason === 'true'}`

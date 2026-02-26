@@ -816,7 +816,7 @@ function parseUrlParams(search: string) {
       ? (isAssembledProduct as BooleanFilter)
       : null,
     categories: categoriesRaw ? categoriesRaw.split(",").filter(Boolean) : null,
-    eventType: eventType || null,
+    eventTypes: eventType ? eventType.split(",").filter(Boolean) : null,
     isPeakSeason: isPeakSeason && BOOLEAN_FILTER_VALUES.includes(isPeakSeason as BooleanFilter)
       ? (isPeakSeason as BooleanFilter)
       : null,
@@ -848,8 +848,8 @@ function buildSearchString(p: UrlBuildParams): string {
   if (p.filters?.categories && p.filters.categories.length > 0) {
     params.set("categories", p.filters.categories.join(","));
   }
-  if (p.filters?.eventType) {
-    params.set("eventType", p.filters.eventType);
+  if (p.filters?.eventTypes && p.filters.eventTypes.length > 0) {
+    params.set("eventType", p.filters.eventTypes.join(","));
   }
   if (p.filters?.isPeakSeason && p.filters.isPeakSeason !== 'either') {
     params.set("peak", p.filters.isPeakSeason);
@@ -936,7 +936,7 @@ function DateRangePicker({ startDate, endDate, onStartChange, onEndChange }: Dat
 const DEFAULT_FILTERS: SalesDataFilters = {
   isAssembledProduct: 'either',
   categories: undefined,
-  eventType: undefined,
+  eventTypes: undefined,
   skus: undefined,
   isPeakSeason: 'either',
 };
@@ -997,7 +997,7 @@ function SalesTab() {
   const activeFilters: SalesDataFilters = useMemo(() => ({
     isAssembledProduct: urlParams.isAssembledProduct ?? savedFilters.isAssembledProduct ?? 'either',
     categories: urlParams.categories ?? savedFilters.categories,
-    eventType: urlParams.eventType ?? savedFilters.eventType,
+    eventTypes: urlParams.eventTypes ?? savedFilters.eventTypes,
     isPeakSeason: urlParams.isPeakSeason ?? savedFilters.isPeakSeason ?? 'either',
     skus: urlParams.skus ?? savedFilters.skus,
   }), [urlParams, savedFilters]);
@@ -1136,7 +1136,7 @@ function SalesTab() {
     selectedChannels !== null ||
     (activeFilters.skus?.length ?? 0) > 0 ||
     (activeFilters.categories?.length ?? 0) > 0 ||
-    !!activeFilters.eventType ||
+    (activeFilters.eventTypes !== undefined && activeFilters.eventTypes !== null && activeFilters.eventTypes.length > 0) ||
     (activeFilters.isPeakSeason !== undefined && activeFilters.isPeakSeason !== 'either') ||
     (activeFilters.isAssembledProduct !== undefined && activeFilters.isAssembledProduct !== 'either');
 
@@ -1167,23 +1167,14 @@ function SalesTab() {
                   onEndChange={setCustomEnd}
                 />
               )}
-              <Select
-                value={activeFilters.eventType ?? '__all__'}
-                onValueChange={(v) => updateFilter('eventType', v === '__all__' ? undefined : v)}
-              >
-                <SelectTrigger className={`w-[140px] sm:w-[180px] transition-all${activeFilters.eventType ? " ring-1 ring-primary/50 border-primary/50" : ""}`} data-testid="select-event-type">
-                  {activeFilters.eventType && <ListFilter className="mr-1 h-3.5 w-3.5 shrink-0 text-primary" />}
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__all__" data-testid="option-event-all">All Event Types</SelectItem>
-                  {filterEventTypes.map((et) => (
-                    <SelectItem key={et} value={et} data-testid={`option-event-${et}`}>
-                      {et}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <MultiSelectFilter
+                label="Event Types"
+                options={filterEventTypes}
+                selected={activeFilters.eventTypes ?? []}
+                onChange={(vals) => updateFilter('eventTypes', vals.length > 0 ? vals : undefined)}
+                popoverWidth="w-[220px]"
+                data-testid="select-event-type"
+              />
               <Select
                 value={activeFilters.isPeakSeason ?? 'either'}
                 onValueChange={(v) => updateFilter('isPeakSeason', v as BooleanFilter)}
