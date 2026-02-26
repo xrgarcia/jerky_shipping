@@ -498,6 +498,10 @@ function CategoryFilter({ categories, selected, onChange }: CategoryFilterProps)
 
   const allSelected = selected.length === 0;
 
+  const visibleSelected = filtered.filter((c) => selected.includes(c));
+  const allFilteredSelected = filtered.length > 0 && visibleSelected.length === filtered.length;
+  const someFilteredSelected = visibleSelected.length > 0 && !allFilteredSelected;
+
   const toggleCategory = (cat: string) => {
     if (selected.includes(cat)) {
       onChange(selected.filter((c) => c !== cat));
@@ -507,19 +511,16 @@ function CategoryFilter({ categories, selected, onChange }: CategoryFilterProps)
   };
 
   const toggleAll = () => {
-    if (filtered.length === categories.length) {
-      onChange([]);
+    if (allFilteredSelected) {
+      const newSelected = selected.filter((c) => !filtered.includes(c));
+      onChange(newSelected);
     } else {
-      const remaining = categories.filter((c) => !filtered.includes(c));
-      onChange(remaining);
+      const newSelected = Array.from(new Set([...selected, ...filtered]));
+      onChange(newSelected.length === categories.length ? [] : newSelected);
     }
   };
 
   const clearAll = () => onChange([]);
-
-  const visibleSelected = filtered.filter((c) => selected.includes(c));
-  const allFilteredSelected = filtered.length > 0 && visibleSelected.length === filtered.length;
-  const someFilteredSelected = visibleSelected.length > 0 && !allFilteredSelected;
 
   const label = allSelected
     ? "All Categories"
