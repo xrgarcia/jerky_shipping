@@ -1601,11 +1601,20 @@ function SalesTab() {
           <CardTitle className="text-base font-medium">
             Sales Revenue by Channel
           </CardTitle>
-          {salesResponse?.params && (
-            <span className="text-sm text-muted-foreground" data-testid="text-date-range">
-              {salesResponse.params.startDate} — {salesResponse.params.endDate}
-            </span>
-          )}
+          <div className="flex items-center gap-3 flex-wrap justify-end">
+            {chartData.length > 0 && (
+              <span className="text-sm font-semibold" data-testid="text-channel-total">
+                {formatCurrency(chartData.reduce((sum, row) => {
+                  return sum + displayChannels.reduce((s, ch) => s + (Number(row[ch]) || 0), 0);
+                }, 0))}
+              </span>
+            )}
+            {salesResponse?.params && (
+              <span className="text-sm text-muted-foreground" data-testid="text-date-range">
+                {salesResponse.params.startDate} — {salesResponse.params.endDate}
+              </span>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           <SalesChart
@@ -1633,11 +1642,25 @@ function SalesTab() {
                 <CardTitle className="text-base font-medium" data-testid="text-revenue-yoy-title">
                   Total Daily Sales Revenue (YoY)
                 </CardTitle>
-                {timeSeriesResponse?.params && (
-                  <span className="text-sm text-muted-foreground" data-testid="text-revenue-yoy-range">
-                    {timeSeriesResponse.params.startDate} — {timeSeriesResponse.params.endDate}
-                  </span>
-                )}
+                <div className="flex items-center gap-3 flex-wrap justify-end">
+                  {(timeSeriesResponse?.data?.length ?? 0) > 0 && (() => {
+                    const rows = timeSeriesResponse!.data;
+                    const cur = rows.reduce((s, r) => s + (Number(r.dailyRevenue) || 0), 0);
+                    const prior = rows.reduce((s, r) => s + (Number(r.yoyRevenue) || 0), 0);
+                    return (
+                      <span className="text-xs text-muted-foreground tabular-nums" data-testid="text-revenue-yoy-totals">
+                        <span className="font-semibold text-foreground">{formatCurrency(cur)}</span>
+                        {" vs "}
+                        <span>{formatCurrency(prior)}</span>
+                      </span>
+                    );
+                  })()}
+                  {timeSeriesResponse?.params && (
+                    <span className="text-sm text-muted-foreground" data-testid="text-revenue-yoy-range">
+                      {timeSeriesResponse.params.startDate} — {timeSeriesResponse.params.endDate}
+                    </span>
+                  )}
+                </div>
               </CardHeader>
               <CardContent>
                 <DualLineChart
@@ -1662,11 +1685,25 @@ function SalesTab() {
                 <CardTitle className="text-base font-medium" data-testid="text-units-yoy-title">
                   Total Units Sold (YoY)
                 </CardTitle>
-                {timeSeriesResponse?.params && (
-                  <span className="text-sm text-muted-foreground" data-testid="text-units-yoy-range">
-                    {timeSeriesResponse.params.startDate} — {timeSeriesResponse.params.endDate}
-                  </span>
-                )}
+                <div className="flex items-center gap-3 flex-wrap justify-end">
+                  {(timeSeriesResponse?.data?.length ?? 0) > 0 && (() => {
+                    const rows = timeSeriesResponse!.data;
+                    const cur = rows.reduce((s, r) => s + (Number(r.dailyQuantity) || 0), 0);
+                    const prior = rows.reduce((s, r) => s + (Number(r.yoyQuantity) || 0), 0);
+                    return (
+                      <span className="text-xs text-muted-foreground tabular-nums" data-testid="text-units-yoy-totals">
+                        <span className="font-semibold text-foreground">{cur.toLocaleString()}</span>
+                        {" vs "}
+                        <span>{prior.toLocaleString()}</span>
+                      </span>
+                    );
+                  })()}
+                  {timeSeriesResponse?.params && (
+                    <span className="text-sm text-muted-foreground" data-testid="text-units-yoy-range">
+                      {timeSeriesResponse.params.startDate} — {timeSeriesResponse.params.endDate}
+                    </span>
+                  )}
+                </div>
               </CardHeader>
               <CardContent>
                 <DualLineChart
@@ -1703,11 +1740,25 @@ function SalesTab() {
                 <CardTitle className="text-base font-medium" data-testid="text-kit-revenue-yoy-title">
                   Kit Daily Sales Revenue (YoY)
                 </CardTitle>
-                {kitTimeSeriesResponse?.params && (
-                  <span className="text-sm text-muted-foreground" data-testid="text-kit-revenue-yoy-range">
-                    {kitTimeSeriesResponse.params.startDate} — {kitTimeSeriesResponse.params.endDate}
-                  </span>
-                )}
+                <div className="flex items-center gap-3 flex-wrap justify-end">
+                  {(kitTimeSeriesResponse?.data?.length ?? 0) > 0 && (() => {
+                    const rows = kitTimeSeriesResponse!.data;
+                    const cur = rows.reduce((s, r) => s + (Number(r.kitDailyRevenue) || 0), 0);
+                    const prior = rows.reduce((s, r) => s + (Number(r.yoyKitDailyRevenue) || 0), 0);
+                    return (
+                      <span className="text-xs text-muted-foreground tabular-nums" data-testid="text-kit-revenue-yoy-totals">
+                        <span className="font-semibold text-foreground">{formatCurrency(cur)}</span>
+                        {" vs "}
+                        <span>{formatCurrency(prior)}</span>
+                      </span>
+                    );
+                  })()}
+                  {kitTimeSeriesResponse?.params && (
+                    <span className="text-sm text-muted-foreground" data-testid="text-kit-revenue-yoy-range">
+                      {kitTimeSeriesResponse.params.startDate} — {kitTimeSeriesResponse.params.endDate}
+                    </span>
+                  )}
+                </div>
               </CardHeader>
               <CardContent>
                 <DualLineChart
@@ -1732,11 +1783,25 @@ function SalesTab() {
                 <CardTitle className="text-base font-medium" data-testid="text-kit-units-yoy-title">
                   Kit Units Sold (YoY)
                 </CardTitle>
-                {kitTimeSeriesResponse?.params && (
-                  <span className="text-sm text-muted-foreground" data-testid="text-kit-units-yoy-range">
-                    {kitTimeSeriesResponse.params.startDate} — {kitTimeSeriesResponse.params.endDate}
-                  </span>
-                )}
+                <div className="flex items-center gap-3 flex-wrap justify-end">
+                  {(kitTimeSeriesResponse?.data?.length ?? 0) > 0 && (() => {
+                    const rows = kitTimeSeriesResponse!.data;
+                    const cur = rows.reduce((s, r) => s + (Number(r.kitDailyQuantity) || 0), 0);
+                    const prior = rows.reduce((s, r) => s + (Number(r.yoyKitDailyQuantity) || 0), 0);
+                    return (
+                      <span className="text-xs text-muted-foreground tabular-nums" data-testid="text-kit-units-yoy-totals">
+                        <span className="font-semibold text-foreground">{cur.toLocaleString()}</span>
+                        {" vs "}
+                        <span>{prior.toLocaleString()}</span>
+                      </span>
+                    );
+                  })()}
+                  {kitTimeSeriesResponse?.params && (
+                    <span className="text-sm text-muted-foreground" data-testid="text-kit-units-yoy-range">
+                      {kitTimeSeriesResponse.params.startDate} — {kitTimeSeriesResponse.params.endDate}
+                    </span>
+                  )}
+                </div>
               </CardHeader>
               <CardContent>
                 <DualLineChart
