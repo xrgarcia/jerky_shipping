@@ -218,6 +218,9 @@ export async function generateForecasts(): Promise<{ totalRows: number; daysProc
   try {
     logger.info('Sales forecast generation starting');
 
+    const deleted = await db.execute(sql`DELETE FROM sales_forecasting WHERE order_date < CURRENT_DATE`);
+    logger.info(`Sales forecast cleanup: deleted ${deleted.rowCount ?? 0} past-dated rows`);
+
     const today = nowCentral();
     const targetYear = today.getFullYear();
     const sourceYear = targetYear - 1;
