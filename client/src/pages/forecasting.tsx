@@ -18,7 +18,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
-import { TrendingUp, TrendingDown, ChevronDown, ChevronUp, ChevronsUpDown, Check, Loader2, CalendarIcon, Pencil, Trash2, MessageSquarePlus, X, DollarSign, Package, Activity, ShieldCheck, Search, ListFilter, RefreshCw, Download, AlertCircle, CheckCircle2, Clock, SlidersHorizontal, Copy, Info } from "lucide-react";
+import { TrendingUp, TrendingDown, ChevronDown, ChevronUp, ChevronsUpDown, Check, Loader2, CalendarIcon, Pencil, Trash2, MessageSquarePlus, X, DollarSign, Package, Activity, ShieldCheck, Search, ListFilter, RefreshCw, Download, AlertCircle, CheckCircle2, Clock, SlidersHorizontal, Copy, Info, BarChart2 } from "lucide-react";
 import { Tooltip as HoverTooltip, TooltipTrigger as HoverTooltipTrigger, TooltipContent as HoverTooltipContent } from "@/components/ui/tooltip";
 import {
   Table,
@@ -1269,7 +1269,7 @@ function SalesTab() {
           )}
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-9 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-8 gap-3">
         <MetricCard
           title="Total Revenue"
           value={summaryResponse?.data.totalRevenue}
@@ -1284,20 +1284,38 @@ function SalesTab() {
           icon={Package}
           isLoading={summaryLoading}
         />
-        <MetricCard
-          title="Avg Daily Revenue"
-          value={summaryResponse?.data.avgDailyRevenue}
-          formatter={formatCurrency}
-          icon={DollarSign}
-          isLoading={summaryLoading}
-        />
-        <MetricCard
-          title="Avg Daily Units"
-          value={summaryResponse?.data.avgDailyUnits}
-          formatter={(v) => v.toLocaleString(undefined, { maximumFractionDigits: 1 })}
-          icon={Package}
-          isLoading={summaryLoading}
-        />
+        <Card data-testid="metric-card-avgs-per-day">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <span className="text-sm text-muted-foreground">Avgs per Day</span>
+              <BarChart2 className="h-4 w-4 text-muted-foreground" />
+            </div>
+            {summaryLoading ? (
+              <div className="flex items-center gap-2 h-7 sm:h-8">
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              </div>
+            ) : (
+              <div className="space-y-1 mt-1">
+                <div className="flex items-baseline justify-between gap-1">
+                  <span className="text-xs text-muted-foreground">Units</span>
+                  <span className="text-sm font-semibold tabular-nums">
+                    {summaryResponse?.data.avgDailyUnits != null
+                      ? summaryResponse.data.avgDailyUnits.toLocaleString(undefined, { maximumFractionDigits: 1 })
+                      : '—'}
+                  </span>
+                </div>
+                <div className="flex items-baseline justify-between gap-1">
+                  <span className="text-xs text-muted-foreground">Revenue</span>
+                  <span className="text-sm font-semibold tabular-nums">
+                    {summaryResponse?.data.avgDailyRevenue != null
+                      ? formatCurrency(summaryResponse.data.avgDailyRevenue)
+                      : '—'}
+                  </span>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
         <MetricCard
           title="YoY Revenue"
           value={summaryResponse?.data.yoyRevenueChangePct}
