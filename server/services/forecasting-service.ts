@@ -22,6 +22,7 @@ import { toZonedTime } from 'date-fns-tz';
 import { getRedisClient } from '../utils/queue';
 
 const CACHE_TTL_SECONDS = 43200;
+const CACHE_VERSION = 'v2';
 const CST_TIMEZONE = 'America/Chicago';
 
 export async function invalidateForecastingCache(): Promise<number> {
@@ -46,9 +47,9 @@ function nowCentral(): Date {
 }
 
 function buildCacheKey(prefix: string, params?: ForecastingSalesParams): string {
-  if (!params) return `forecasting:${prefix}`;
+  if (!params) return `forecasting:${CACHE_VERSION}:${prefix}`;
   const parts = [
-    `forecasting:${prefix}`,
+    `forecasting:${CACHE_VERSION}:${prefix}`,
     params.preset,
     params.channels ? [...params.channels].sort().join(',') : '_',
     params.skus ? [...params.skus].sort().join(',') : '_',
