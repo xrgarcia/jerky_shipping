@@ -47,7 +47,7 @@ export function useProducts() {
 
 export interface SalesDataFilters {
   isAssembledProduct?: BooleanFilter;
-  category?: string;
+  categories?: string[];
   eventType?: string;
   isPeakSeason?: BooleanFilter;
   skus?: string[];
@@ -76,8 +76,8 @@ function buildFilterParams(
     params.set("isAssembledProduct", filters.isAssembledProduct);
   }
 
-  if (filters?.category) {
-    params.set("category", filters.category);
+  if (filters?.categories && filters.categories.length > 0) {
+    params.set("categories", filters.categories.join(","));
   }
 
   if (filters?.eventType) {

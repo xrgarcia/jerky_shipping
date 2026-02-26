@@ -55,7 +55,7 @@ function buildCacheKey(prefix: string, params?: ForecastingSalesParams): string 
     params.startDate ?? '_',
     params.endDate ?? '_',
     params.isAssembledProduct ?? '_',
-    params.category ?? '_',
+    params.categories?.join(',') ?? '_',
     params.eventType ?? '_',
     params.isPeakSeason ?? '_',
   ];
@@ -145,8 +145,8 @@ function buildLocalWhereConditions(params: ForecastingSalesParams, startDate: Da
   if (params.isAssembledProduct && params.isAssembledProduct !== 'either') {
     conditions.push(eq(salesForecasting.isAssembledProduct, params.isAssembledProduct === 'true'));
   }
-  if (params.category) {
-    conditions.push(eq(salesForecasting.category, params.category));
+  if (params.categories && params.categories.length > 0) {
+    conditions.push(inArray(salesForecasting.category, params.categories));
   }
   if (params.eventType) {
     conditions.push(eq(salesForecasting.eventType, params.eventType));
@@ -162,8 +162,8 @@ export class ForecastingService {
     const assembledFilter = params.isAssembledProduct && params.isAssembledProduct !== 'either'
       ? reportingSql`AND is_assembled_product = ${params.isAssembledProduct === 'true'}`
       : reportingSql``;
-    const categoryFilter = params.category
-      ? reportingSql`AND category = ${params.category}`
+    const categoryFilter = params.categories && params.categories.length > 0
+      ? reportingSql`AND category IN ${reportingSql(params.categories)}`
       : reportingSql``;
     const eventTypeFilter = params.eventType
       ? reportingSql`AND event_type = ${params.eventType}`

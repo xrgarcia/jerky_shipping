@@ -57,7 +57,7 @@ export interface ForecastingSalesParams {
   startDate?: string;
   endDate?: string;
   isAssembledProduct?: BooleanFilter;
-  category?: string;
+  categories?: string[];
   eventType?: string;
   isPeakSeason?: BooleanFilter;
 }

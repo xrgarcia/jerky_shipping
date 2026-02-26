@@ -15895,7 +15895,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
         endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
         isAssembledProduct: booleanFilterSchema,
-        category: z.string().optional(),
+        categories: z.string().optional(),
         eventType: z.string().optional(),
         isPeakSeason: booleanFilterSchema,
       });
@@ -15906,9 +15906,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
 
-      const { preset, channels: channelsParam, skus: skusParam, startDate, endDate, isAssembledProduct, category, eventType, isPeakSeason } = parsed.data;
+      const { preset, channels: channelsParam, skus: skusParam, startDate, endDate, isAssembledProduct, categories: categoriesParam, eventType, isPeakSeason } = parsed.data;
       const channels = channelsParam ? channelsParam.split(',').filter(Boolean) : undefined;
       const skus = skusParam ? skusParam.split(',').filter(Boolean) : undefined;
+      const categories = categoriesParam ? categoriesParam.split(',').filter(Boolean) : undefined;
 
       const result = await forecastingService.getSalesData({
         preset,
@@ -15917,7 +15918,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         startDate,
         endDate,
         isAssembledProduct,
-        category,
+        categories,
         eventType,
         isPeakSeason,
       });
@@ -15942,7 +15943,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
         endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
         isAssembledProduct: booleanFilterSchema,
-        category: z.string().optional(),
+        categories: z.string().optional(),
         eventType: z.string().optional(),
         isPeakSeason: booleanFilterSchema,
       });
@@ -15953,9 +15954,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
 
-      const { preset, channels: channelsParam, skus: skusParam, startDate, endDate, isAssembledProduct, category, eventType, isPeakSeason } = parsed.data;
+      const { preset, channels: channelsParam, skus: skusParam, startDate, endDate, isAssembledProduct, categories: categoriesParam, eventType, isPeakSeason } = parsed.data;
       const channels = channelsParam ? channelsParam.split(',').filter(Boolean) : undefined;
       const skus = skusParam ? skusParam.split(',').filter(Boolean) : undefined;
+      const categories = categoriesParam ? categoriesParam.split(',').filter(Boolean) : undefined;
 
       const result = await forecastingService.getRevenueTimeSeries({
         preset,
@@ -15964,7 +15966,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         startDate,
         endDate,
         isAssembledProduct,
-        category,
+        categories,
         eventType,
         isPeakSeason,
       });
@@ -15989,7 +15991,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
         endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
         isAssembledProduct: booleanFilterSchema,
-        category: z.string().optional(),
+        categories: z.string().optional(),
         eventType: z.string().optional(),
         isPeakSeason: booleanFilterSchema,
       });
@@ -16000,9 +16002,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
 
-      const { preset, channels: channelsParam, skus: skusParam, startDate, endDate, isAssembledProduct, category, eventType, isPeakSeason } = parsed.data;
+      const { preset, channels: channelsParam, skus: skusParam, startDate, endDate, isAssembledProduct, categories: categoriesParam, eventType, isPeakSeason } = parsed.data;
       const channels = channelsParam ? channelsParam.split(',').filter(Boolean) : undefined;
       const skus = skusParam ? skusParam.split(',').filter(Boolean) : undefined;
+      const categories = categoriesParam ? categoriesParam.split(',').filter(Boolean) : undefined;
 
       const result = await forecastingService.getKitTimeSeries({
         preset,
@@ -16011,7 +16014,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         startDate,
         endDate,
         isAssembledProduct,
-        category,
+        categories,
         eventType,
         isPeakSeason,
       });
@@ -16036,7 +16039,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
         endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
         isAssembledProduct: booleanFilterSchema,
-        category: z.string().optional(),
+        categories: z.string().optional(),
         eventType: z.string().optional(),
         isPeakSeason: booleanFilterSchema,
       });
@@ -16047,9 +16050,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
 
-      const { preset, channels: channelsParam, skus: skusParam, startDate, endDate, isAssembledProduct, category, eventType, isPeakSeason } = parsed.data;
+      const { preset, channels: channelsParam, skus: skusParam, startDate, endDate, isAssembledProduct, categories: categoriesParam, eventType, isPeakSeason } = parsed.data;
       const channels = channelsParam ? channelsParam.split(',').filter(Boolean) : undefined;
       const skus = skusParam ? skusParam.split(',').filter(Boolean) : undefined;
+      const categories = categoriesParam ? categoriesParam.split(',').filter(Boolean) : undefined;
 
       const result = await forecastingService.getSummaryMetrics({
         preset,
@@ -16058,7 +16062,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         startDate,
         endDate,
         isAssembledProduct,
-        category,
+        categories,
         eventType,
         isPeakSeason,
       });

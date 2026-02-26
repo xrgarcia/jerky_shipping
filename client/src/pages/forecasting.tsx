@@ -26,7 +26,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
-import { TrendingUp, TrendingDown, ChevronDown, ChevronUp, ChevronsUpDown, Check, Loader2, CalendarIcon, Pencil, Trash2, MessageSquarePlus, X, DollarSign, Package, Activity, ShieldCheck, Search, ListFilter, RefreshCw, Download, AlertCircle, CheckCircle2, Clock } from "lucide-react";
+import { TrendingUp, TrendingDown, ChevronDown, ChevronUp, ChevronsUpDown, Check, Loader2, CalendarIcon, Pencil, Trash2, MessageSquarePlus, X, DollarSign, Package, Activity, ShieldCheck, Search, ListFilter, RefreshCw, Download, AlertCircle, CheckCircle2, Clock, Minus } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -475,6 +475,152 @@ function ChannelFilter({ channels, selected, onChange }: ChannelFilterProps) {
             </button>
           );
         })}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+interface CategoryFilterProps {
+  categories: string[];
+  selected: string[];
+  onChange: (categories: string[]) => void;
+}
+
+function CategoryFilter({ categories, selected, onChange }: CategoryFilterProps) {
+  const [searchQuery, setSearchQuery] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const filtered = useMemo(() => {
+    if (!searchQuery.trim()) return categories;
+    const q = searchQuery.toLowerCase();
+    return categories.filter((c) => c.toLowerCase().includes(q));
+  }, [categories, searchQuery]);
+
+  const allSelected = selected.length === 0;
+
+  const toggleCategory = (cat: string) => {
+    if (selected.includes(cat)) {
+      onChange(selected.filter((c) => c !== cat));
+    } else {
+      onChange([...selected, cat]);
+    }
+  };
+
+  const toggleAll = () => {
+    if (filtered.length === categories.length) {
+      onChange([]);
+    } else {
+      const remaining = categories.filter((c) => !filtered.includes(c));
+      onChange(remaining);
+    }
+  };
+
+  const clearAll = () => onChange([]);
+
+  const visibleSelected = filtered.filter((c) => selected.includes(c));
+  const allFilteredSelected = filtered.length > 0 && visibleSelected.length === filtered.length;
+  const someFilteredSelected = visibleSelected.length > 0 && !allFilteredSelected;
+
+  const label = allSelected
+    ? "All Categories"
+    : selected.length === 1
+      ? selected[0]
+      : `${selected.length} Categories`;
+
+  return (
+    <Popover onOpenChange={(open) => {
+      if (open) {
+        setTimeout(() => inputRef.current?.focus(), 0);
+      } else {
+        setSearchQuery("");
+      }
+    }}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          className="w-[180px] sm:w-[200px] justify-between"
+          data-testid="button-category-filter"
+        >
+          {!allSelected && <ListFilter className="mr-1 h-3.5 w-3.5 shrink-0 text-primary" />}
+          <span className="truncate">{label}</span>
+          <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[240px] p-2" align="start">
+        <div className="relative mb-2" onKeyDown={(e) => e.stopPropagation()}>
+          <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            ref={inputRef}
+            placeholder="Search categories..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-8 text-sm"
+            data-testid="input-category-search"
+          />
+        </div>
+        {!allSelected && (
+          <>
+            <button
+              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover-elevate active-elevate-2"
+              onClick={clearAll}
+              data-testid="button-clear-categories"
+            >
+              <X className="h-3 w-3" />
+              <span>Clear selection ({selected.length})</span>
+            </button>
+            <div className="my-1 h-px bg-border" />
+          </>
+        )}
+        <button
+          className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover-elevate active-elevate-2"
+          onClick={toggleAll}
+          data-testid="button-toggle-all-categories"
+        >
+          <div
+            className={`flex h-4 w-4 items-center justify-center rounded-sm border ${
+              allFilteredSelected
+                ? "border-primary bg-primary text-primary-foreground"
+                : someFilteredSelected
+                  ? "border-primary bg-primary/20"
+                  : "border-muted-foreground"
+            }`}
+          >
+            {allFilteredSelected && <Check className="h-3 w-3" />}
+            {someFilteredSelected && <Minus className="h-3 w-3 text-primary" />}
+          </div>
+          <span className="font-medium">Select All</span>
+        </button>
+        <div className="my-1 h-px bg-border" />
+        <div className="max-h-[240px] overflow-y-auto">
+          {filtered.length === 0 ? (
+            <div className="px-2 py-3 text-sm text-muted-foreground text-center">
+              No categories found
+            </div>
+          ) : (
+            filtered.map((cat) => {
+              const isSelected = selected.includes(cat);
+              return (
+                <button
+                  key={cat}
+                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover-elevate active-elevate-2"
+                  onClick={() => toggleCategory(cat)}
+                  data-testid={`button-category-${cat}`}
+                >
+                  <div
+                    className={`flex h-4 w-4 items-center justify-center rounded-sm border shrink-0 ${
+                      isSelected
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-muted-foreground"
+                    }`}
+                  >
+                    {isSelected && <Check className="h-3 w-3" />}
+                  </div>
+                  <span className="truncate">{cat}</span>
+                </button>
+              );
+            })
+          )}
+        </div>
       </PopoverContent>
     </Popover>
   );
@@ -1020,7 +1166,7 @@ function parseUrlParams(search: string) {
   const startDate = params.get("start");
   const endDate = params.get("end");
   const isAssembledProduct = params.get("assembled");
-  const category = params.get("category");
+  const categoriesRaw = params.get("categories");
   const eventType = params.get("eventType");
   const isPeakSeason = params.get("peak");
   const skus = params.get("skus");
@@ -1034,7 +1180,7 @@ function parseUrlParams(search: string) {
     isAssembledProduct: isAssembledProduct && BOOLEAN_FILTER_VALUES.includes(isAssembledProduct as BooleanFilter)
       ? (isAssembledProduct as BooleanFilter)
       : null,
-    category: category || null,
+    categories: categoriesRaw ? categoriesRaw.split(",").filter(Boolean) : null,
     eventType: eventType || null,
     isPeakSeason: isPeakSeason && BOOLEAN_FILTER_VALUES.includes(isPeakSeason as BooleanFilter)
       ? (isPeakSeason as BooleanFilter)
@@ -1064,8 +1210,8 @@ function buildSearchString(p: UrlBuildParams): string {
   if (p.filters?.isAssembledProduct && p.filters.isAssembledProduct !== 'either') {
     params.set("assembled", p.filters.isAssembledProduct);
   }
-  if (p.filters?.category) {
-    params.set("category", p.filters.category);
+  if (p.filters?.categories && p.filters.categories.length > 0) {
+    params.set("categories", p.filters.categories.join(","));
   }
   if (p.filters?.eventType) {
     params.set("eventType", p.filters.eventType);
@@ -1154,7 +1300,7 @@ function DateRangePicker({ startDate, endDate, onStartChange, onEndChange }: Dat
 
 const DEFAULT_FILTERS: SalesDataFilters = {
   isAssembledProduct: 'either',
-  category: undefined,
+  categories: undefined,
   eventType: undefined,
   skus: undefined,
   isPeakSeason: 'either',
@@ -1215,7 +1361,7 @@ function SalesTab() {
 
   const activeFilters: SalesDataFilters = useMemo(() => ({
     isAssembledProduct: urlParams.isAssembledProduct ?? savedFilters.isAssembledProduct ?? 'either',
-    category: urlParams.category ?? savedFilters.category,
+    categories: urlParams.categories ?? savedFilters.categories,
     eventType: urlParams.eventType ?? savedFilters.eventType,
     isPeakSeason: urlParams.isPeakSeason ?? savedFilters.isPeakSeason ?? 'either',
     skus: urlParams.skus ?? savedFilters.skus,
@@ -1414,23 +1560,13 @@ function SalesTab() {
                   onChange={(skus) => updateFilter('skus', skus.length > 0 ? skus : undefined)}
                 />
               )}
-              <Select
-                value={activeFilters.category ?? '__all__'}
-                onValueChange={(v) => updateFilter('category', v === '__all__' ? undefined : v)}
-              >
-                <SelectTrigger className="w-[140px] sm:w-[180px]" data-testid="select-category">
-                  {activeFilters.category && <ListFilter className="mr-1 h-3.5 w-3.5 shrink-0 text-primary" />}
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__all__" data-testid="option-category-all">All Categories</SelectItem>
-                  {filterCategories.map((cat) => (
-                    <SelectItem key={cat} value={cat} data-testid={`option-category-${cat}`}>
-                      {cat}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {filterCategories.length > 0 && (
+                <CategoryFilter
+                  categories={filterCategories}
+                  selected={activeFilters.categories ?? []}
+                  onChange={(cats) => updateFilter('categories', cats.length > 0 ? cats : undefined)}
+                />
+              )}
               <Select
                 value={activeFilters.isAssembledProduct ?? 'either'}
                 onValueChange={(v) => updateFilter('isAssembledProduct', v as BooleanFilter)}
