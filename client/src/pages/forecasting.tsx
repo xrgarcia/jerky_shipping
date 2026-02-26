@@ -1259,7 +1259,8 @@ function SalesTab() {
                 <MultiSelectFilter
                   label="Channel"
                   options={allChannels}
-                  selected={selectedChannels ?? []}
+                  selected={selectedChannels ?? activeChannels}
+                  isActive={selectedChannels !== null}
                   onChange={(channels) => setChannels(channels.length === 0 ? null : channels)}
                   data-testid="select-channel-filter"
                 />
@@ -1651,6 +1652,7 @@ function MultiSelectFilter({
   options,
   selected,
   onChange,
+  isActive,
   popoverWidth = "w-[220px]",
   "data-testid": testId,
 }: {
@@ -1658,6 +1660,7 @@ function MultiSelectFilter({
   options: MultiSelectOption[];
   selected: string[];
   onChange: (selected: string[]) => void;
+  isActive?: boolean;
   popoverWidth?: string;
   "data-testid"?: string;
 }) {
@@ -1703,10 +1706,10 @@ function MultiSelectFilter({
         <Button
           variant="outline"
           size="default"
-          className={`justify-between gap-2 transition-all${selected.length > 0 ? " ring-1 ring-primary/50 border-primary/50" : ""}`}
+          className={`justify-between gap-2 transition-all${(isActive ?? selected.length > 0) ? " ring-1 ring-primary/50 border-primary/50" : ""}`}
           data-testid={testId}
         >
-          {selected.length > 0 && <ListFilter className="h-3.5 w-3.5 shrink-0 text-primary" />}
+          {(isActive ?? selected.length > 0) && <ListFilter className="h-3.5 w-3.5 shrink-0 text-primary" />}
           <span className="truncate">{displayLabel}</span>
           <ChevronDown className="w-3 h-3 opacity-50 shrink-0" />
         </Button>
