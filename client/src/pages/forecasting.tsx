@@ -1760,6 +1760,43 @@ function MultiSelectFilter({
   );
 }
 
+function ColumnFilterPopover({
+  isActive,
+  children,
+  "data-testid": testId,
+}: {
+  isActive: boolean;
+  children: React.ReactNode;
+  "data-testid"?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          data-testid={testId}
+          onClick={(e) => e.stopPropagation()}
+          className={`inline-flex items-center justify-center rounded p-0.5 transition-colors ${
+            isActive
+              ? "text-primary ring-1 ring-primary/50"
+              : "text-muted-foreground/50 hover:text-muted-foreground"
+          }`}
+        >
+          <ListFilter className="w-3 h-3" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        className="p-2 w-auto min-w-[160px]"
+        align="start"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {children}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 function PurchaseOrdersTab() {
   const { toast } = useToast();
   const [selectedDate, setSelectedDate] = useState<string | undefined>();
@@ -2271,40 +2308,6 @@ function PurchaseOrdersTab() {
             data-testid="input-po-search"
           />
         </div>
-        <MultiSelectFilter
-          label="Category"
-          options={categories}
-          selected={categoryFilter}
-          onChange={setCategoryFilter}
-          data-testid="select-po-category"
-        />
-        <MultiSelectFilter
-          label="Supplier"
-          options={suppliers}
-          selected={supplierFilter}
-          onChange={setSupplierFilter}
-          data-testid="select-po-supplier"
-        />
-        <Select value={kitFilter} onValueChange={setKitFilter}>
-          <SelectTrigger className="w-[120px]" data-testid="select-po-kit">
-            <SelectValue placeholder="Kit" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="either">Kit: Either</SelectItem>
-            <SelectItem value="yes">Kit: Yes</SelectItem>
-            <SelectItem value="no">Kit: No</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={assembledFilter} onValueChange={setAssembledFilter}>
-          <SelectTrigger className="w-[150px]" data-testid="select-po-assembled">
-            <SelectValue placeholder="Assembled" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="either">AP: Either</SelectItem>
-            <SelectItem value="yes">AP: Yes</SelectItem>
-            <SelectItem value="no">AP: No</SelectItem>
-          </SelectContent>
-        </Select>
         {hasActivePoFilters && (
           <Button
             variant="ghost"
@@ -2342,11 +2345,168 @@ function PurchaseOrdersTab() {
             <Table containerClassName="flex-1 overflow-auto">
               <TableHeader>
                 <TableRow>
+                  {/* SKU column — Kit filter in header */}
+                  <TableHead
+                    style={{ width: 145, minWidth: 145 }}
+                    className="sticky top-0 bg-card z-10 cursor-pointer select-none whitespace-nowrap"
+                    onClick={() => toggleSort("sku")}
+                    data-testid="sort-sku"
+                  >
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="inline-flex items-center gap-1">
+                        SKU
+                        {sortCol === "sku" ? (sortDir === "asc" ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />) : <ChevronsUpDown className="w-3 h-3 opacity-30" />}
+                      </span>
+                      <ColumnFilterPopover isActive={kitFilter !== "no"} data-testid="filter-kit-popover">
+                        <div className="flex flex-col gap-0.5">
+                          <p className="text-xs font-medium text-muted-foreground px-1 pb-1">Kit</p>
+                          {(["no", "yes", "either"] as const).map((v) => (
+                            <button
+                              key={v}
+                              type="button"
+                              className={`text-left text-sm px-2 py-1 rounded hover-elevate ${kitFilter === v ? "text-primary font-medium" : ""}`}
+                              onClick={() => setKitFilter(v)}
+                            >
+                              {v === "no" ? "Not a Kit" : v === "yes" ? "Kits Only" : "Show All"}
+                            </button>
+                          ))}
+                        </div>
+                      </ColumnFilterPopover>
+                    </div>
+                  </TableHead>
+                  {/* Title column — Assembled Product filter in header */}
+                  <TableHead
+                    style={{ width: 230, minWidth: 230 }}
+                    className="sticky top-0 bg-card z-10 cursor-pointer select-none whitespace-nowrap"
+                    onClick={() => toggleSort("title")}
+                    data-testid="sort-title"
+                  >
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="inline-flex items-center gap-1">
+                        Title
+                        {sortCol === "title" ? (sortDir === "asc" ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />) : <ChevronsUpDown className="w-3 h-3 opacity-30" />}
+                      </span>
+                      <ColumnFilterPopover isActive={assembledFilter !== "either"} data-testid="filter-assembled-popover">
+                        <div className="flex flex-col gap-0.5">
+                          <p className="text-xs font-medium text-muted-foreground px-1 pb-1">Assembled Product</p>
+                          {(["either", "yes", "no"] as const).map((v) => (
+                            <button
+                              key={v}
+                              type="button"
+                              className={`text-left text-sm px-2 py-1 rounded hover-elevate ${assembledFilter === v ? "text-primary font-medium" : ""}`}
+                              onClick={() => setAssembledFilter(v)}
+                            >
+                              {v === "either" ? "Show All" : v === "yes" ? "Assembled Only" : "Not Assembled"}
+                            </button>
+                          ))}
+                        </div>
+                      </ColumnFilterPopover>
+                    </div>
+                  </TableHead>
+                  {/* Category column — multi-select filter in header */}
+                  <TableHead
+                    style={{ width: 130, minWidth: 130 }}
+                    className="sticky top-0 bg-card z-10 cursor-pointer select-none whitespace-nowrap"
+                    onClick={() => toggleSort("category")}
+                    data-testid="sort-category"
+                  >
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="inline-flex items-center gap-1">
+                        Category
+                        {sortCol === "category" ? (sortDir === "asc" ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />) : <ChevronsUpDown className="w-3 h-3 opacity-30" />}
+                      </span>
+                      <ColumnFilterPopover isActive={categoryFilter.length > 0} data-testid="filter-category-popover">
+                        <div className="flex flex-col gap-1" style={{ width: 180 }}>
+                          <p className="text-xs font-medium text-muted-foreground pb-1">Category</p>
+                          <div className="flex flex-col gap-0.5 max-h-[220px] overflow-y-auto">
+                            {categories.length === 0 ? (
+                              <p className="text-xs text-muted-foreground px-1">No categories</p>
+                            ) : categories.map((cat) => (
+                              <button
+                                key={cat}
+                                type="button"
+                                className={`flex items-center gap-2 text-left text-sm px-2 py-1 rounded hover-elevate ${categoryFilter.includes(cat) ? "text-primary font-medium" : ""}`}
+                                onClick={() => {
+                                  if (categoryFilter.includes(cat)) {
+                                    setCategoryFilter(categoryFilter.filter((c) => c !== cat));
+                                  } else {
+                                    setCategoryFilter([...categoryFilter, cat]);
+                                  }
+                                }}
+                              >
+                                <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 ${categoryFilter.includes(cat) ? "bg-primary border-primary" : "border-muted-foreground/40"}`}>
+                                  {categoryFilter.includes(cat) && <Check className="w-2.5 h-2.5 text-primary-foreground" />}
+                                </div>
+                                <span className="truncate">{cat}</span>
+                              </button>
+                            ))}
+                          </div>
+                          {categoryFilter.length > 0 && (
+                            <button
+                              type="button"
+                              className="text-xs text-muted-foreground hover:text-foreground text-left px-2 pt-1 border-t mt-1"
+                              onClick={() => setCategoryFilter([])}
+                            >
+                              Clear
+                            </button>
+                          )}
+                        </div>
+                      </ColumnFilterPopover>
+                    </div>
+                  </TableHead>
+                  {/* Supplier column — multi-select filter in header */}
+                  <TableHead
+                    style={{ width: 140, minWidth: 140 }}
+                    className="sticky top-0 bg-card z-10 cursor-pointer select-none whitespace-nowrap"
+                    onClick={() => toggleSort("supplier")}
+                    data-testid="sort-supplier"
+                  >
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="inline-flex items-center gap-1">
+                        Supplier
+                        {sortCol === "supplier" ? (sortDir === "asc" ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />) : <ChevronsUpDown className="w-3 h-3 opacity-30" />}
+                      </span>
+                      <ColumnFilterPopover isActive={supplierFilter.length > 0} data-testid="filter-supplier-popover">
+                        <div className="flex flex-col gap-1" style={{ width: 200 }}>
+                          <p className="text-xs font-medium text-muted-foreground pb-1">Supplier</p>
+                          <div className="flex flex-col gap-0.5 max-h-[220px] overflow-y-auto">
+                            {suppliers.length === 0 ? (
+                              <p className="text-xs text-muted-foreground px-1">No suppliers</p>
+                            ) : suppliers.map((sup) => (
+                              <button
+                                key={sup}
+                                type="button"
+                                className={`flex items-center gap-2 text-left text-sm px-2 py-1 rounded hover-elevate ${supplierFilter.includes(sup) ? "text-primary font-medium" : ""}`}
+                                onClick={() => {
+                                  if (supplierFilter.includes(sup)) {
+                                    setSupplierFilter(supplierFilter.filter((s) => s !== sup));
+                                  } else {
+                                    setSupplierFilter([...supplierFilter, sup]);
+                                  }
+                                }}
+                              >
+                                <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 ${supplierFilter.includes(sup) ? "bg-primary border-primary" : "border-muted-foreground/40"}`}>
+                                  {supplierFilter.includes(sup) && <Check className="w-2.5 h-2.5 text-primary-foreground" />}
+                                </div>
+                                <span className="truncate">{sup}</span>
+                              </button>
+                            ))}
+                          </div>
+                          {supplierFilter.length > 0 && (
+                            <button
+                              type="button"
+                              className="text-xs text-muted-foreground hover:text-foreground text-left px-2 pt-1 border-t mt-1"
+                              onClick={() => setSupplierFilter([])}
+                            >
+                              Clear
+                            </button>
+                          )}
+                        </div>
+                      </ColumnFilterPopover>
+                    </div>
+                  </TableHead>
+                  {/* Remaining sortable-only columns */}
                   {[
-                    { key: "sku", label: "SKU", width: 130 },
-                    { key: "title", label: "Title", width: 220 },
-                    { key: "category", label: "Category", width: 100 },
-                    { key: "supplier", label: "Supplier", width: 110 },
                     { key: "cost", label: "Cost", right: true, width: 70 },
                     { key: "on_hand", label: "On Hand", right: true, width: 75 },
                     { key: "available", label: "Available", right: true, width: 80 },
@@ -2402,16 +2562,16 @@ function PurchaseOrdersTab() {
                   const isLow = avail <= 0 && !row.is_kit;
                   return (
                     <TableRow key={row.id} data-testid={`row-po-${row.sku}`}>
-                      <TableCell style={{ width: 130, minWidth: 130 }} className="font-mono text-xs whitespace-nowrap overflow-hidden text-ellipsis">
+                      <TableCell style={{ width: 145, minWidth: 145 }} className="font-mono text-xs whitespace-nowrap overflow-hidden text-ellipsis">
                         {row.sku}
                         {row.is_kit && <Badge variant="outline" className="ml-1 text-[10px]">Kit</Badge>}
                         {row.is_assembled_product && <Badge variant="outline" className="ml-1 text-[10px]">Asm</Badge>}
                       </TableCell>
-                      <TableCell style={{ width: 220, minWidth: 220, maxWidth: 220 }} className="text-sm truncate" title={row.product_title}>
+                      <TableCell style={{ width: 230, minWidth: 230, maxWidth: 230 }} className="text-sm truncate" title={row.product_title}>
                         {row.product_title || row.description || "—"}
                       </TableCell>
-                      <TableCell style={{ width: 100, minWidth: 100, maxWidth: 100 }} className="text-xs truncate">{row.product_category || "—"}</TableCell>
-                      <TableCell style={{ width: 110, minWidth: 110, maxWidth: 110 }} className="text-xs truncate" title={row.supplier}>{row.supplier || "—"}</TableCell>
+                      <TableCell style={{ width: 130, minWidth: 130, maxWidth: 130 }} className="text-xs truncate">{row.product_category || "—"}</TableCell>
+                      <TableCell style={{ width: 140, minWidth: 140, maxWidth: 140 }} className="text-xs truncate" title={row.supplier}>{row.supplier || "—"}</TableCell>
                       <TableCell style={{ width: 70, minWidth: 70 }} className="text-right tabular-nums">{row.unit_cost ? `$${Number(row.unit_cost).toFixed(2)}` : "—"}</TableCell>
                       <TableCell style={{ width: 75, minWidth: 75 }} className="text-right tabular-nums">{row.quantity_on_hand ?? "—"}</TableCell>
                       <TableCell style={{ width: 80, minWidth: 80 }} className={`text-right tabular-nums ${isLow ? "text-red-600 dark:text-red-400 font-semibold" : ""}`}>
