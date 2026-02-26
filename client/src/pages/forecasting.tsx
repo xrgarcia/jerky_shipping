@@ -1085,9 +1085,19 @@ function SalesTab() {
   const filterCategories = filterOptionsData?.categories ?? [];
   const filterEventTypes = filterOptionsData?.eventTypes ?? [];
 
-  const activeChannels = selectedChannels ?? allChannels;
+  const EXCLUDED_DEFAULT_CHANNEL = 'jerkywholesale.com';
 
-  const hookChannels = selectedChannels === null ? null : selectedChannels;
+  const activeChannels = selectedChannels !== null
+    ? selectedChannels
+    : allChannels.filter((c) => c !== EXCLUDED_DEFAULT_CHANNEL);
+
+  // When null (default), send the filtered list to the API once channels have loaded.
+  // Before channels load, send null so the query runs immediately without filtering.
+  const hookChannels = selectedChannels !== null
+    ? selectedChannels
+    : allChannels.length > 0
+      ? allChannels.filter((c) => c !== EXCLUDED_DEFAULT_CHANNEL)
+      : null;
 
   const { data: salesResponse, isLoading: salesLoading } = useSalesData(
     preset,
@@ -1121,10 +1131,8 @@ function SalesTab() {
     activeFilters,
   );
 
-  const displayChannels = selectedChannels === null
-    ? (salesResponse?.data
-        ? Array.from(new Set(salesResponse.data.map((d) => d.salesChannel))).sort()
-        : allChannels)
+  const displayChannels = salesResponse?.data
+    ? Array.from(new Set(salesResponse.data.map((d) => d.salesChannel))).sort()
     : activeChannels;
 
   const chartData = useMemo(() => {
