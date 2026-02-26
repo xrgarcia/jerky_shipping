@@ -2,7 +2,7 @@ import { reportingSql } from '../reporting-db';
 import { db } from '../db';
 import { salesForecasting, skuvaultProducts, kitComponentMappings } from '@shared/schema';
 import { sql } from 'drizzle-orm';
-import { format, addDays, differenceInCalendarDays, addYears, subYears } from 'date-fns';
+import { format, addDays, addMonths, differenceInCalendarDays, addYears, subYears } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
 import logger from '../utils/logger';
 import { invalidateForecastingCache } from './forecasting-service';
@@ -316,8 +316,8 @@ export async function generateForecasts(): Promise<{ totalRows: number; daysProc
   try {
     logger.info('Sales forecast generation starting');
 
-    const deleted = await db.execute(sql`DELETE FROM sales_forecasting WHERE order_date < CURRENT_DATE`);
-    logger.info(`Sales forecast cleanup: deleted ${deleted.rowCount ?? 0} past-dated rows`);
+    const deleted = await db.execute(sql`DELETE FROM sales_forecasting WHERE order_date < CURRENT_DATE OR order_date > CURRENT_DATE + INTERVAL '6 months'`);
+    logger.info(`Sales forecast cleanup: deleted ${deleted.rowCount ?? 0} past-dated or beyond-6-month rows`);
 
     // Always refresh current velocity on every run, even if generation is skipped below
     const velocityMap = await loadCurrentVelocity();
@@ -327,7 +327,7 @@ export async function generateForecasts(): Promise<{ totalRows: number; daysProc
     const targetYear = today.getFullYear();
     const sourceYear = targetYear - 1;
 
-    const forecastEndDate = addYears(today, 1);
+    const forecastEndDate = addMonths(today, 6);
     const forecastEndStr = formatDateStr(forecastEndDate);
 
     const existingDates = await getExistingForecastDates();
