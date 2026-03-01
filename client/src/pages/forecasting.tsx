@@ -2412,7 +2412,7 @@ function PurchaseOrdersTab() {
         </Card>
       ) : (
         <Card className="flex flex-col flex-1 min-h-0 overflow-hidden">
-            <Table containerClassName="flex-1 overflow-auto">
+            <Table containerClassName="flex-1 overflow-auto" className="[&_th]:border-r [&_th]:border-border [&_td]:border-r [&_td]:border-border">
               <TableHeader>
                 <TableRow>
                   {/* SKU column — Kit filter in header */}
