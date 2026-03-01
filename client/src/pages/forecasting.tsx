@@ -1691,6 +1691,7 @@ function MultiSelectFilter({
   onChange,
   isActive,
   popoverWidth = "w-[220px]",
+  triggerVariant = "button",
   "data-testid": testId,
 }: {
   label: string;
@@ -1699,6 +1700,7 @@ function MultiSelectFilter({
   onChange: (selected: string[]) => void;
   isActive?: boolean;
   popoverWidth?: string;
+  triggerVariant?: "button" | "icon";
   "data-testid"?: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -1737,19 +1739,35 @@ function MultiSelectFilter({
       ? (normalized.find((o) => o.value === selected[0])?.label ?? selected[0])
       : `${selected.length} ${label}s`;
 
+  const active = isActive ?? selected.length > 0;
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
+        {triggerVariant === "icon" ? (
+          <button
+            type="button"
+            data-testid={testId}
+            className={`inline-flex items-center justify-center rounded p-0.5 transition-colors ${
+              active
+                ? "text-primary ring-1 ring-primary/50"
+                : "text-muted-foreground/50 hover:text-muted-foreground"
+            }`}
+          >
+            <ListFilter className="w-3 h-3" />
+          </button>
+        ) : (
         <Button
           variant="outline"
           size="default"
-          className={`justify-between gap-2 transition-all${(isActive ?? selected.length > 0) ? " ring-1 ring-primary/50 border-primary/50" : ""}`}
+          className={`justify-between gap-2 transition-all${active ? " ring-1 ring-primary/50 border-primary/50" : ""}`}
           data-testid={testId}
         >
-          {(isActive ?? selected.length > 0) && <ListFilter className="h-3.5 w-3.5 shrink-0 text-primary" />}
+          {active && <ListFilter className="h-3.5 w-3.5 shrink-0 text-primary" />}
           <span className="truncate">{displayLabel}</span>
           <ChevronDown className="w-3 h-3 opacity-50 shrink-0" />
         </Button>
+        )}
       </PopoverTrigger>
       <PopoverContent className={`${popoverWidth} p-0`} align="start">
         <div className="flex flex-col">
@@ -2495,6 +2513,7 @@ function PurchaseOrdersTab() {
                           selected={categoryFilter}
                           onChange={setCategoryFilter}
                           isActive={categoryFilter.length > 0}
+                          triggerVariant="icon"
                           popoverWidth="w-[240px]"
                           data-testid="filter-category-popover"
                         />
@@ -2522,6 +2541,7 @@ function PurchaseOrdersTab() {
                           selected={supplierFilter}
                           onChange={setSupplierFilter}
                           isActive={supplierFilter.length > 0}
+                          triggerVariant="icon"
                           popoverWidth="w-[260px]"
                           data-testid="filter-supplier-popover"
                         />
