@@ -18,7 +18,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
-import { TrendingUp, TrendingDown, ChevronDown, ChevronUp, ChevronsUpDown, Check, Loader2, CalendarIcon, Pencil, Trash2, MessageSquarePlus, X, DollarSign, Package, Activity, ShieldCheck, Search, ListFilter, RefreshCw, Download, AlertCircle, CheckCircle2, Clock, SlidersHorizontal, Copy, Info, BarChart2 } from "lucide-react";
+import { TrendingUp, TrendingDown, ChevronDown, ChevronUp, ChevronsUpDown, Check, Loader2, CalendarIcon, Pencil, Trash2, MessageSquarePlus, X, DollarSign, Package, Activity, ShieldCheck, Search, ListFilter, RefreshCw, Download, AlertCircle, CheckCircle2, Clock, SlidersHorizontal, Copy, Info, BarChart2, MessageSquare } from "lucide-react";
 import { Tooltip as HoverTooltip, TooltipTrigger as HoverTooltipTrigger, TooltipContent as HoverTooltipContent } from "@/components/ui/tooltip";
 import {
   Table,
@@ -56,6 +56,9 @@ import type { ChartNote, PurchaseOrderConfig } from "@shared/schema";
 import { useUserPreference } from "@/hooks/use-user-preference";
 import { format, parseISO, subDays } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import ReactMarkdown from "react-markdown";
 
 const CENTRAL_TZ = "America/Chicago";
 function getCentralToday(): string {
@@ -1831,7 +1834,114 @@ function MultiSelectFilter({
   );
 }
 
+function SkuNotesModal({
+  open,
+  onClose,
+  sku,
+  productTitle,
+  initialNotes,
+  onSave,
+  isSaving,
+}: {
+  open: boolean;
+  onClose: () => void;
+  sku: string;
+  productTitle?: string;
+  initialNotes: string;
+  onSave: (notes: string) => void;
+  isSaving?: boolean;
+}) {
+  const [draft, setDraft] = useState(initialNotes);
+  const [tab, setTab] = useState<"edit" | "preview">("edit");
+
+  useEffect(() => {
+    if (open) {
+      setDraft(initialNotes);
+      setTab("edit");
+    }
+  }, [open, initialNotes]);
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent className="max-w-2xl w-full flex flex-col" style={{ maxHeight: "80vh" }}>
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <MessageSquare className="w-4 h-4 text-primary" />
+            Notes
+            <span className="text-muted-foreground font-normal text-sm">·</span>
+            <span className="font-mono text-sm text-muted-foreground">{sku}</span>
+          </DialogTitle>
+          {productTitle && (
+            <p className="text-sm text-muted-foreground mt-0.5">{productTitle}</p>
+          )}
+        </DialogHeader>
+
+        <div className="flex gap-1 border-b pb-0">
+          <button
+            type="button"
+            onClick={() => setTab("edit")}
+            className={`px-3 py-1.5 text-sm font-medium rounded-t border-b-2 transition-colors ${
+              tab === "edit"
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Edit
+          </button>
+          <button
+            type="button"
+            onClick={() => setTab("preview")}
+            className={`px-3 py-1.5 text-sm font-medium rounded-t border-b-2 transition-colors ${
+              tab === "preview"
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Preview
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-auto min-h-0" style={{ minHeight: 260 }}>
+          {tab === "edit" ? (
+            <Textarea
+              autoFocus
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              placeholder={"Add notes in markdown format...\n\n# Heading\n- bullet points\n**bold**, _italic_"}
+              className="w-full h-full resize-none font-mono text-sm border-0 rounded-none focus-visible:ring-0 min-h-[260px]"
+              style={{ height: "100%" }}
+            />
+          ) : (
+            <div className="px-4 py-3 prose prose-sm dark:prose-invert max-w-none min-h-[260px]">
+              {draft.trim() ? (
+                <ReactMarkdown>{draft}</ReactMarkdown>
+              ) : (
+                <p className="text-muted-foreground italic text-sm">Nothing to preview yet.</p>
+              )}
+            </div>
+          )}
+        </div>
+
+        <DialogFooter className="flex flex-row justify-end gap-2 pt-2 border-t">
+          <Button variant="outline" size="default" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            size="default"
+            onClick={() => onSave(draft)}
+            disabled={isSaving}
+          >
+            {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : null}
+            Save Notes
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 const PO_COLUMNS = [
+  { key: "notes", label: "Notes" },
   { key: "title", label: "Title" },
   { key: "category", label: "Category" },
   { key: "supplier", label: "Supplier" },
@@ -1916,6 +2026,7 @@ function PurchaseOrdersTab() {
   const [sortCol, setSortCol] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [copiedSku, setCopiedSku] = useState<string | null>(null);
+  const [noteModalSku, setNoteModalSku] = useState<string | null>(null);
 
   const toggleSort = useCallback((col: string) => {
     if (sortCol === col) {
@@ -1977,6 +2088,24 @@ function PurchaseOrdersTab() {
       return res.json();
     },
     enabled: (datesQuery.data?.length ?? 0) > 0,
+  });
+
+  const skuNotesQuery = useQuery<Record<string, string>>({
+    queryKey: ["/api/purchase-orders/sku-notes"],
+  });
+
+  const saveNoteMutation = useMutation({
+    mutationFn: async ({ sku, notes }: { sku: string; notes: string }) => {
+      const res = await apiRequest("PUT", `/api/purchase-orders/sku-notes/${encodeURIComponent(sku)}`, { notes });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/purchase-orders/sku-notes"] });
+      setNoteModalSku(null);
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to save notes.", variant: "destructive" });
+    },
   });
 
   const createSnapshotMutation = useMutation({
@@ -2433,6 +2562,16 @@ function PurchaseOrdersTab() {
             <Table containerClassName="flex-1 overflow-auto" className="[&_th]:border-r [&_th]:border-border [&_td]:border-r [&_td]:border-border">
               <TableHeader>
                 <TableRow>
+                  {/* Notes column — icon-only, no sort */}
+                  {colVisible("notes") && (
+                  <TableHead
+                    style={{ width: 44, minWidth: 44 }}
+                    className="sticky top-0 bg-card z-10 select-none text-center"
+                    data-testid="col-notes"
+                  >
+                    <span className="sr-only">Notes</span>
+                  </TableHead>
+                  )}
                   {/* SKU column — Kit filter in header */}
                   <TableHead
                     style={{ width: 145, minWidth: 145 }}
@@ -2614,6 +2753,30 @@ function PurchaseOrdersTab() {
                   const isLow = avail <= 0 && !row.is_kit;
                   return (
                     <TableRow key={row.id} data-testid={`row-po-${row.sku}`} className="group/row">
+                      {colVisible("notes") && (() => {
+                        const hasNote = !!(skuNotesQuery.data?.[row.sku]?.trim());
+                        return (
+                          <TableCell style={{ width: 44, minWidth: 44 }} className="text-center p-1">
+                            <button
+                              type="button"
+                              data-testid={`button-notes-${row.sku}`}
+                              title={hasNote ? "View/edit notes" : "Add notes"}
+                              onClick={() => setNoteModalSku(row.sku)}
+                              className={`inline-flex items-center justify-center rounded p-1 transition-colors ${
+                                hasNote
+                                  ? "text-primary"
+                                  : "text-muted-foreground/30 hover:text-muted-foreground"
+                              }`}
+                            >
+                              <MessageSquare
+                                className="w-4 h-4"
+                                fill={hasNote ? "currentColor" : "none"}
+                                fillOpacity={hasNote ? 0.2 : 0}
+                              />
+                            </button>
+                          </TableCell>
+                        );
+                      })()}
                       <TableCell style={{ width: 145, minWidth: 145 }} className="font-mono text-xs whitespace-nowrap">
                         <div className="flex items-center gap-1">
                           <span className="truncate">{row.sku}</span>
@@ -2670,6 +2833,22 @@ function PurchaseOrdersTab() {
             </Table>
         </Card>
       )}
+
+      {/* SKU Notes Modal */}
+      {noteModalSku && (() => {
+        const modalRow = (snapshotQuery.data ?? []).find((r: any) => r.sku === noteModalSku);
+        return (
+          <SkuNotesModal
+            open={!!noteModalSku}
+            onClose={() => setNoteModalSku(null)}
+            sku={noteModalSku}
+            productTitle={modalRow?.product_title || modalRow?.description}
+            initialNotes={skuNotesQuery.data?.[noteModalSku] ?? ""}
+            onSave={(notes) => saveNoteMutation.mutate({ sku: noteModalSku, notes })}
+            isSaving={saveNoteMutation.isPending}
+          />
+        );
+      })()}
     </div>
   );
 }

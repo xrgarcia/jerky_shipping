@@ -2182,3 +2182,16 @@ export const updatePurchaseOrderConfigSchema = createInsertSchema(purchaseOrderC
 }).partial();
 
 export type PurchaseOrderConfig = typeof purchaseOrderConfig.$inferSelect;
+
+// ============================================================================
+// Purchase Order SKU Notes - Per-SKU markdown notes, persisted across snapshots
+// ============================================================================
+
+export const purchaseOrderSkuNotes = pgTable("purchase_order_sku_notes", {
+  sku: text("sku").primaryKey(),
+  notes: text("notes").notNull().default(""),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const upsertPurchaseOrderSkuNoteSchema = createInsertSchema(purchaseOrderSkuNotes);
+export type PurchaseOrderSkuNote = typeof purchaseOrderSkuNotes.$inferSelect;

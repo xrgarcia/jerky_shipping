@@ -16275,6 +16275,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET all SKU notes as a map: { sku -> notes }
+  app.get("/api/purchase-orders/sku-notes", requireAuth, async (_req: Request, res: Response) => {
+    try {
+      const { purchaseOrderSkuNotes } = await import('../shared/schema');
+      const rows = await db.select().from(purchaseOrderSkuNotes);
+      const map: Record<string, string> = {};
+      for (const row of rows) {
+        map[row.sku] = row.notes;
+      }
+      res.json(map);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch SKU notes", message: error.message });
+    }
+  });
+
+  // PUT upsert a note for a specific SKU
+  app.put("/api/purchase-orders/sku-notes/:sku", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { purchaseOrderSkuNotes } = await import('../shared/schema');
+      const { sku } = req.params;
+      const { notes } = req.body;
+      if (typeof notes !== "string") {
+        return res.status(400).json({ error: "notes must be a string" });
+      }
+      const [updated] = await db
+        .insert(purchaseOrderSkuNotes)
+        .values({ sku, notes })
+        .onConflictDoUpdate({
+          target: purchaseOrderSkuNotes.sku,
+          set: { notes, updatedAt: new Date() },
+        })
+        .returning();
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to upsert SKU note", message: error.message });
+    }
+  });
+
   app.get("/api/user-preferences/:namespace", requireAuth, async (req: Request, res: Response) => {
     try {
       const user = (req as any).user;
