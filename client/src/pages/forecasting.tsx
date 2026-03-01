@@ -1941,7 +1941,6 @@ function SkuNotesModal({
 }
 
 const PO_COLUMNS = [
-  { key: "notes", label: "Notes" },
   { key: "title", label: "Title" },
   { key: "category", label: "Category" },
   { key: "supplier", label: "Supplier" },
@@ -1959,6 +1958,7 @@ const PO_COLUMNS = [
   { key: "proj_kits", label: "Proj. Kits", group: "projection" },
   { key: "proj_total", label: "Proj. Total", group: "projection" },
   { key: "rec_purchase", label: "Rec. Purchase", group: "projection" },
+  { key: "notes", label: "Notes" },
 ] as const;
 type PoColumnKey = (typeof PO_COLUMNS)[number]["key"];
 const PO_DEFAULT_COLUMNS: PoColumnKey[] = PO_COLUMNS.filter((c) => !("group" in c)).map((c) => c.key) as PoColumnKey[];
@@ -2047,6 +2047,18 @@ function PurchaseOrdersTab() {
   const { value: visibleColumns, setValue: setVisibleColumns } = useUserPreference<string[]>(
     "purchase-orders", "visible-columns", [...PO_DEFAULT_COLUMNS], { debounceMs: 300 }
   );
+  useEffect(() => {
+    const allKeys = PO_COLUMNS.map((c) => c.key);
+    const missing = PO_DEFAULT_COLUMNS.filter((k) => !visibleColumns.includes(k));
+    if (missing.length > 0) {
+      setVisibleColumns(
+        [...visibleColumns, ...missing].sort(
+          (a, b) => allKeys.indexOf(a as PoColumnKey) - allKeys.indexOf(b as PoColumnKey)
+        )
+      );
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const colVisible = useCallback((key: string) => visibleColumns.includes(key), [visibleColumns]);
   const toggleColumn = useCallback((key: string) => {
     if (visibleColumns.includes(key)) {
