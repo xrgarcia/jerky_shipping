@@ -2488,43 +2488,17 @@ function PurchaseOrdersTab() {
                         Category
                         {sortCol === "category" ? (sortDir === "asc" ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />) : <ChevronsUpDown className="w-3 h-3 opacity-30" />}
                       </span>
-                      <ColumnFilterPopover isActive={categoryFilter.length > 0} data-testid="filter-category-popover">
-                        <div className="flex flex-col gap-1" style={{ width: 180 }}>
-                          <p className="text-xs font-medium text-muted-foreground pb-1">Category</p>
-                          <div className="flex flex-col gap-0.5 max-h-[220px] overflow-y-auto">
-                            {categories.length === 0 ? (
-                              <p className="text-xs text-muted-foreground px-1">No categories</p>
-                            ) : categories.map((cat) => (
-                              <button
-                                key={cat}
-                                type="button"
-                                className={`flex items-center gap-2 text-left text-sm px-2 py-1 rounded hover-elevate ${categoryFilter.includes(cat) ? "text-primary font-medium" : ""}`}
-                                onClick={() => {
-                                  if (categoryFilter.includes(cat)) {
-                                    setCategoryFilter(categoryFilter.filter((c) => c !== cat));
-                                  } else {
-                                    setCategoryFilter([...categoryFilter, cat]);
-                                  }
-                                }}
-                              >
-                                <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 ${categoryFilter.includes(cat) ? "bg-primary border-primary" : "border-muted-foreground/40"}`}>
-                                  {categoryFilter.includes(cat) && <Check className="w-2.5 h-2.5 text-primary-foreground" />}
-                                </div>
-                                <span className="truncate">{cat}</span>
-                              </button>
-                            ))}
-                          </div>
-                          {categoryFilter.length > 0 && (
-                            <button
-                              type="button"
-                              className="text-xs text-muted-foreground hover:text-foreground text-left px-2 pt-1 border-t mt-1"
-                              onClick={() => setCategoryFilter([])}
-                            >
-                              Clear
-                            </button>
-                          )}
-                        </div>
-                      </ColumnFilterPopover>
+                      <div onClick={(e) => e.stopPropagation()}>
+                        <MultiSelectFilter
+                          label="Category"
+                          options={categories}
+                          selected={categoryFilter}
+                          onChange={setCategoryFilter}
+                          isActive={categoryFilter.length > 0}
+                          popoverWidth="w-[240px]"
+                          data-testid="filter-category-popover"
+                        />
+                      </div>
                     </div>
                   </TableHead>
                   )}
@@ -2541,43 +2515,17 @@ function PurchaseOrdersTab() {
                         Supplier
                         {sortCol === "supplier" ? (sortDir === "asc" ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />) : <ChevronsUpDown className="w-3 h-3 opacity-30" />}
                       </span>
-                      <ColumnFilterPopover isActive={supplierFilter.length > 0} data-testid="filter-supplier-popover">
-                        <div className="flex flex-col gap-1" style={{ width: 200 }}>
-                          <p className="text-xs font-medium text-muted-foreground pb-1">Supplier</p>
-                          <div className="flex flex-col gap-0.5 max-h-[220px] overflow-y-auto">
-                            {suppliers.length === 0 ? (
-                              <p className="text-xs text-muted-foreground px-1">No suppliers</p>
-                            ) : suppliers.map((sup) => (
-                              <button
-                                key={sup}
-                                type="button"
-                                className={`flex items-center gap-2 text-left text-sm px-2 py-1 rounded hover-elevate ${supplierFilter.includes(sup) ? "text-primary font-medium" : ""}`}
-                                onClick={() => {
-                                  if (supplierFilter.includes(sup)) {
-                                    setSupplierFilter(supplierFilter.filter((s) => s !== sup));
-                                  } else {
-                                    setSupplierFilter([...supplierFilter, sup]);
-                                  }
-                                }}
-                              >
-                                <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 ${supplierFilter.includes(sup) ? "bg-primary border-primary" : "border-muted-foreground/40"}`}>
-                                  {supplierFilter.includes(sup) && <Check className="w-2.5 h-2.5 text-primary-foreground" />}
-                                </div>
-                                <span className="truncate">{sup}</span>
-                              </button>
-                            ))}
-                          </div>
-                          {supplierFilter.length > 0 && (
-                            <button
-                              type="button"
-                              className="text-xs text-muted-foreground hover:text-foreground text-left px-2 pt-1 border-t mt-1"
-                              onClick={() => setSupplierFilter([])}
-                            >
-                              Clear
-                            </button>
-                          )}
-                        </div>
-                      </ColumnFilterPopover>
+                      <div onClick={(e) => e.stopPropagation()}>
+                        <MultiSelectFilter
+                          label="Supplier"
+                          options={suppliers}
+                          selected={supplierFilter}
+                          onChange={setSupplierFilter}
+                          isActive={supplierFilter.length > 0}
+                          popoverWidth="w-[260px]"
+                          data-testid="filter-supplier-popover"
+                        />
+                      </div>
                     </div>
                   </TableHead>
                   )}
