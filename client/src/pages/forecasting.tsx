@@ -2574,16 +2574,6 @@ function PurchaseOrdersTab() {
             <Table containerClassName="flex-1 overflow-auto" className="[&_th]:border-r [&_th]:border-border [&_td]:border-r [&_td]:border-border">
               <TableHeader>
                 <TableRow>
-                  {/* Notes column — icon-only, no sort */}
-                  {colVisible("notes") && (
-                  <TableHead
-                    style={{ width: 44, minWidth: 44 }}
-                    className="sticky top-0 bg-card z-10 select-none text-center"
-                    data-testid="col-notes"
-                  >
-                    <span className="sr-only">Notes</span>
-                  </TableHead>
-                  )}
                   {/* SKU column — Kit filter in header */}
                   <TableHead
                     style={{ width: 145, minWidth: 145 }}
@@ -2757,6 +2747,16 @@ function PurchaseOrdersTab() {
                       </span>
                     </TableHead>
                   ))}
+                  {/* Notes column — icon-only, no sort, always last */}
+                  {colVisible("notes") && (
+                    <TableHead
+                      style={{ width: 44, minWidth: 44 }}
+                      className="sticky top-0 bg-card z-10 select-none text-center"
+                      data-testid="col-notes"
+                    >
+                      <span className="sr-only">Notes</span>
+                    </TableHead>
+                  )}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -2765,37 +2765,6 @@ function PurchaseOrdersTab() {
                   const isLow = avail <= 0 && !row.is_kit;
                   return (
                     <TableRow key={row.id} data-testid={`row-po-${row.sku}`} className="group/row">
-                      {colVisible("notes") && (() => {
-                        const noteText = skuNotesQuery.data?.[row.sku]?.trim() ?? "";
-                        const hasNote = !!noteText;
-                        return (
-                          <TableCell style={{ width: 44, minWidth: 44 }} className="text-center p-1">
-                            <HoverTooltip>
-                              <HoverTooltipTrigger asChild>
-                                <button
-                                  type="button"
-                                  data-testid={`button-notes-${row.sku}`}
-                                  onClick={() => setNoteModalSku(row.sku)}
-                                  className={`inline-flex items-center justify-center rounded p-1 transition-colors ${
-                                    hasNote
-                                      ? "text-primary"
-                                      : "text-muted-foreground/30 hover:text-muted-foreground"
-                                  }`}
-                                >
-                                  <MessageSquare
-                                    className="w-4 h-4"
-                                    fill={hasNote ? "currentColor" : "none"}
-                                    fillOpacity={hasNote ? 0.2 : 0}
-                                  />
-                                </button>
-                              </HoverTooltipTrigger>
-                              <HoverTooltipContent side="left" className="max-w-xs text-left whitespace-pre-wrap">
-                                {hasNote ? noteText : <span className="text-muted-foreground italic">No notes — click to add</span>}
-                              </HoverTooltipContent>
-                            </HoverTooltip>
-                          </TableCell>
-                        );
-                      })()}
                       <TableCell style={{ width: 145, minWidth: 145 }} className="font-mono text-xs whitespace-nowrap">
                         <div className="flex items-center gap-1">
                           <span className="truncate">{row.sku}</span>
@@ -2843,6 +2812,38 @@ function PurchaseOrdersTab() {
                             {colVisible("proj_total") && <TableCell style={{ width: 90, minWidth: 90 }} className="text-right tabular-nums font-semibold">{total.toLocaleString()}</TableCell>}
                             {colVisible("rec_purchase") && <TableCell style={{ width: 90, minWidth: 90 }} className={`text-right tabular-nums font-semibold ${rec > 0 ? "text-red-600 dark:text-red-400" : ""}`}>{rec.toLocaleString()}</TableCell>}
                           </>
+                        );
+                      })()}
+                      {/* Notes cell — always last */}
+                      {colVisible("notes") && (() => {
+                        const noteText = skuNotesQuery.data?.[row.sku]?.trim() ?? "";
+                        const hasNote = !!noteText;
+                        return (
+                          <TableCell style={{ width: 44, minWidth: 44 }} className="text-center p-1">
+                            <HoverTooltip>
+                              <HoverTooltipTrigger asChild>
+                                <button
+                                  type="button"
+                                  data-testid={`button-notes-${row.sku}`}
+                                  onClick={() => setNoteModalSku(row.sku)}
+                                  className={`inline-flex items-center justify-center rounded p-1 transition-colors ${
+                                    hasNote
+                                      ? "text-primary"
+                                      : "text-muted-foreground/30 hover:text-muted-foreground"
+                                  }`}
+                                >
+                                  <MessageSquare
+                                    className="w-4 h-4"
+                                    fill={hasNote ? "currentColor" : "none"}
+                                    fillOpacity={hasNote ? 0.2 : 0}
+                                  />
+                                </button>
+                              </HoverTooltipTrigger>
+                              <HoverTooltipContent side="left" className="max-w-xs text-left whitespace-pre-wrap">
+                                {hasNote ? noteText : <span className="text-muted-foreground italic">No notes — click to add</span>}
+                              </HoverTooltipContent>
+                            </HoverTooltip>
+                          </TableCell>
                         );
                       })()}
                     </TableRow>
