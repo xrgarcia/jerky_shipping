@@ -2127,7 +2127,6 @@ export const purchaseOrderSnapshots = pgTable("purchase_order_snapshots", {
   weightValue: real("weight_value"),
   weightUnit: text("weight_unit"),
   parentSku: text("parent_sku"),
-  quantityOnHand: integer("quantity_on_hand").notNull().default(0),
   availableQuantity: integer("available_quantity").notNull().default(0),
   physicalLocation: text("physical_location"),
   brand: text("brand"),

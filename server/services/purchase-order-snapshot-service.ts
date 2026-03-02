@@ -108,7 +108,6 @@ export async function createSnapshot(): Promise<{ rowCount: number; stockCheckDa
       weightValue: p.weightValue,
       weightUnit: p.weightUnit,
       parentSku: p.parentSku || p.sku,
-      quantityOnHand: p.quantityOnHand,
       availableQuantity: ifd?.quantity_available ?? p.availableQuantity,
       physicalLocation: p.physicalLocation,
       brand: p.brand,

@@ -1965,7 +1965,6 @@ const PO_COLUMNS = [
   { key: "category", label: "Category" },
   { key: "supplier", label: "Supplier" },
   { key: "cost", label: "Cost" },
-  { key: "on_hand", label: "On Hand" },
   { key: "available", label: "Available" },
   { key: "incoming", label: "Incoming" },
   { key: "lead_time", label: "Lead Time" },
@@ -2265,7 +2264,6 @@ function PurchaseOrdersTab() {
           case "category": aVal = a.product_category ?? ""; bVal = b.product_category ?? ""; break;
           case "supplier": aVal = a.supplier ?? ""; bVal = b.supplier ?? ""; break;
           case "cost": aVal = Number(a.unit_cost ?? 0); bVal = Number(b.unit_cost ?? 0); break;
-          case "on_hand": aVal = a.quantity_on_hand ?? 0; bVal = b.quantity_on_hand ?? 0; break;
           case "available": aVal = a.available_quantity ?? 0; bVal = b.available_quantity ?? 0; break;
           case "incoming": aVal = a.quantity_incoming ?? 0; bVal = b.quantity_incoming ?? 0; break;
           case "lead_time": aVal = a.lead_time ?? 0; bVal = b.lead_time ?? 0; break;
@@ -2317,14 +2315,14 @@ function PurchaseOrdersTab() {
 
   const exportCsv = useCallback(() => {
     if (filtered.length === 0) return;
-    const headers = ["SKU", "Title", "Category", "Supplier", "Unit Cost", "On Hand", "Available", "Incoming", "Lead Time (days)", "MOQ", "Amazon Inv", "Walmart Inv", "In Kits", "Total Stock"];
+    const headers = ["SKU", "Title", "Category", "Supplier", "Unit Cost", "Available", "Incoming", "Lead Time (days)", "MOQ", "Amazon Inv", "Walmart Inv", "In Kits", "Total Stock"];
     if (hasProjection) headers.push("Proj. Direct", "Proj. Kits", "Growth Adj.", "Proj. Total", "Rec. Purchase");
     const csvRows = [headers.join(",")];
     for (const r of filtered) {
       const row = [
         r.sku, `"${(r.product_title || '').replace(/"/g, '""')}"`, r.product_category || '',
         `"${(r.supplier || '').replace(/"/g, '""')}"`, r.unit_cost ?? '',
-        r.quantity_on_hand ?? 0, r.available_quantity ?? 0,
+        r.available_quantity ?? 0,
         r.quantity_incoming ?? '', r.lead_time ?? '', r.moq ?? '',
         r.ext_amzn_inv ?? '', r.ext_wlmt_inv ?? '', r.quantity_in_kits ?? '',
         r.total_stock ?? ''
@@ -2756,7 +2754,6 @@ function PurchaseOrdersTab() {
                   {/* Remaining sortable-only columns */}
                   {[
                     { key: "cost", label: "Cost", right: true, width: 70 },
-                    { key: "on_hand", label: "On Hand", right: true, width: 75 },
                     { key: "available", label: "Available", right: true, width: 80 },
                     { key: "incoming", label: "Incoming", right: true, width: 80 },
                     { key: "lead_time", label: "Lead Time", right: true, width: 80 },
@@ -2855,7 +2852,6 @@ function PurchaseOrdersTab() {
                       {colVisible("category") && <TableCell style={{ width: 130, minWidth: 130, maxWidth: 130 }} className="text-xs truncate">{row.product_category || "—"}</TableCell>}
                       {colVisible("supplier") && <TableCell style={{ width: 140, minWidth: 140, maxWidth: 140 }} className="text-xs truncate" title={row.supplier}>{row.supplier || "—"}</TableCell>}
                       {colVisible("cost") && <TableCell style={{ width: 70, minWidth: 70 }} className="text-right tabular-nums">{row.unit_cost ? `$${Number(row.unit_cost).toFixed(2)}` : "—"}</TableCell>}
-                      {colVisible("on_hand") && <TableCell style={{ width: 75, minWidth: 75 }} className="text-right tabular-nums">{row.quantity_on_hand ?? "—"}</TableCell>}
                       {colVisible("available") && <TableCell style={{ width: 80, minWidth: 80 }} className={`text-right tabular-nums ${isLow ? "text-red-600 dark:text-red-400 font-semibold" : ""}`}>{avail}</TableCell>}
                       {colVisible("incoming") && <TableCell style={{ width: 80, minWidth: 80 }} className="text-right tabular-nums">{row.quantity_incoming ?? "—"}</TableCell>}
                       {colVisible("lead_time") && <TableCell style={{ width: 80, minWidth: 80 }} className="text-right tabular-nums">{row.lead_time != null ? `${row.lead_time}d` : "—"}</TableCell>}
