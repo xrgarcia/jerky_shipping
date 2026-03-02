@@ -2875,7 +2875,7 @@ function PurchaseOrdersTab() {
                     return (
                       <TableHead
                         colSpan={cnt}
-                        className="sticky top-0 bg-muted z-20 text-center text-[10px] font-semibold text-muted-foreground uppercase tracking-widest py-1"
+                        className="sticky top-0 bg-muted z-20 text-center text-[10px] font-bold text-foreground/55 uppercase tracking-widest py-1 border-b border-border/60"
                       >
                         {group.label}
                       </TableHead>
@@ -2889,7 +2889,7 @@ function PurchaseOrdersTab() {
                     return (
                       <TableHead
                         colSpan={cnt}
-                        className="sticky top-0 bg-muted z-20 text-center text-[10px] font-semibold text-muted-foreground uppercase tracking-widest py-1"
+                        className="sticky top-0 bg-muted z-20 text-center text-[10px] font-bold text-foreground/55 uppercase tracking-widest py-1 border-b border-border/60"
                       >
                         Projection
                       </TableHead>
@@ -2903,7 +2903,7 @@ function PurchaseOrdersTab() {
                     return (
                       <TableHead
                         colSpan={cnt}
-                        className="sticky top-0 bg-muted z-20 text-center text-[10px] font-semibold text-muted-foreground uppercase tracking-widest py-1"
+                        className="sticky top-0 bg-muted z-20 text-center text-[10px] font-bold text-foreground/55 uppercase tracking-widest py-1 border-b border-border/60"
                       >
                         {group.label}
                       </TableHead>
@@ -2917,7 +2917,7 @@ function PurchaseOrdersTab() {
                     return (
                       <TableHead
                         colSpan={cnt}
-                        className="sticky top-0 bg-muted z-20 text-center text-[10px] font-semibold text-muted-foreground uppercase tracking-widest py-1"
+                        className="sticky top-0 bg-muted z-20 text-center text-[10px] font-bold text-foreground/55 uppercase tracking-widest py-1 border-b border-border/60"
                       >
                         {group.label}
                       </TableHead>
