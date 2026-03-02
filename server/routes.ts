@@ -16291,11 +16291,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       } catch (_e) { /* redis unavailable, fall through */ }
 
-      const rows = await reportingSql<{ sku: string; trend_factor: string | null; yoy_growth_rate: string | null }[]>`
+      const rows = await reportingSql<{ sku: string; trend_factor: string | null; yoy_growth_factor: string | null }[]>`
         SELECT
           sku,
-          SUM(trend_factor::numeric * daily_sales_quantity::numeric) / NULLIF(SUM(daily_sales_quantity::numeric), 0) AS trend_factor,
-          SUM(yoy_growth_rate::numeric * daily_sales_quantity::numeric) / NULLIF(SUM(daily_sales_quantity::numeric), 0) AS yoy_growth_rate
+          SUM(CASE WHEN trend_factor IS NOT NULL THEN trend_factor::numeric * daily_sales_quantity::numeric ELSE 0 END) / NULLIF(SUM(CASE WHEN trend_factor IS NOT NULL THEN daily_sales_quantity::numeric ELSE 0 END), 0) AS trend_factor,
+          SUM(CASE WHEN yoy_growth_factor IS NOT NULL THEN yoy_growth_factor::numeric * daily_sales_quantity::numeric ELSE 0 END) / NULLIF(SUM(CASE WHEN yoy_growth_factor IS NOT NULL THEN daily_sales_quantity::numeric ELSE 0 END), 0) AS yoy_growth_factor
         FROM sales_metrics_lookup
         WHERE order_date = (SELECT MAX(order_date) FROM sales_metrics_lookup)
           AND daily_sales_quantity IS NOT NULL
@@ -16303,11 +16303,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         GROUP BY sku
       `;
 
-      const result: Record<string, { trendFactor: number | null; yoyGrowthRate: number | null }> = {};
+      const result: Record<string, { trendFactor: number | null; yoyGrowthFactor: number | null }> = {};
       for (const row of rows) {
         result[row.sku] = {
           trendFactor: row.trend_factor != null ? parseFloat(row.trend_factor) : null,
-          yoyGrowthRate: row.yoy_growth_rate != null ? parseFloat(row.yoy_growth_rate) : null,
+          yoyGrowthFactor: row.yoy_growth_factor != null ? parseFloat(row.yoy_growth_factor) : null,
         };
       }
 

@@ -2108,7 +2108,7 @@ function PurchaseOrdersTab() {
     queryKey: ["/api/purchase-orders/sku-notes"],
   });
 
-  const growthFactorsQuery = useQuery<Record<string, { trendFactor: number | null; yoyGrowthRate: number | null }>>({
+  const growthFactorsQuery = useQuery<Record<string, { trendFactor: number | null; yoyGrowthFactor: number | null }>>({
     queryKey: ["/api/purchase-orders/growth-factors"],
     enabled: growthFactorMethod !== "none",
     staleTime: 60 * 60 * 1000,
@@ -2191,10 +2191,10 @@ function PurchaseOrdersTab() {
     if (growthFactorMethod === "none" || !growthFactorsQuery.data) return 1;
     const factors = growthFactorsQuery.data[sku];
     if (!factors) return 1;
-    const { trendFactor, yoyGrowthRate } = factors;
+    const { trendFactor, yoyGrowthFactor } = factors;
     if (growthFactorMethod === "trend") return trendFactor ?? 1;
-    if (growthFactorMethod === "yoy") return yoyGrowthRate ?? 1;
-    if (growthFactorMethod === "smart") return Math.max(trendFactor ?? 1, yoyGrowthRate ?? 1);
+    if (growthFactorMethod === "yoy") return yoyGrowthFactor ?? 1;
+    if (growthFactorMethod === "smart") return Math.max(trendFactor ?? 1, yoyGrowthFactor ?? 1);
     return 1;
   }, [growthFactorMethod, growthFactorsQuery.data]);
 
@@ -2872,9 +2872,9 @@ function PurchaseOrdersTab() {
                             )}
                             {colVisible("growth_mult") && (
                               <TableCell style={{ width: 70, minWidth: 70 }} className="text-right tabular-nums">
-                                {growthFactorMethod === "none" || !isAdjusted
+                                {growthFactorMethod === "none"
                                   ? <span className="text-muted-foreground">—</span>
-                                  : <span>{factor.toFixed(2)}×</span>
+                                  : <span className={isAdjusted ? "" : "text-muted-foreground"}>{factor.toFixed(2)}×</span>
                                 }
                               </TableCell>
                             )}
