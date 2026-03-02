@@ -56,7 +56,8 @@ import type { ChartNote, PurchaseOrderConfig } from "@shared/schema";
 import { useUserPreference } from "@/hooks/use-user-preference";
 import { format, parseISO, subDays } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import ReactMarkdown from "react-markdown";
 
@@ -2020,6 +2021,32 @@ function ColumnFilterPopover({
   );
 }
 
+type ProjFilterOp = 'none' | 'above' | 'below' | 'eq' | 'between';
+type ProjFilter = { op: ProjFilterOp; value: string; value2: string };
+const PROJ_FILTER_DEFAULT: ProjFilter = { op: 'none', value: '', value2: '' };
+
+const PROJ_FILTER_OP_LABELS: Record<ProjFilterOp, string> = {
+  none: 'No filter',
+  above: 'Above',
+  below: 'Below',
+  eq: 'Equal to',
+  between: 'Between',
+};
+
+function applyProjFilter(rows: any[], filter: ProjFilter, getValue: (r: any) => number): any[] {
+  if (filter.op === 'none') return rows;
+  const v = Number(filter.value);
+  const v2 = Number(filter.value2);
+  return rows.filter((r) => {
+    const val = getValue(r);
+    if (filter.op === 'above') return val > v;
+    if (filter.op === 'below') return val < v;
+    if (filter.op === 'eq') return val === v;
+    if (filter.op === 'between') return val >= Math.min(v, v2) && val <= Math.max(v, v2);
+    return true;
+  });
+}
+
 function PurchaseOrdersTab() {
   const { toast } = useToast();
   const [selectedDate, setSelectedDate] = useState<string | undefined>();
@@ -2048,6 +2075,11 @@ function PurchaseOrdersTab() {
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [copiedSku, setCopiedSku] = useState<string | null>(null);
   const [noteModalSku, setNoteModalSku] = useState<string | null>(null);
+  const [projFilterDirect, setProjFilterDirect] = useState<ProjFilter>(PROJ_FILTER_DEFAULT);
+  const [projFilterKits, setProjFilterKits] = useState<ProjFilter>(PROJ_FILTER_DEFAULT);
+  const [projFilterTotal, setProjFilterTotal] = useState<ProjFilter>(PROJ_FILTER_DEFAULT);
+  const [projFilterRec, setProjFilterRec] = useState<ProjFilter>(PROJ_FILTER_DEFAULT);
+  const [projFilterOpen, setProjFilterOpen] = useState(false);
 
   const toggleSort = useCallback((col: string) => {
     if (sortCol === col) {
@@ -2285,8 +2317,20 @@ function PurchaseOrdersTab() {
         return sortDir === "asc" ? aVal - bVal : bVal - aVal;
       });
     }
+    if (hasProjection) {
+      rows = applyProjFilter(rows, projFilterDirect, (r) => Math.round(Number(r.proj_direct ?? 0) * getGrowthMultiplier(r.sku)));
+      rows = applyProjFilter(rows, projFilterKits, (r) => Math.round(Number(r.proj_kits ?? 0) * getGrowthMultiplier(r.sku)));
+      rows = applyProjFilter(rows, projFilterTotal, (r) => {
+        const f = getGrowthMultiplier(r.sku);
+        return Math.round(Number(r.proj_direct ?? 0) * f) + Math.round(Number(r.proj_kits ?? 0) * f);
+      });
+      rows = applyProjFilter(rows, projFilterRec, (r) => {
+        const f = getGrowthMultiplier(r.sku);
+        return Math.round(Number(r.proj_direct ?? 0) * f) + Math.round(Number(r.proj_kits ?? 0) * f) - Number(r.total_stock ?? 0);
+      });
+    }
     return rows;
-  }, [snapshot, searchTerm, categoryFilter, supplierFilter, kitFilter, assembledFilter, sortCol, sortDir, getGrowthMultiplier]);
+  }, [snapshot, searchTerm, categoryFilter, supplierFilter, kitFilter, assembledFilter, sortCol, sortDir, getGrowthMultiplier, hasProjection, projFilterDirect, projFilterKits, projFilterTotal, projFilterRec]);
 
   const summaryStats = useMemo(() => {
     const totalSkus = filtered.length;
@@ -2301,7 +2345,8 @@ function PurchaseOrdersTab() {
     categoryFilter.length > 0 ||
     supplierFilter.length > 0 ||
     kitFilter !== "no" ||
-    assembledFilter !== "either";
+    assembledFilter !== "either" ||
+    (hasProjection && [projFilterDirect, projFilterKits, projFilterTotal, projFilterRec].some((f) => f.op !== 'none'));
 
   const clearPoFilters = useCallback(() => {
     setSearchTerm("");
@@ -2309,6 +2354,10 @@ function PurchaseOrdersTab() {
     setSupplierFilter([]);
     setKitFilter("no");
     setAssembledFilter("either");
+    setProjFilterDirect(PROJ_FILTER_DEFAULT);
+    setProjFilterKits(PROJ_FILTER_DEFAULT);
+    setProjFilterTotal(PROJ_FILTER_DEFAULT);
+    setProjFilterRec(PROJ_FILTER_DEFAULT);
   }, [setCategoryFilter, setSupplierFilter, setKitFilter, setAssembledFilter]);
 
   const readiness = readinessQuery.data;
@@ -2593,6 +2642,106 @@ function PurchaseOrdersTab() {
             </div>
           </PopoverContent>
         </Popover>
+        {hasProjection && (() => {
+          const hasActiveProjFilters = [projFilterDirect, projFilterKits, projFilterTotal, projFilterRec].some((f) => f.op !== 'none');
+          const projFilterRows: { label: string; filter: ProjFilter; setFilter: (f: ProjFilter) => void }[] = [
+            { label: "Proj. Direct", filter: projFilterDirect, setFilter: setProjFilterDirect },
+            { label: "Proj. Kits", filter: projFilterKits, setFilter: setProjFilterKits },
+            { label: "Proj. Total", filter: projFilterTotal, setFilter: setProjFilterTotal },
+            { label: "Rec. Purchase", filter: projFilterRec, setFilter: setProjFilterRec },
+          ];
+          return (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setProjFilterOpen(true)}
+                className={hasActiveProjFilters ? "gap-1.5 border-primary/50 ring-1 ring-primary/30 text-primary" : "gap-1.5"}
+                data-testid="button-proj-filters"
+              >
+                <SlidersHorizontal className="w-3.5 h-3.5" />
+                Projection Filters
+                {hasActiveProjFilters && (
+                  <Badge variant="secondary" className="ml-0.5 px-1.5 py-0 text-xs">
+                    {[projFilterDirect, projFilterKits, projFilterTotal, projFilterRec].filter((f) => f.op !== 'none').length}
+                  </Badge>
+                )}
+              </Button>
+              <Dialog open={projFilterOpen} onOpenChange={setProjFilterOpen}>
+                <DialogContent className="max-w-lg">
+                  <DialogHeader>
+                    <DialogTitle>Projection Filters</DialogTitle>
+                    <DialogDescription>
+                      Filter rows by projected values. Growth factor adjustments are applied before filtering.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="flex flex-col gap-5 py-2">
+                    {projFilterRows.map(({ label, filter, setFilter }) => (
+                      <div key={label} className="flex flex-col gap-2">
+                        <Label className="text-sm font-medium">{label}</Label>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Select
+                            value={filter.op}
+                            onValueChange={(v) => setFilter({ ...filter, op: v as ProjFilterOp })}
+                          >
+                            <SelectTrigger className="w-36" data-testid={`select-proj-filter-op-${label.replace(/\W+/g, '-').toLowerCase()}`}>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {(Object.entries(PROJ_FILTER_OP_LABELS) as [ProjFilterOp, string][]).map(([op, lbl]) => (
+                                <SelectItem key={op} value={op}>{lbl}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {filter.op !== 'none' && (
+                            <Input
+                              type="number"
+                              className="w-28"
+                              placeholder="Value"
+                              value={filter.value}
+                              onChange={(e) => setFilter({ ...filter, value: e.target.value })}
+                              data-testid={`input-proj-filter-value-${label.replace(/\W+/g, '-').toLowerCase()}`}
+                            />
+                          )}
+                          {filter.op === 'between' && (
+                            <>
+                              <span className="text-sm text-muted-foreground">and</span>
+                              <Input
+                                type="number"
+                                className="w-28"
+                                placeholder="Value"
+                                value={filter.value2}
+                                onChange={(e) => setFilter({ ...filter, value2: e.target.value })}
+                                data-testid={`input-proj-filter-value2-${label.replace(/\W+/g, '-').toLowerCase()}`}
+                              />
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <DialogFooter className="gap-2">
+                    <Button
+                      variant="ghost"
+                      onClick={() => {
+                        setProjFilterDirect(PROJ_FILTER_DEFAULT);
+                        setProjFilterKits(PROJ_FILTER_DEFAULT);
+                        setProjFilterTotal(PROJ_FILTER_DEFAULT);
+                        setProjFilterRec(PROJ_FILTER_DEFAULT);
+                      }}
+                      data-testid="button-proj-filter-clear"
+                    >
+                      Clear All
+                    </Button>
+                    <Button onClick={() => setProjFilterOpen(false)} data-testid="button-proj-filter-apply">
+                      Apply
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </>
+          );
+        })()}
         {hasActivePoFilters && (
           <Button
             variant="ghost"
