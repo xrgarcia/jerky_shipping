@@ -2440,61 +2440,8 @@ function PurchaseOrdersTab() {
               </SelectContent>
             </Select>
 
-            <div className="flex items-center gap-2 border rounded-md px-3 py-1.5 bg-card" data-testid="projection-window">
-              <span className="text-xs text-muted-foreground whitespace-nowrap">Projection Window:</span>
-              <Popover open={velocityStartPopoverOpen} onOpenChange={setVelocityStartPopoverOpen}>
-                <PopoverTrigger asChild>
-                  <Button variant="ghost" size="sm" className="text-xs font-mono px-2" data-testid="button-window-start">
-                    {velocityStart.toLocaleDateString('en-CA')}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={velocityStart}
-                    onSelect={(date) => {
-                      if (date) {
-                        setVelocityStart(date);
-                        setVelocityStartPopoverOpen(false);
-                        saveConfigMutation.mutate({ velocityWindowStart: date.toLocaleDateString('en-CA') });
-                      }
-                    }}
-                    disabled={(date) => date >= velocityEnd}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-              <span className="text-xs text-muted-foreground">to</span>
-              <Popover open={velocityEndPopoverOpen} onOpenChange={setVelocityEndPopoverOpen}>
-                <PopoverTrigger asChild>
-                  <Button variant="ghost" size="sm" className="text-xs font-mono px-2" data-testid="button-window-end">
-                    {velocityEnd.toLocaleDateString('en-CA')}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={velocityEnd}
-                    onSelect={(date) => {
-                      if (date) {
-                        setVelocityEnd(date);
-                        setVelocityEndPopoverOpen(false);
-                        saveConfigMutation.mutate({ velocityWindowEnd: date.toLocaleDateString('en-CA') });
-                      }
-                    }}
-                    disabled={(date) => date <= velocityStart}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
           </>
         )}
-
-        <Button variant="outline" onClick={exportCsv} disabled={filtered.length === 0} className="ml-auto" data-testid="button-export-csv">
-          <Download className="w-4 h-4 mr-2" />
-          Export CSV
-        </Button>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -2615,9 +2562,65 @@ function PurchaseOrdersTab() {
             Clear Filters
           </Button>
         )}
+        {snapshot.length > 0 && (
+          <div className="flex items-center gap-2 border rounded-md px-3 py-1.5 bg-card" data-testid="projection-window">
+            <span className="text-xs text-muted-foreground whitespace-nowrap">Projection Window:</span>
+            <Popover open={velocityStartPopoverOpen} onOpenChange={setVelocityStartPopoverOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="ghost" size="sm" className="text-xs font-mono px-2" data-testid="button-window-start">
+                  {velocityStart.toLocaleDateString('en-CA')}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={velocityStart}
+                  onSelect={(date) => {
+                    if (date) {
+                      setVelocityStart(date);
+                      setVelocityStartPopoverOpen(false);
+                      saveConfigMutation.mutate({ velocityWindowStart: date.toLocaleDateString('en-CA') });
+                    }
+                  }}
+                  disabled={(date) => date >= velocityEnd}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+            <span className="text-xs text-muted-foreground">to</span>
+            <Popover open={velocityEndPopoverOpen} onOpenChange={setVelocityEndPopoverOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="ghost" size="sm" className="text-xs font-mono px-2" data-testid="button-window-end">
+                  {velocityEnd.toLocaleDateString('en-CA')}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={velocityEnd}
+                  onSelect={(date) => {
+                    if (date) {
+                      setVelocityEnd(date);
+                      setVelocityEndPopoverOpen(false);
+                      saveConfigMutation.mutate({ velocityWindowEnd: date.toLocaleDateString('en-CA') });
+                    }
+                  }}
+                  disabled={(date) => date <= velocityStart}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+        )}
+
         <p className="text-xs text-muted-foreground whitespace-nowrap">
           {filtered.length} of {snapshot.length} products
         </p>
+
+        <Button variant="outline" onClick={exportCsv} disabled={filtered.length === 0} className="ml-auto" data-testid="button-export-csv">
+          <Download className="w-4 h-4 mr-2" />
+          Export CSV
+        </Button>
       </div>
 
       {snapshotQuery.isLoading ? (
