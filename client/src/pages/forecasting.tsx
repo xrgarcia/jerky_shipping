@@ -1220,14 +1220,16 @@ function SalesTab() {
                 value={activeFilters.isPeakSeason ?? 'either'}
                 onValueChange={(v) => updateFilter('isPeakSeason', v as BooleanFilter)}
               >
-                <SelectTrigger className={`w-[120px] sm:w-[150px] transition-all${activeFilters.isPeakSeason && activeFilters.isPeakSeason !== 'either' ? " ring-1 ring-primary/50 border-primary/50" : ""}`} data-testid="select-peak-season">
+                <SelectTrigger className={`w-[185px] transition-all${activeFilters.isPeakSeason && activeFilters.isPeakSeason !== 'either' ? " ring-1 ring-primary/50 border-primary/50" : ""}`} data-testid="select-peak-season">
                   {activeFilters.isPeakSeason && activeFilters.isPeakSeason !== 'either' && <ListFilter className="mr-1 h-3.5 w-3.5 shrink-0 text-primary" />}
-                  <SelectValue />
+                  <span className="truncate text-sm">
+                    {"Peak Season: " + (activeFilters.isPeakSeason === 'true' ? 'Yes' : activeFilters.isPeakSeason === 'false' ? 'No' : 'Either')}
+                  </span>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="either" data-testid="option-peak-either">Either</SelectItem>
-                  <SelectItem value="true" data-testid="option-peak-true">True</SelectItem>
-                  <SelectItem value="false" data-testid="option-peak-false">False</SelectItem>
+                  <SelectItem value="true" data-testid="option-peak-true">Yes</SelectItem>
+                  <SelectItem value="false" data-testid="option-peak-false">No</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -1261,14 +1263,16 @@ function SalesTab() {
                 value={activeFilters.isAssembledProduct ?? 'either'}
                 onValueChange={(v) => updateFilter('isAssembledProduct', v as BooleanFilter)}
               >
-                <SelectTrigger className={`w-[120px] sm:w-[150px] transition-all${activeFilters.isAssembledProduct && activeFilters.isAssembledProduct !== 'either' ? " ring-1 ring-primary/50 border-primary/50" : ""}`} data-testid="select-assembled">
+                <SelectTrigger className={`w-[185px] transition-all${activeFilters.isAssembledProduct && activeFilters.isAssembledProduct !== 'either' ? " ring-1 ring-primary/50 border-primary/50" : ""}`} data-testid="select-assembled">
                   {activeFilters.isAssembledProduct && activeFilters.isAssembledProduct !== 'either' && <ListFilter className="mr-1 h-3.5 w-3.5 shrink-0 text-primary" />}
-                  <SelectValue />
+                  <span className="truncate text-sm">
+                    {"Assembled: " + (activeFilters.isAssembledProduct === 'true' ? 'Yes' : activeFilters.isAssembledProduct === 'false' ? 'No' : 'Either')}
+                  </span>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="either" data-testid="option-assembled-either">Either</SelectItem>
-                  <SelectItem value="true" data-testid="option-assembled-true">True</SelectItem>
-                  <SelectItem value="false" data-testid="option-assembled-false">False</SelectItem>
+                  <SelectItem value="true" data-testid="option-assembled-true">Yes</SelectItem>
+                  <SelectItem value="false" data-testid="option-assembled-false">No</SelectItem>
                 </SelectContent>
               </Select>
             </div>
