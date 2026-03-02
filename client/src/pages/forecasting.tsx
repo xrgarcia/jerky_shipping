@@ -1989,7 +1989,7 @@ const PO_DEFAULT_COLUMNS: PoColumnKey[] = PO_COLUMNS
 const PO_COLUMN_GROUPS = [
   { key: "product",   label: "Product",   keys: ["title", "category"] as PoColumnKey[] },
   { key: "inventory", label: "Inventory", keys: ["available", "incoming", "amzn", "wlmt", "in_kits", "total"] as PoColumnKey[] },
-  { key: "ordering",  label: "Ordering",  keys: ["supplier", "cost", "lead_time", "moq"] as PoColumnKey[] },
+  { key: "ordering",  label: "Supplier",  keys: ["supplier", "cost", "lead_time", "moq"] as PoColumnKey[] },
 ] as const;
 
 function ColumnFilterPopover({
