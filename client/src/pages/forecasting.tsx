@@ -1964,14 +1964,14 @@ function SkuNotesModal({
 const PO_COLUMNS = [
   { key: "title",        label: "Title",        group: "product"    },
   { key: "category",     label: "Category",     group: "product"    },
-  { key: "supplier",     label: "Supplier",     group: "product"    },
-  { key: "cost",         label: "Cost",         group: "product"    },
   { key: "available",    label: "Available",    group: "inventory"  },
   { key: "incoming",     label: "Incoming",     group: "inventory"  },
   { key: "amzn",         label: "Amazon Inv",   group: "inventory"  },
   { key: "wlmt",         label: "Walmart Inv",  group: "inventory"  },
   { key: "in_kits",      label: "In Kits",      group: "inventory"  },
   { key: "total",        label: "Total Stock",  group: "inventory"  },
+  { key: "supplier",     label: "Supplier",     group: "ordering"   },
+  { key: "cost",         label: "Cost",         group: "ordering"   },
   { key: "lead_time",    label: "Lead Time",    group: "ordering"   },
   { key: "moq",          label: "MOQ",          group: "ordering"   },
   { key: "proj_direct",  label: "Proj. Direct",  group: "projection" },
@@ -1987,9 +1987,9 @@ const PO_DEFAULT_COLUMNS: PoColumnKey[] = PO_COLUMNS
   .map((c) => c.key) as PoColumnKey[];
 
 const PO_COLUMN_GROUPS = [
-  { key: "product",   label: "Product",   keys: ["title", "category", "supplier", "cost"] as PoColumnKey[] },
+  { key: "product",   label: "Product",   keys: ["title", "category"] as PoColumnKey[] },
   { key: "inventory", label: "Inventory", keys: ["available", "incoming", "amzn", "wlmt", "in_kits", "total"] as PoColumnKey[] },
-  { key: "ordering",  label: "Ordering",  keys: ["lead_time", "moq"] as PoColumnKey[] },
+  { key: "ordering",  label: "Ordering",  keys: ["supplier", "cost", "lead_time", "moq"] as PoColumnKey[] },
 ] as const;
 
 function ColumnFilterPopover({
@@ -2976,7 +2976,29 @@ function PurchaseOrdersTab() {
                     </div>
                   </TableHead>
                   )}
-                  {/* Supplier column — multi-select filter in header */}
+                  {/* Inventory columns — sortable-only */}
+                  {[
+                    { key: "available", label: "Available", right: true, width: 80 },
+                    { key: "incoming",  label: "Incoming",  right: true, width: 80 },
+                    { key: "amzn",      label: "Amzn",      right: true, width: 65 },
+                    { key: "wlmt",      label: "Wlmt",      right: true, width: 65 },
+                    { key: "in_kits",   label: "In Kits",   right: true, width: 70 },
+                    { key: "total",     label: "Total",     right: true, width: 70 },
+                  ].filter((col) => colVisible(col.key)).map((col) => (
+                    <TableHead
+                      key={col.key}
+                      style={{ width: col.width, minWidth: col.width }}
+                      className={`sticky top-8 bg-card z-10 cursor-pointer select-none whitespace-nowrap ${col.right ? "text-right" : ""}`}
+                      onClick={() => toggleSort(col.key)}
+                      data-testid={`sort-${col.key}`}
+                    >
+                      <span className={`inline-flex items-center gap-1 ${col.right ? "justify-end" : ""}`}>
+                        {col.label}
+                        {sortCol === col.key ? (sortDir === "asc" ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />) : <ChevronsUpDown className="w-3 h-3 opacity-30" />}
+                      </span>
+                    </TableHead>
+                  ))}
+                  {/* Supplier column — multi-select filter in header (Ordering group) */}
                   {colVisible("supplier") && (
                   <TableHead
                     style={{ width: 140, minWidth: 140 }}
@@ -3004,15 +3026,9 @@ function PurchaseOrdersTab() {
                     </div>
                   </TableHead>
                   )}
-                  {/* Remaining sortable-only columns — ordered to match group boundaries */}
+                  {/* Ordering columns — cost, lead_time, moq */}
                   {[
-                    { key: "cost",      label: "Cost",     right: true, width: 70 },
-                    { key: "available", label: "Available", right: true, width: 80 },
-                    { key: "incoming",  label: "Incoming",  right: true, width: 80 },
-                    { key: "amzn",      label: "Amzn",      right: true, width: 65 },
-                    { key: "wlmt",      label: "Wlmt",      right: true, width: 65 },
-                    { key: "in_kits",   label: "In Kits",   right: true, width: 70 },
-                    { key: "total",     label: "Total",     right: true, width: 70 },
+                    { key: "cost",      label: "Cost",      right: true, width: 70 },
                     { key: "lead_time", label: "Lead Time", right: true, width: 80 },
                     { key: "moq",       label: "MOQ",       right: true, width: 65 },
                   ].filter((col) => colVisible(col.key)).map((col) => (
@@ -3093,14 +3109,14 @@ function PurchaseOrdersTab() {
                       </TableCell>
                       {colVisible("title") && <TableCell style={{ width: 230, minWidth: 230, maxWidth: 230 }} className="text-sm truncate" title={row.product_title}>{row.product_title || row.description || "—"}</TableCell>}
                       {colVisible("category") && <TableCell style={{ width: 130, minWidth: 130, maxWidth: 130 }} className="text-xs truncate">{row.product_category || "—"}</TableCell>}
-                      {colVisible("supplier") && <TableCell style={{ width: 140, minWidth: 140, maxWidth: 140 }} className="text-xs truncate" title={row.supplier}>{row.supplier || "—"}</TableCell>}
-                      {colVisible("cost") && <TableCell style={{ width: 70, minWidth: 70 }} className="text-right tabular-nums">{row.unit_cost ? `$${Number(row.unit_cost).toFixed(2)}` : "—"}</TableCell>}
                       {colVisible("available") && <TableCell style={{ width: 80, minWidth: 80 }} className={`text-right tabular-nums ${isLow ? "text-red-600 dark:text-red-400 font-semibold" : ""}`}>{avail}</TableCell>}
                       {colVisible("incoming") && <TableCell style={{ width: 80, minWidth: 80 }} className="text-right tabular-nums">{row.quantity_incoming ?? "—"}</TableCell>}
                       {colVisible("amzn") && <TableCell style={{ width: 65, minWidth: 65 }} className="text-right tabular-nums">{row.ext_amzn_inv ?? "—"}</TableCell>}
                       {colVisible("wlmt") && <TableCell style={{ width: 65, minWidth: 65 }} className="text-right tabular-nums">{row.ext_wlmt_inv ?? "—"}</TableCell>}
                       {colVisible("in_kits") && <TableCell style={{ width: 70, minWidth: 70 }} className="text-right tabular-nums">{row.quantity_in_kits ?? "—"}</TableCell>}
                       {colVisible("total") && <TableCell style={{ width: 70, minWidth: 70 }} className="text-right tabular-nums">{row.total_stock ?? "—"}</TableCell>}
+                      {colVisible("supplier") && <TableCell style={{ width: 140, minWidth: 140, maxWidth: 140 }} className="text-xs truncate" title={row.supplier}>{row.supplier || "—"}</TableCell>}
+                      {colVisible("cost") && <TableCell style={{ width: 70, minWidth: 70 }} className="text-right tabular-nums">{row.unit_cost ? `$${Number(row.unit_cost).toFixed(2)}` : "—"}</TableCell>}
                       {colVisible("lead_time") && <TableCell style={{ width: 80, minWidth: 80 }} className="text-right tabular-nums">{row.lead_time != null ? `${row.lead_time}d` : "—"}</TableCell>}
                       {colVisible("moq") && <TableCell style={{ width: 65, minWidth: 65 }} className="text-right tabular-nums">{row.moq ?? "—"}</TableCell>}
                       {hasProjection && (() => {
