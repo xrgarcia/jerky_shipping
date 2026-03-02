@@ -2846,40 +2846,12 @@ function PurchaseOrdersTab() {
         <Card className="flex flex-col flex-1 min-h-0 overflow-hidden">
             <Table containerClassName="flex-1 overflow-auto" className="[&_th]:border-r [&_th]:border-border [&_td]:border-r [&_td]:border-border">
               <TableHeader>
-                {/* Row 1 — Group label row; SKU and Notes span both rows via rowSpan */}
+                {/* Row 1 — Group label row; Notes spans both rows via rowSpan; SKU is now under Product */}
                 <TableRow className="h-8">
-                  <TableHead
-                    rowSpan={2}
-                    style={{ width: 145, minWidth: 145 }}
-                    className="sticky top-0 bg-card z-20 cursor-pointer select-none whitespace-nowrap align-middle border-b-0"
-                    onClick={() => toggleSort("sku")}
-                    data-testid="sort-sku"
-                  >
-                    <div className="flex items-center justify-between gap-1">
-                      <span className="inline-flex items-center gap-1">
-                        SKU
-                        {sortCol === "sku" ? (sortDir === "asc" ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />) : <ChevronsUpDown className="w-3 h-3 opacity-30" />}
-                      </span>
-                      <ColumnFilterPopover isActive={kitFilter !== "no"} data-testid="filter-kit-popover">
-                        <div className="flex flex-col gap-0.5">
-                          <p className="text-xs font-medium text-muted-foreground px-1 pb-1">Kit</p>
-                          {(["no", "yes", "either"] as const).map((v) => (
-                            <button
-                              key={v}
-                              type="button"
-                              className={`text-left text-sm px-2 py-1 rounded hover-elevate ${kitFilter === v ? "text-primary font-medium" : ""}`}
-                              onClick={() => setKitFilter(v)}
-                            >
-                              {v === "no" ? "Not a Kit" : v === "yes" ? "Kits Only" : "Show All"}
-                            </button>
-                          ))}
-                        </div>
-                      </ColumnFilterPopover>
-                    </div>
-                  </TableHead>
-                  {/* Group label cells */}
+                  {/* Group label cells — Product always includes SKU (+1) */}
                   {PO_COLUMN_GROUPS.map((group) => {
-                    const cnt = group.keys.filter((k) => colVisible(k)).length;
+                    const visibleCnt = group.keys.filter((k) => colVisible(k)).length;
+                    const cnt = group.key === "product" ? visibleCnt + 1 : visibleCnt;
                     if (cnt === 0) return null;
                     return (
                       <TableHead
@@ -2915,8 +2887,37 @@ function PurchaseOrdersTab() {
                     </TableHead>
                   )}
                 </TableRow>
-                {/* Row 2 — Individual column headers (SKU and Notes already placed via rowSpan above) */}
+                {/* Row 2 — Individual column headers (Notes already placed via rowSpan above) */}
                 <TableRow>
+                  {/* SKU column — Kit filter in header (Product group) */}
+                  <TableHead
+                    style={{ width: 145, minWidth: 145 }}
+                    className="sticky top-8 bg-card z-10 cursor-pointer select-none whitespace-nowrap"
+                    onClick={() => toggleSort("sku")}
+                    data-testid="sort-sku"
+                  >
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="inline-flex items-center gap-1">
+                        SKU
+                        {sortCol === "sku" ? (sortDir === "asc" ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />) : <ChevronsUpDown className="w-3 h-3 opacity-30" />}
+                      </span>
+                      <ColumnFilterPopover isActive={kitFilter !== "no"} data-testid="filter-kit-popover">
+                        <div className="flex flex-col gap-0.5">
+                          <p className="text-xs font-medium text-muted-foreground px-1 pb-1">Kit</p>
+                          {(["no", "yes", "either"] as const).map((v) => (
+                            <button
+                              key={v}
+                              type="button"
+                              className={`text-left text-sm px-2 py-1 rounded hover-elevate ${kitFilter === v ? "text-primary font-medium" : ""}`}
+                              onClick={() => setKitFilter(v)}
+                            >
+                              {v === "no" ? "Not a Kit" : v === "yes" ? "Kits Only" : "Show All"}
+                            </button>
+                          ))}
+                        </div>
+                      </ColumnFilterPopover>
+                    </div>
+                  </TableHead>
                   {/* Title column — Assembled Product filter in header */}
                   {colVisible("title") && (
                   <TableHead
