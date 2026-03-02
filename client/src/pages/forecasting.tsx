@@ -151,6 +151,7 @@ function MetricCard({
   icon: Icon,
   changeValue,
   isLoading,
+  tooltip,
 }: {
   title: string;
   value: number | null | undefined;
@@ -158,6 +159,7 @@ function MetricCard({
   icon: React.ComponentType<{ className?: string }>;
   changeValue?: number | null;
   isLoading: boolean;
+  tooltip?: string;
 }) {
   const isChange = changeValue !== undefined;
   const isPositive = isChange && changeValue != null && changeValue >= 0;
@@ -167,7 +169,19 @@ function MetricCard({
     <Card data-testid={`metric-card-${title.toLowerCase().replace(/\s+/g, '-')}`}>
       <CardContent className="p-4">
         <div className="flex items-center justify-between gap-2 mb-1">
-          <span className="text-sm text-muted-foreground">{title}</span>
+          <div className="flex items-center gap-1">
+            <span className="text-sm text-muted-foreground">{title}</span>
+            {tooltip && (
+              <HoverTooltip>
+                <HoverTooltipTrigger asChild>
+                  <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                </HoverTooltipTrigger>
+                <HoverTooltipContent side="top" className="max-w-xs text-xs">
+                  {tooltip}
+                </HoverTooltipContent>
+              </HoverTooltip>
+            )}
+          </div>
           <Icon className="h-4 w-4 text-muted-foreground" />
         </div>
         {isLoading ? (
@@ -1348,6 +1362,7 @@ function SalesTab() {
           icon={summaryResponse?.data.yoyRevenueChangePct != null && summaryResponse.data.yoyRevenueChangePct >= 0 ? TrendingUp : TrendingDown}
           changeValue={summaryResponse?.data.yoyRevenueChangePct}
           isLoading={summaryLoading}
+          tooltip="Compares the selected period's revenue against the same period one year prior. For historical dates this is actual current-year vs. last-year revenue from the GCP reporting database. For future dates it uses last year's actuals vs. two years ago stored in the sales_forecasting table as a growth proxy."
         />
         <MetricCard
           title="YoY Units"
@@ -1356,6 +1371,7 @@ function SalesTab() {
           icon={summaryResponse?.data.yoyUnitsChangePct != null && summaryResponse.data.yoyUnitsChangePct >= 0 ? TrendingUp : TrendingDown}
           changeValue={summaryResponse?.data.yoyUnitsChangePct}
           isLoading={summaryLoading}
+          tooltip="Compares the selected period's unit sales against the same period one year prior. For historical dates this is actual current-year vs. last-year units from the GCP reporting database. For future dates it uses last year's actuals vs. two years ago stored in the sales_forecasting table as a growth proxy."
         />
         <Card data-testid="metric-card-yoy-growth">
           <CardContent className="p-4">
