@@ -2889,7 +2889,7 @@ function PurchaseOrdersTab() {
                     return (
                       <TableHead
                         colSpan={cnt}
-                        className="sticky top-0 bg-border/50 z-20 text-center text-[10px] font-bold text-foreground/70 uppercase tracking-widest py-1.5 border-b border-border"
+                        className="sticky top-0 bg-border/50 z-20 text-center text-[10px] font-bold text-foreground/70 uppercase tracking-widest py-1.5 border-l-2 border-b border-border"
                       >
                         Projection
                       </TableHead>
@@ -2903,7 +2903,7 @@ function PurchaseOrdersTab() {
                     return (
                       <TableHead
                         colSpan={cnt}
-                        className="sticky top-0 bg-border/50 z-20 text-center text-[10px] font-bold text-foreground/70 uppercase tracking-widest py-1.5 border-b border-border"
+                        className="sticky top-0 bg-border/50 z-20 text-center text-[10px] font-bold text-foreground/70 uppercase tracking-widest py-1.5 border-l-2 border-b border-border"
                       >
                         {group.label}
                       </TableHead>
@@ -2917,7 +2917,7 @@ function PurchaseOrdersTab() {
                     return (
                       <TableHead
                         colSpan={cnt}
-                        className="sticky top-0 bg-border/50 z-20 text-center text-[10px] font-bold text-foreground/70 uppercase tracking-widest py-1.5 border-b border-border"
+                        className="sticky top-0 bg-border/50 z-20 text-center text-[10px] font-bold text-foreground/70 uppercase tracking-widest py-1.5 border-l-2 border-b border-border"
                       >
                         {group.label}
                       </TableHead>
@@ -3022,11 +3022,11 @@ function PurchaseOrdersTab() {
                     { key: "proj_total",   label: "Proj. Total",   width: 90, tooltip: "Total projected units needed (direct + kit-driven) over the selected window." },
                     { key: "rec_purchase", label: "Rec. Purchase", width: 90, tooltip: "Recommended purchase qty: projected total minus current total stock. Negative means you have sufficient stock." },
                     { key: "qty_ordered",  label: "Qty Ordered",   width: 90, tooltip: "The quantity your team decided to order for this SKU. Click any cell to enter or edit the value." },
-                  ].filter((col) => colVisible(col.key)).map((col) => (
+                  ].filter((col) => colVisible(col.key)).map((col, idx) => (
                     <TableHead
                       key={col.key}
                       style={{ width: col.width, minWidth: col.width }}
-                      className="text-right sticky top-8 bg-card z-10 cursor-pointer select-none whitespace-nowrap"
+                      className={`text-right sticky top-8 bg-card z-10 cursor-pointer select-none whitespace-nowrap ${idx === 0 ? "border-l-2 border-border" : ""}`}
                       onClick={() => toggleSort(col.key)}
                       data-testid={`sort-${col.key}`}
                     >
@@ -3056,11 +3056,11 @@ function PurchaseOrdersTab() {
                     { key: "wlmt",      label: "Wlmt",      right: true, width: 65 },
                     { key: "in_kits",   label: "In Kits",   right: true, width: 70 },
                     { key: "total",     label: "Total",     right: true, width: 70 },
-                  ].filter((col) => colVisible(col.key)).map((col) => (
+                  ].filter((col) => colVisible(col.key)).map((col, idx) => (
                     <TableHead
                       key={col.key}
                       style={{ width: col.width, minWidth: col.width }}
-                      className={`sticky top-8 bg-card z-10 cursor-pointer select-none whitespace-nowrap ${col.right ? "text-right" : ""}`}
+                      className={`sticky top-8 bg-card z-10 cursor-pointer select-none whitespace-nowrap ${col.right ? "text-right" : ""} ${idx === 0 ? "border-l-2 border-border" : ""}`}
                       onClick={() => toggleSort(col.key)}
                       data-testid={`sort-${col.key}`}
                     >
@@ -3074,7 +3074,7 @@ function PurchaseOrdersTab() {
                   {colVisible("supplier") && (
                   <TableHead
                     style={{ width: 140, minWidth: 140 }}
-                    className="sticky top-8 bg-card z-10 cursor-pointer select-none whitespace-nowrap"
+                    className="sticky top-8 bg-card z-10 cursor-pointer select-none whitespace-nowrap border-l-2 border-border"
                     onClick={() => toggleSort("supplier")}
                     data-testid="sort-supplier"
                   >
@@ -3194,7 +3194,7 @@ function PurchaseOrdersTab() {
                         return (
                           <>
                             {colVisible("proj_direct") && (
-                              <TableCell style={{ width: 90, minWidth: 90 }} className="text-right tabular-nums">
+                              <TableCell style={{ width: 90, minWidth: 90 }} className="text-right tabular-nums border-l-2 border-border">
                                 {adjDirect.toLocaleString()}
                                 {isAdjusted && <div className="text-xs text-muted-foreground">{rawDirect.toLocaleString()}</div>}
                               </TableCell>
@@ -3283,13 +3283,13 @@ function PurchaseOrdersTab() {
                           </>
                         );
                       })()}
-                      {colVisible("available") && <TableCell style={{ width: 80, minWidth: 80 }} className={`text-right tabular-nums ${isLow ? "text-red-600 dark:text-red-400 font-semibold" : ""}`}>{avail}</TableCell>}
+                      {colVisible("available") && <TableCell style={{ width: 80, minWidth: 80 }} className={`text-right tabular-nums border-l-2 border-border ${isLow ? "text-red-600 dark:text-red-400 font-semibold" : ""}`}>{avail}</TableCell>}
                       {colVisible("incoming") && <TableCell style={{ width: 80, minWidth: 80 }} className="text-right tabular-nums">{row.quantity_incoming ?? "—"}</TableCell>}
                       {colVisible("amzn") && <TableCell style={{ width: 65, minWidth: 65 }} className="text-right tabular-nums">{row.ext_amzn_inv ?? "—"}</TableCell>}
                       {colVisible("wlmt") && <TableCell style={{ width: 65, minWidth: 65 }} className="text-right tabular-nums">{row.ext_wlmt_inv ?? "—"}</TableCell>}
                       {colVisible("in_kits") && <TableCell style={{ width: 70, minWidth: 70 }} className="text-right tabular-nums">{row.quantity_in_kits ?? "—"}</TableCell>}
                       {colVisible("total") && <TableCell style={{ width: 70, minWidth: 70 }} className="text-right tabular-nums">{row.total_stock ?? "—"}</TableCell>}
-                      {colVisible("supplier") && <TableCell style={{ width: 140, minWidth: 140, maxWidth: 140 }} className="text-xs truncate" title={row.supplier}>{row.supplier || "—"}</TableCell>}
+                      {colVisible("supplier") && <TableCell style={{ width: 140, minWidth: 140, maxWidth: 140 }} className="text-xs truncate border-l-2 border-border" title={row.supplier}>{row.supplier || "—"}</TableCell>}
                       {colVisible("cost") && <TableCell style={{ width: 70, minWidth: 70 }} className="text-right tabular-nums">{row.unit_cost ? `$${Number(row.unit_cost).toFixed(2)}` : "—"}</TableCell>}
                       {colVisible("lead_time") && <TableCell style={{ width: 80, minWidth: 80 }} className="text-right tabular-nums">{row.lead_time != null ? `${row.lead_time}d` : "—"}</TableCell>}
                       {colVisible("moq") && <TableCell style={{ width: 65, minWidth: 65 }} className="text-right tabular-nums">{row.moq ?? "—"}</TableCell>}
