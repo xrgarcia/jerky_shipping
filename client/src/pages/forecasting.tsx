@@ -2403,11 +2403,6 @@ function PurchaseOrdersTab() {
           </Select>
         )}
 
-        <Button variant="outline" onClick={exportCsv} disabled={filtered.length === 0} data-testid="button-export-csv">
-          <Download className="w-4 h-4 mr-2" />
-          Export CSV
-        </Button>
-
         {snapshot.length > 0 && (
           <>
             <Select
@@ -2495,6 +2490,11 @@ function PurchaseOrdersTab() {
             </div>
           </>
         )}
+
+        <Button variant="outline" onClick={exportCsv} disabled={filtered.length === 0} className="ml-auto" data-testid="button-export-csv">
+          <Download className="w-4 h-4 mr-2" />
+          Export CSV
+        </Button>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
