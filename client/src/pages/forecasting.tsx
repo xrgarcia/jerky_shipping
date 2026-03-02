@@ -2359,36 +2359,33 @@ function PurchaseOrdersTab() {
   return (
     <div className="flex flex-col flex-1 min-h-0 gap-3">
       <div className="flex flex-wrap items-center gap-3 shrink-0">
-        <Card className="flex-1 min-w-[200px]">
-          <CardContent className="pt-4 pb-3 px-4">
-            <div className="flex items-center gap-2">
-              {readiness?.ready ? (
-                <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400 shrink-0" />
-              ) : (
-                <Clock className="w-5 h-5 text-muted-foreground shrink-0" />
+        <HoverTooltip>
+          <HoverTooltipTrigger asChild>
+            <div className="relative inline-block">
+              <Button
+                onClick={() => createSnapshotMutation.mutate()}
+                disabled={!readiness?.ready || createSnapshotMutation.isPending}
+                data-testid="button-create-snapshot"
+              >
+                {createSnapshotMutation.isPending ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                )}
+                Create Snapshot
+              </Button>
+              {readiness?.ready && (
+                <span className="absolute -top-1.5 -right-1.5 flex h-3.5 w-3.5 pointer-events-none" data-testid="text-po-readiness">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-green-500" />
+                </span>
               )}
-              <div className="min-w-0">
-                <p className="text-xs text-muted-foreground">Snapshot Status</p>
-                <p className="text-sm truncate" data-testid="text-po-readiness">
-                  {readinessQuery.isLoading ? "Checking..." : readiness?.reason ?? "Unknown"}
-                </p>
-              </div>
             </div>
-          </CardContent>
-        </Card>
-
-        <Button
-          onClick={() => createSnapshotMutation.mutate()}
-          disabled={!readiness?.ready || createSnapshotMutation.isPending}
-          data-testid="button-create-snapshot"
-        >
-          {createSnapshotMutation.isPending ? (
-            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-          ) : (
-            <RefreshCw className="w-4 h-4 mr-2" />
-          )}
-          Create Snapshot
-        </Button>
+          </HoverTooltipTrigger>
+          <HoverTooltipContent side="bottom">
+            {readinessQuery.isLoading ? "Checking..." : readiness?.reason ?? "Unknown"}
+          </HoverTooltipContent>
+        </HoverTooltip>
 
         {(datesQuery.data?.length ?? 0) > 0 && (
           <Select value={selectedDate ?? ""} onValueChange={(v) => { setSelectedDate(v || undefined); saveConfigMutation.mutate({ activeSnapshotDate: v || null }); }}>
