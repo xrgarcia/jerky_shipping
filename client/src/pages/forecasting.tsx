@@ -1956,6 +1956,7 @@ const PO_COLUMNS = [
   { key: "total", label: "Total Stock" },
   { key: "proj_direct", label: "Proj. Direct", group: "projection" },
   { key: "proj_kits", label: "Proj. Kits", group: "projection" },
+  { key: "growth_mult", label: "Growth Adj.", group: "projection" },
   { key: "proj_total", label: "Proj. Total", group: "projection" },
   { key: "rec_purchase", label: "Rec. Purchase", group: "projection" },
   { key: "notes", label: "Notes" },
@@ -2297,7 +2298,7 @@ function PurchaseOrdersTab() {
   const exportCsv = useCallback(() => {
     if (filtered.length === 0) return;
     const headers = ["SKU", "Title", "Category", "Supplier", "Unit Cost", "On Hand", "Available", "Incoming", "Lead Time (days)", "MOQ", "Amazon Inv", "Walmart Inv", "In Kits", "Total Stock"];
-    if (hasProjection) headers.push("Proj. Direct", "Proj. Kits", "Proj. Total", "Rec. Purchase");
+    if (hasProjection) headers.push("Proj. Direct", "Proj. Kits", "Growth Adj.", "Proj. Total", "Rec. Purchase");
     const csvRows = [headers.join(",")];
     for (const r of filtered) {
       const row = [
@@ -2319,6 +2320,7 @@ function PurchaseOrdersTab() {
         row.push(
           String(csvAdjDirect),
           String(csvAdjKits),
+          growthFactorMethod === "none" ? "—" : csvFactor.toFixed(2) + "x",
           String(csvAdjTotal),
           String(csvAdjRec),
         );
@@ -2763,6 +2765,7 @@ function PurchaseOrdersTab() {
                   {hasProjection && [
                     { key: "proj_direct", label: "Proj. Direct", width: 90, tooltip: "Projected individual units sold (not part of a kit) over the selected window, using the chosen algorithm." },
                     { key: "proj_kits", label: "Proj. Kits", width: 90, tooltip: "Projected kit-driven units (this SKU ships inside a kit) over the selected window, using the chosen algorithm." },
+                    { key: "growth_mult", label: "Growth Adj.", width: 70, tooltip: "The growth multiplier applied to this SKU's projections based on the selected growth factor method." },
                     { key: "proj_total", label: "Proj. Total", width: 90, tooltip: "Total projected units needed (direct + kit-driven) over the selected window." },
                     { key: "rec_purchase", label: "Rec. Purchase", width: 90, tooltip: "Recommended purchase qty: projected total minus current total stock. Negative means you have sufficient stock." },
                   ].filter((col) => colVisible(col.key)).map((col) => (
@@ -2865,6 +2868,14 @@ function PurchaseOrdersTab() {
                               <TableCell style={{ width: 90, minWidth: 90 }} className="text-right tabular-nums">
                                 {adjKits.toLocaleString()}
                                 {isAdjusted && <div className="text-xs text-muted-foreground">{rawKits.toLocaleString()}</div>}
+                              </TableCell>
+                            )}
+                            {colVisible("growth_mult") && (
+                              <TableCell style={{ width: 70, minWidth: 70 }} className="text-right tabular-nums">
+                                {growthFactorMethod === "none" || !isAdjusted
+                                  ? <span className="text-muted-foreground">—</span>
+                                  : <span>{factor.toFixed(2)}×</span>
+                                }
                               </TableCell>
                             )}
                             {colVisible("proj_total") && (
