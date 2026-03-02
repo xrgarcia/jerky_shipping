@@ -2891,7 +2891,22 @@ function PurchaseOrdersTab() {
                               <TableCell style={{ width: 70, minWidth: 70 }} className="text-right tabular-nums">
                                 {growthFactorMethod === "none"
                                   ? <span className="text-muted-foreground">—</span>
-                                  : <span className={isAdjusted ? "" : "text-muted-foreground"}>{factor.toFixed(2)}×</span>
+                                  : (
+                                    <>
+                                      <span className={isAdjusted ? "" : "text-muted-foreground"}>{factor.toFixed(2)}×</span>
+                                      <div className="text-xs text-muted-foreground/70">
+                                        {growthFactorMethod === "smart"
+                                          ? (() => {
+                                              const f = growthFactorsQuery.data?.[row.sku];
+                                              const tf = f?.trendFactor ?? 1;
+                                              const yf = f?.yoyGrowthFactor ?? 1;
+                                              return tf >= yf ? "trend" : "yoy";
+                                            })()
+                                          : growthFactorMethod
+                                        }
+                                      </div>
+                                    </>
+                                  )
                                 }
                               </TableCell>
                             )}
