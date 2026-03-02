@@ -2071,8 +2071,12 @@ function PurchaseOrdersTab() {
   });
   const [velocityStartPopoverOpen, setVelocityStartPopoverOpen] = useState(false);
   const [velocityEndPopoverOpen, setVelocityEndPopoverOpen] = useState(false);
-  const [sortCol, setSortCol] = useState<string | null>(null);
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const { value: sortCol, setValue: setSortCol } = useUserPreference<string | null>(
+    "purchase-orders", "sort-col", null, { debounceMs: 300 }
+  );
+  const { value: sortDir, setValue: setSortDir } = useUserPreference<"asc" | "desc">(
+    "purchase-orders", "sort-dir", "asc", { debounceMs: 300 }
+  );
   const [copiedSku, setCopiedSku] = useState<string | null>(null);
   const [noteModalSku, setNoteModalSku] = useState<string | null>(null);
   const { value: projFilterDirect, setValue: setProjFilterDirect } = useUserPreference<ProjFilter>(
