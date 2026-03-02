@@ -2075,10 +2075,18 @@ function PurchaseOrdersTab() {
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [copiedSku, setCopiedSku] = useState<string | null>(null);
   const [noteModalSku, setNoteModalSku] = useState<string | null>(null);
-  const [projFilterDirect, setProjFilterDirect] = useState<ProjFilter>(PROJ_FILTER_DEFAULT);
-  const [projFilterKits, setProjFilterKits] = useState<ProjFilter>(PROJ_FILTER_DEFAULT);
-  const [projFilterTotal, setProjFilterTotal] = useState<ProjFilter>(PROJ_FILTER_DEFAULT);
-  const [projFilterRec, setProjFilterRec] = useState<ProjFilter>(PROJ_FILTER_DEFAULT);
+  const { value: projFilterDirect, setValue: setProjFilterDirect } = useUserPreference<ProjFilter>(
+    "purchase-orders", "proj-filter-direct", PROJ_FILTER_DEFAULT, { debounceMs: 300 }
+  );
+  const { value: projFilterKits, setValue: setProjFilterKits } = useUserPreference<ProjFilter>(
+    "purchase-orders", "proj-filter-kits", PROJ_FILTER_DEFAULT, { debounceMs: 300 }
+  );
+  const { value: projFilterTotal, setValue: setProjFilterTotal } = useUserPreference<ProjFilter>(
+    "purchase-orders", "proj-filter-total", PROJ_FILTER_DEFAULT, { debounceMs: 300 }
+  );
+  const { value: projFilterRec, setValue: setProjFilterRec } = useUserPreference<ProjFilter>(
+    "purchase-orders", "proj-filter-rec", PROJ_FILTER_DEFAULT, { debounceMs: 300 }
+  );
   const [projFilterOpen, setProjFilterOpen] = useState(false);
 
   const toggleSort = useCallback((col: string) => {
