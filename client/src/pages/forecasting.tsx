@@ -2050,13 +2050,13 @@ function PurchaseOrdersTab() {
   useEffect(() => {
     const allKeys = PO_COLUMNS.map((c) => c.key);
     const missing = PO_DEFAULT_COLUMNS.filter((k) => !visibleColumns.includes(k));
-    if (missing.length > 0) {
-      setVisibleColumns(
-        [...visibleColumns, ...missing].sort(
-          (a, b) => allKeys.indexOf(a as PoColumnKey) - allKeys.indexOf(b as PoColumnKey)
-        )
-      );
-    }
+    const merged = [...visibleColumns, ...missing].sort(
+      (a, b) => allKeys.indexOf(a as PoColumnKey) - allKeys.indexOf(b as PoColumnKey)
+    );
+    const changed =
+      merged.length !== visibleColumns.length ||
+      merged.some((k, i) => k !== visibleColumns[i]);
+    if (changed) setVisibleColumns(merged);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const colVisible = useCallback((key: string) => visibleColumns.includes(key), [visibleColumns]);
@@ -2766,26 +2766,33 @@ function PurchaseOrdersTab() {
                   return (
                     <TableRow key={row.id} data-testid={`row-po-${row.sku}`} className="group/row">
                       {colVisible("notes") && (() => {
-                        const hasNote = !!(skuNotesQuery.data?.[row.sku]?.trim());
+                        const noteText = skuNotesQuery.data?.[row.sku]?.trim() ?? "";
+                        const hasNote = !!noteText;
                         return (
                           <TableCell style={{ width: 44, minWidth: 44 }} className="text-center p-1">
-                            <button
-                              type="button"
-                              data-testid={`button-notes-${row.sku}`}
-                              title={hasNote ? "View/edit notes" : "Add notes"}
-                              onClick={() => setNoteModalSku(row.sku)}
-                              className={`inline-flex items-center justify-center rounded p-1 transition-colors ${
-                                hasNote
-                                  ? "text-primary"
-                                  : "text-muted-foreground/30 hover:text-muted-foreground"
-                              }`}
-                            >
-                              <MessageSquare
-                                className="w-4 h-4"
-                                fill={hasNote ? "currentColor" : "none"}
-                                fillOpacity={hasNote ? 0.2 : 0}
-                              />
-                            </button>
+                            <HoverTooltip>
+                              <HoverTooltipTrigger asChild>
+                                <button
+                                  type="button"
+                                  data-testid={`button-notes-${row.sku}`}
+                                  onClick={() => setNoteModalSku(row.sku)}
+                                  className={`inline-flex items-center justify-center rounded p-1 transition-colors ${
+                                    hasNote
+                                      ? "text-primary"
+                                      : "text-muted-foreground/30 hover:text-muted-foreground"
+                                  }`}
+                                >
+                                  <MessageSquare
+                                    className="w-4 h-4"
+                                    fill={hasNote ? "currentColor" : "none"}
+                                    fillOpacity={hasNote ? 0.2 : 0}
+                                  />
+                                </button>
+                              </HoverTooltipTrigger>
+                              <HoverTooltipContent side="left" className="max-w-xs text-left whitespace-pre-wrap">
+                                {hasNote ? noteText : <span className="text-muted-foreground italic">No notes — click to add</span>}
+                              </HoverTooltipContent>
+                            </HoverTooltip>
                           </TableCell>
                         );
                       })()}
