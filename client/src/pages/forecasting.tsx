@@ -2596,11 +2596,18 @@ function PurchaseOrdersTab() {
         </div>
         <Popover>
           <PopoverTrigger asChild>
-            <Button variant="outline" size="sm" className="gap-1.5 shrink-0" data-testid="button-po-columns">
+            <Button
+              variant="outline"
+              size="sm"
+              className={visibleColumns.length < PO_DEFAULT_COLUMNS.length ? "gap-1.5 shrink-0 border-primary/50 ring-1 ring-primary/30 text-primary" : "gap-1.5 shrink-0"}
+              data-testid="button-po-columns"
+            >
               <SlidersHorizontal className="w-3.5 h-3.5" />
               Columns
               {visibleColumns.length < PO_DEFAULT_COLUMNS.length && (
-                <Badge variant="secondary" className="ml-0.5">{PO_DEFAULT_COLUMNS.length - visibleColumns.length} hidden</Badge>
+                <Badge variant="secondary" className="ml-0.5 px-1.5 py-0 text-xs">
+                  {PO_DEFAULT_COLUMNS.length - visibleColumns.length}
+                </Badge>
               )}
             </Button>
           </PopoverTrigger>
