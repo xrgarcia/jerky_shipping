@@ -2274,10 +2274,10 @@ function PurchaseOrdersTab() {
           case "wlmt": aVal = a.ext_wlmt_inv ?? 0; bVal = b.ext_wlmt_inv ?? 0; break;
           case "in_kits": aVal = a.quantity_in_kits ?? 0; bVal = b.quantity_in_kits ?? 0; break;
           case "total": aVal = a.total_stock ?? 0; bVal = b.total_stock ?? 0; break;
-          case "proj_direct": aVal = Number(a.proj_direct ?? 0); bVal = Number(b.proj_direct ?? 0); break;
-          case "proj_kits": aVal = Number(a.proj_kits ?? 0); bVal = Number(b.proj_kits ?? 0); break;
-          case "proj_total": aVal = Number(a.proj_total ?? 0); bVal = Number(b.proj_total ?? 0); break;
-          case "rec_purchase": aVal = Number(a.rec_purchase ?? 0); bVal = Number(b.rec_purchase ?? 0); break;
+          case "proj_direct": aVal = Math.round(Number(a.proj_direct ?? 0) * getGrowthMultiplier(a.sku)); bVal = Math.round(Number(b.proj_direct ?? 0) * getGrowthMultiplier(b.sku)); break;
+          case "proj_kits": aVal = Math.round(Number(a.proj_kits ?? 0) * getGrowthMultiplier(a.sku)); bVal = Math.round(Number(b.proj_kits ?? 0) * getGrowthMultiplier(b.sku)); break;
+          case "proj_total": { const fa = getGrowthMultiplier(a.sku); const fb = getGrowthMultiplier(b.sku); aVal = Math.round(Number(a.proj_direct ?? 0) * fa) + Math.round(Number(a.proj_kits ?? 0) * fa); bVal = Math.round(Number(b.proj_direct ?? 0) * fb) + Math.round(Number(b.proj_kits ?? 0) * fb); break; }
+          case "rec_purchase": { const fa = getGrowthMultiplier(a.sku); const fb = getGrowthMultiplier(b.sku); aVal = Math.round(Number(a.proj_direct ?? 0) * fa) + Math.round(Number(a.proj_kits ?? 0) * fa) - Math.round(Number(a.total_stock ?? 0)); bVal = Math.round(Number(b.proj_direct ?? 0) * fb) + Math.round(Number(b.proj_kits ?? 0) * fb) - Math.round(Number(b.total_stock ?? 0)); break; }
           default: aVal = 0; bVal = 0;
         }
         if (typeof aVal === "string") {
@@ -2288,7 +2288,7 @@ function PurchaseOrdersTab() {
       });
     }
     return rows;
-  }, [snapshot, searchTerm, categoryFilter, supplierFilter, kitFilter, assembledFilter, sortCol, sortDir]);
+  }, [snapshot, searchTerm, categoryFilter, supplierFilter, kitFilter, assembledFilter, sortCol, sortDir, getGrowthMultiplier]);
 
   const summaryStats = useMemo(() => {
     const totalSkus = filtered.length;
