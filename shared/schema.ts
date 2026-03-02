@@ -2173,6 +2173,7 @@ export const purchaseOrderConfig = pgTable("purchase_order_config", {
   defaultLeadTime: integer("default_lead_time"),
   safetyStockDays: integer("safety_stock_days").notNull().default(0),
   activeProjectionMethod: varchar("active_projection_method", { length: 20 }).notNull().default("yoy"),
+  growthFactorMethod: varchar("growth_factor_method", { length: 20 }).notNull().default("none"),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 

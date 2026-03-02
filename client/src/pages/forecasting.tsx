@@ -2011,6 +2011,7 @@ function PurchaseOrdersTab() {
     "purchase-orders", "supplier-filter", [], { debounceMs: 300 }
   );
   const [activeProjectionMethod, setActiveProjectionMethod] = useState<string>("yoy");
+  const [growthFactorMethod, setGrowthFactorMethod] = useState<string>("none");
   const [velocityStart, setVelocityStart] = useState<Date>(() => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
@@ -2106,6 +2107,12 @@ function PurchaseOrdersTab() {
     queryKey: ["/api/purchase-orders/sku-notes"],
   });
 
+  const growthFactorsQuery = useQuery<Record<string, { trendFactor: number | null; yoyGrowthRate: number | null }>>({
+    queryKey: ["/api/purchase-orders/growth-factors"],
+    enabled: growthFactorMethod !== "none",
+    staleTime: 60 * 60 * 1000,
+  });
+
   const saveNoteMutation = useMutation({
     mutationFn: async ({ sku, notes }: { sku: string; notes: string }) => {
       const res = await apiRequest("PUT", `/api/purchase-orders/sku-notes/${encodeURIComponent(sku)}`, { notes });
@@ -2163,6 +2170,7 @@ function PurchaseOrdersTab() {
       const cfg = configQuery.data;
       if (cfg.activeSnapshotDate) setSelectedDate(cfg.activeSnapshotDate);
       if (cfg.activeProjectionMethod) setActiveProjectionMethod(cfg.activeProjectionMethod);
+      if (cfg.growthFactorMethod) setGrowthFactorMethod(cfg.growthFactorMethod);
       if (cfg.velocityWindowStart) {
         const d = new Date(cfg.velocityWindowStart);
         if (!isNaN(d.getTime())) setVelocityStart(d);
@@ -2177,6 +2185,17 @@ function PurchaseOrdersTab() {
 
   const snapshot = snapshotQuery.data ?? [];
   const hasProjection = snapshot.length > 0;
+
+  const getGrowthMultiplier = useCallback((sku: string): number => {
+    if (growthFactorMethod === "none" || !growthFactorsQuery.data) return 1;
+    const factors = growthFactorsQuery.data[sku];
+    if (!factors) return 1;
+    const { trendFactor, yoyGrowthRate } = factors;
+    if (growthFactorMethod === "trend") return trendFactor ?? 1;
+    if (growthFactorMethod === "yoy") return yoyGrowthRate ?? 1;
+    if (growthFactorMethod === "smart") return Math.max(trendFactor ?? 1, yoyGrowthRate ?? 1);
+    return 1;
+  }, [growthFactorMethod, growthFactorsQuery.data]);
 
   const categories = useMemo(() => {
     const set = new Set<string>();
@@ -2290,11 +2309,18 @@ function PurchaseOrdersTab() {
         r.total_stock ?? ''
       ];
       if (hasProjection) {
+        const csvFactor = getGrowthMultiplier(r.sku);
+        const csvRawDirect = Math.round(Number(r.proj_direct ?? 0));
+        const csvRawKits = Math.round(Number(r.proj_kits ?? 0));
+        const csvAdjDirect = Math.round(csvRawDirect * csvFactor);
+        const csvAdjKits = Math.round(csvRawKits * csvFactor);
+        const csvAdjTotal = csvAdjDirect + csvAdjKits;
+        const csvAdjRec = csvAdjTotal - Math.round(Number(r.total_stock ?? 0));
         row.push(
-          String(Math.round(Number(r.proj_direct ?? 0))),
-          String(Math.round(Number(r.proj_kits ?? 0))),
-          String(Math.round(Number(r.proj_total ?? 0))),
-          String(Math.round(Number(r.rec_purchase ?? 0))),
+          String(csvAdjDirect),
+          String(csvAdjKits),
+          String(csvAdjTotal),
+          String(csvAdjRec),
         );
       }
       csvRows.push(row.join(","));
@@ -2376,6 +2402,24 @@ function PurchaseOrdersTab() {
                 <SelectItem value="yoy">YoY (Last Year)</SelectItem>
                 <SelectItem value="velocity">14-Day Velocity</SelectItem>
                 <SelectItem value="smart">Smart Blend</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={growthFactorMethod}
+              onValueChange={(val) => {
+                setGrowthFactorMethod(val);
+                saveConfigMutation.mutate({ growthFactorMethod: val });
+              }}
+            >
+              <SelectTrigger className="w-[185px]" data-testid="select-growth-factor">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">No Growth Adj.</SelectItem>
+                <SelectItem value="trend">Trend Factor</SelectItem>
+                <SelectItem value="yoy">YoY Growth Rate</SelectItem>
+                <SelectItem value="smart">Smart Growth</SelectItem>
               </SelectContent>
             </Select>
 
@@ -2801,16 +2845,39 @@ function PurchaseOrdersTab() {
                       {colVisible("in_kits") && <TableCell style={{ width: 70, minWidth: 70 }} className="text-right tabular-nums">{row.quantity_in_kits ?? "—"}</TableCell>}
                       {colVisible("total") && <TableCell style={{ width: 70, minWidth: 70 }} className="text-right tabular-nums">{row.total_stock ?? "—"}</TableCell>}
                       {hasProjection && (() => {
-                        const direct = Math.round(Number(row.proj_direct ?? 0));
-                        const kits = Math.round(Number(row.proj_kits ?? 0));
-                        const total = Math.round(Number(row.proj_total ?? 0));
-                        const rec = Math.round(Number(row.rec_purchase ?? 0));
+                        const rawDirect = Math.round(Number(row.proj_direct ?? 0));
+                        const rawKits = Math.round(Number(row.proj_kits ?? 0));
+                        const factor = getGrowthMultiplier(row.sku);
+                        const adjDirect = Math.round(rawDirect * factor);
+                        const adjKits = Math.round(rawKits * factor);
+                        const adjTotal = adjDirect + adjKits;
+                        const adjRec = adjTotal - Math.round(Number(row.total_stock ?? 0));
+                        const isAdjusted = factor !== 1;
                         return (
                           <>
-                            {colVisible("proj_direct") && <TableCell style={{ width: 90, minWidth: 90 }} className="text-right tabular-nums">{direct.toLocaleString()}</TableCell>}
-                            {colVisible("proj_kits") && <TableCell style={{ width: 90, minWidth: 90 }} className="text-right tabular-nums">{kits.toLocaleString()}</TableCell>}
-                            {colVisible("proj_total") && <TableCell style={{ width: 90, minWidth: 90 }} className="text-right tabular-nums font-semibold">{total.toLocaleString()}</TableCell>}
-                            {colVisible("rec_purchase") && <TableCell style={{ width: 90, minWidth: 90 }} className={`text-right tabular-nums font-semibold ${rec > 0 ? "text-red-600 dark:text-red-400" : ""}`}>{rec.toLocaleString()}</TableCell>}
+                            {colVisible("proj_direct") && (
+                              <TableCell style={{ width: 90, minWidth: 90 }} className="text-right tabular-nums">
+                                {adjDirect.toLocaleString()}
+                                {isAdjusted && <div className="text-xs text-muted-foreground">{rawDirect.toLocaleString()}</div>}
+                              </TableCell>
+                            )}
+                            {colVisible("proj_kits") && (
+                              <TableCell style={{ width: 90, minWidth: 90 }} className="text-right tabular-nums">
+                                {adjKits.toLocaleString()}
+                                {isAdjusted && <div className="text-xs text-muted-foreground">{rawKits.toLocaleString()}</div>}
+                              </TableCell>
+                            )}
+                            {colVisible("proj_total") && (
+                              <TableCell style={{ width: 90, minWidth: 90 }} className="text-right tabular-nums font-semibold">
+                                {adjTotal.toLocaleString()}
+                                {isAdjusted && <div className="text-xs text-muted-foreground font-normal">{(rawDirect + rawKits).toLocaleString()}</div>}
+                              </TableCell>
+                            )}
+                            {colVisible("rec_purchase") && (
+                              <TableCell style={{ width: 90, minWidth: 90 }} className={`text-right tabular-nums font-semibold ${adjRec > 0 ? "text-red-600 dark:text-red-400" : ""}`}>
+                                {adjRec.toLocaleString()}
+                              </TableCell>
+                            )}
                           </>
                         );
                       })()}

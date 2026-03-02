@@ -16275,6 +16275,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET growth factors per SKU from GCP sales_metrics_lookup (most recent order_date)
+  app.get("/api/purchase-orders/growth-factors", requireAuth, async (_req: Request, res: Response) => {
+    try {
+      const { getRedisClient } = await import('./utils/queue');
+      const CACHE_KEY = 'po:growth-factors';
+      const CACHE_TTL = 3600;
+
+      let redis: any = null;
+      try {
+        redis = getRedisClient();
+        const cached = await redis.get(CACHE_KEY);
+        if (cached) {
+          return res.json(typeof cached === 'string' ? JSON.parse(cached) : cached);
+        }
+      } catch (_e) { /* redis unavailable, fall through */ }
+
+      const rows = await reportingSql<{ sku: string; trend_factor: string | null; yoy_growth_rate: string | null }[]>`
+        SELECT
+          sku,
+          SUM(trend_factor::numeric * daily_sales_quantity::numeric) / NULLIF(SUM(daily_sales_quantity::numeric), 0) AS trend_factor,
+          SUM(yoy_growth_rate::numeric * daily_sales_quantity::numeric) / NULLIF(SUM(daily_sales_quantity::numeric), 0) AS yoy_growth_rate
+        FROM sales_metrics_lookup
+        WHERE order_date = (SELECT MAX(order_date) FROM sales_metrics_lookup)
+          AND daily_sales_quantity IS NOT NULL
+          AND daily_sales_quantity::numeric > 0
+        GROUP BY sku
+      `;
+
+      const result: Record<string, { trendFactor: number | null; yoyGrowthRate: number | null }> = {};
+      for (const row of rows) {
+        result[row.sku] = {
+          trendFactor: row.trend_factor != null ? parseFloat(row.trend_factor) : null,
+          yoyGrowthRate: row.yoy_growth_rate != null ? parseFloat(row.yoy_growth_rate) : null,
+        };
+      }
+
+      try {
+        if (redis) await redis.set(CACHE_KEY, JSON.stringify(result), { ex: CACHE_TTL });
+      } catch (_e) { /* ignore cache write errors */ }
+
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch growth factors", message: error.message });
+    }
+  });
+
   // GET all SKU notes as a map: { sku -> notes }
   app.get("/api/purchase-orders/sku-notes", requireAuth, async (_req: Request, res: Response) => {
     try {
