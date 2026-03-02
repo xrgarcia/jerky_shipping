@@ -1962,27 +1962,35 @@ function SkuNotesModal({
 }
 
 const PO_COLUMNS = [
-  { key: "title", label: "Title" },
-  { key: "category", label: "Category" },
-  { key: "supplier", label: "Supplier" },
-  { key: "cost", label: "Cost" },
-  { key: "available", label: "Available" },
-  { key: "incoming", label: "Incoming" },
-  { key: "lead_time", label: "Lead Time" },
-  { key: "moq", label: "MOQ" },
-  { key: "amzn", label: "Amazon Inv" },
-  { key: "wlmt", label: "Walmart Inv" },
-  { key: "in_kits", label: "In Kits" },
-  { key: "total", label: "Total Stock" },
-  { key: "proj_direct", label: "Proj. Direct", group: "projection" },
-  { key: "proj_kits", label: "Proj. Kits", group: "projection" },
-  { key: "growth_mult", label: "Growth Adj.", group: "projection" },
-  { key: "proj_total", label: "Proj. Total", group: "projection" },
+  { key: "title",        label: "Title",        group: "product"    },
+  { key: "category",     label: "Category",     group: "product"    },
+  { key: "supplier",     label: "Supplier",     group: "product"    },
+  { key: "cost",         label: "Cost",         group: "product"    },
+  { key: "available",    label: "Available",    group: "inventory"  },
+  { key: "incoming",     label: "Incoming",     group: "inventory"  },
+  { key: "amzn",         label: "Amazon Inv",   group: "inventory"  },
+  { key: "wlmt",         label: "Walmart Inv",  group: "inventory"  },
+  { key: "in_kits",      label: "In Kits",      group: "inventory"  },
+  { key: "total",        label: "Total Stock",  group: "inventory"  },
+  { key: "lead_time",    label: "Lead Time",    group: "ordering"   },
+  { key: "moq",          label: "MOQ",          group: "ordering"   },
+  { key: "proj_direct",  label: "Proj. Direct",  group: "projection" },
+  { key: "proj_kits",    label: "Proj. Kits",    group: "projection" },
+  { key: "growth_mult",  label: "Growth Adj.",   group: "projection" },
+  { key: "proj_total",   label: "Proj. Total",   group: "projection" },
   { key: "rec_purchase", label: "Rec. Purchase", group: "projection" },
-  { key: "notes", label: "Notes" },
+  { key: "notes",        label: "Notes" },
 ] as const;
 type PoColumnKey = (typeof PO_COLUMNS)[number]["key"];
-const PO_DEFAULT_COLUMNS: PoColumnKey[] = PO_COLUMNS.filter((c) => !("group" in c)).map((c) => c.key) as PoColumnKey[];
+const PO_DEFAULT_COLUMNS: PoColumnKey[] = PO_COLUMNS
+  .filter((c) => "group" in c && c.group !== "projection")
+  .map((c) => c.key) as PoColumnKey[];
+
+const PO_COLUMN_GROUPS = [
+  { key: "product",   label: "Product",   keys: ["title", "category", "supplier", "cost"] as PoColumnKey[] },
+  { key: "inventory", label: "Inventory", keys: ["available", "incoming", "amzn", "wlmt", "in_kits", "total"] as PoColumnKey[] },
+  { key: "ordering",  label: "Ordering",  keys: ["lead_time", "moq"] as PoColumnKey[] },
+] as const;
 
 function ColumnFilterPopover({
   isActive,
@@ -2596,34 +2604,77 @@ function PurchaseOrdersTab() {
               )}
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-[210px] p-2" align="start">
-            <div className="flex flex-col gap-0.5">
-              <p className="text-xs font-medium text-muted-foreground px-1 pb-1">Standard Columns</p>
-              <div className="flex flex-col gap-0.5 max-h-[260px] overflow-y-auto">
-                {PO_COLUMNS.filter((c) => !("group" in c)).map((c) => (
-                  <button
-                    key={c.key}
-                    type="button"
-                    className={`flex items-center gap-2 text-sm px-2 py-1 rounded hover-elevate ${colVisible(c.key) ? "" : "text-muted-foreground"}`}
-                    onClick={() => toggleColumn(c.key)}
-                  >
-                    <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 ${colVisible(c.key) ? "bg-primary border-primary" : "border-muted-foreground/40"}`}>
-                      {colVisible(c.key) && <Check className="w-2.5 h-2.5 text-primary-foreground" />}
-                    </div>
-                    {c.label}
-                  </button>
-                ))}
-              </div>
-              {hasProjection && (
-                <>
-                  <div className="border-t my-1" />
-                  <p className="text-xs font-medium text-muted-foreground px-1 pb-1">Projection Columns</p>
-                  <div className="flex flex-col gap-0.5 max-h-[180px] overflow-y-auto">
-                    {PO_COLUMNS.filter((c) => "group" in c && c.group === "projection").map((c) => (
+          <PopoverContent className="w-[230px] p-2" align="start">
+            <div className="flex flex-col gap-1">
+              {PO_COLUMN_GROUPS.map((group) => {
+                const allColKeys = PO_COLUMNS.map((c) => c.key) as PoColumnKey[];
+                const allOn = group.keys.every((k) => colVisible(k));
+                const someOn = group.keys.some((k) => colVisible(k));
+                const toggleGroup = () => {
+                  if (allOn) {
+                    setVisibleColumns(visibleColumns.filter((k) => !group.keys.includes(k as PoColumnKey)));
+                  } else {
+                    const merged = [...new Set([...visibleColumns, ...group.keys])];
+                    setVisibleColumns(merged.sort((a, b) => allColKeys.indexOf(a as PoColumnKey) - allColKeys.indexOf(b as PoColumnKey)));
+                  }
+                };
+                return (
+                  <div key={group.key}>
+                    <button type="button" onClick={toggleGroup} className="flex items-center gap-2 px-1 py-1 w-full rounded hover-elevate">
+                      <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 ${allOn ? "bg-primary border-primary" : someOn ? "border-primary/60" : "border-muted-foreground/40"}`}>
+                        {allOn && <Check className="w-2.5 h-2.5 text-primary-foreground" />}
+                        {!allOn && someOn && <div className="w-1.5 h-0.5 bg-primary/60 rounded-full" />}
+                      </div>
+                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{group.label}</span>
+                    </button>
+                    {group.keys.map((k) => {
+                      const col = PO_COLUMNS.find((c) => c.key === k)!;
+                      return (
+                        <button
+                          key={k}
+                          type="button"
+                          className={`flex items-center gap-2 text-sm px-2 py-0.5 pl-5 rounded hover-elevate w-full ${colVisible(k) ? "" : "text-muted-foreground"}`}
+                          onClick={() => toggleColumn(k)}
+                        >
+                          <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 ${colVisible(k) ? "bg-primary border-primary" : "border-muted-foreground/40"}`}>
+                            {colVisible(k) && <Check className="w-2.5 h-2.5 text-primary-foreground" />}
+                          </div>
+                          {col.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+              {hasProjection && (() => {
+                const projCols = PO_COLUMNS.filter((c) => "group" in c && c.group === "projection");
+                const allColKeys = PO_COLUMNS.map((c) => c.key) as PoColumnKey[];
+                const projKeys = projCols.map((c) => c.key) as PoColumnKey[];
+                const allOn = projKeys.every((k) => colVisible(k));
+                const someOn = projKeys.some((k) => colVisible(k));
+                const toggleGroup = () => {
+                  if (allOn) {
+                    setVisibleColumns(visibleColumns.filter((k) => !projKeys.includes(k as PoColumnKey)));
+                  } else {
+                    const merged = [...new Set([...visibleColumns, ...projKeys])];
+                    setVisibleColumns(merged.sort((a, b) => allColKeys.indexOf(a as PoColumnKey) - allColKeys.indexOf(b as PoColumnKey)));
+                  }
+                };
+                return (
+                  <div>
+                    <div className="border-t my-1" />
+                    <button type="button" onClick={toggleGroup} className="flex items-center gap-2 px-1 py-1 w-full rounded hover-elevate">
+                      <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 ${allOn ? "bg-primary border-primary" : someOn ? "border-primary/60" : "border-muted-foreground/40"}`}>
+                        {allOn && <Check className="w-2.5 h-2.5 text-primary-foreground" />}
+                        {!allOn && someOn && <div className="w-1.5 h-0.5 bg-primary/60 rounded-full" />}
+                      </div>
+                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Projection</span>
+                    </button>
+                    {projCols.map((c) => (
                       <button
                         key={c.key}
                         type="button"
-                        className={`flex items-center gap-2 text-sm px-2 py-1 rounded hover-elevate ${colVisible(c.key) ? "" : "text-muted-foreground"}`}
+                        className={`flex items-center gap-2 text-sm px-2 py-0.5 pl-5 rounded hover-elevate w-full ${colVisible(c.key) ? "" : "text-muted-foreground"}`}
                         onClick={() => toggleColumn(c.key)}
                       >
                         <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 ${colVisible(c.key) ? "bg-primary border-primary" : "border-muted-foreground/40"}`}>
@@ -2633,8 +2684,8 @@ function PurchaseOrdersTab() {
                       </button>
                     ))}
                   </div>
-                </>
-              )}
+                );
+              })()}
               <div className="border-t mt-1 pt-1 flex gap-1">
                 <button
                   type="button"
@@ -2795,11 +2846,12 @@ function PurchaseOrdersTab() {
         <Card className="flex flex-col flex-1 min-h-0 overflow-hidden">
             <Table containerClassName="flex-1 overflow-auto" className="[&_th]:border-r [&_th]:border-border [&_td]:border-r [&_td]:border-border">
               <TableHeader>
-                <TableRow>
-                  {/* SKU column — Kit filter in header */}
+                {/* Row 1 — Group label row; SKU and Notes span both rows via rowSpan */}
+                <TableRow className="h-8">
                   <TableHead
+                    rowSpan={2}
                     style={{ width: 145, minWidth: 145 }}
-                    className="sticky top-0 bg-card z-10 cursor-pointer select-none whitespace-nowrap"
+                    className="sticky top-0 bg-card z-20 cursor-pointer select-none whitespace-nowrap align-middle border-b-0"
                     onClick={() => toggleSort("sku")}
                     data-testid="sort-sku"
                   >
@@ -2825,11 +2877,51 @@ function PurchaseOrdersTab() {
                       </ColumnFilterPopover>
                     </div>
                   </TableHead>
+                  {/* Group label cells */}
+                  {PO_COLUMN_GROUPS.map((group) => {
+                    const cnt = group.keys.filter((k) => colVisible(k)).length;
+                    if (cnt === 0) return null;
+                    return (
+                      <TableHead
+                        key={group.key}
+                        colSpan={cnt}
+                        className="sticky top-0 bg-muted/30 z-10 text-center text-[10px] font-semibold text-muted-foreground uppercase tracking-widest py-1"
+                      >
+                        {group.label}
+                      </TableHead>
+                    );
+                  })}
+                  {hasProjection && (() => {
+                    const projKeys = PO_COLUMNS.filter((c) => "group" in c && c.group === "projection").map((c) => c.key);
+                    const cnt = projKeys.filter((k) => colVisible(k)).length;
+                    if (cnt === 0) return null;
+                    return (
+                      <TableHead
+                        colSpan={cnt}
+                        className="sticky top-0 bg-muted/30 z-10 text-center text-[10px] font-semibold text-muted-foreground uppercase tracking-widest py-1"
+                      >
+                        Projection
+                      </TableHead>
+                    );
+                  })()}
+                  {colVisible("notes") && (
+                    <TableHead
+                      rowSpan={2}
+                      style={{ width: 44, minWidth: 44 }}
+                      className="sticky top-0 bg-card z-20 select-none text-center align-middle border-b-0"
+                      data-testid="col-notes"
+                    >
+                      <span className="sr-only">Notes</span>
+                    </TableHead>
+                  )}
+                </TableRow>
+                {/* Row 2 — Individual column headers (SKU and Notes already placed via rowSpan above) */}
+                <TableRow>
                   {/* Title column — Assembled Product filter in header */}
                   {colVisible("title") && (
                   <TableHead
                     style={{ width: 230, minWidth: 230 }}
-                    className="sticky top-0 bg-card z-10 cursor-pointer select-none whitespace-nowrap"
+                    className="sticky top-8 bg-card z-10 cursor-pointer select-none whitespace-nowrap"
                     onClick={() => toggleSort("title")}
                     data-testid="sort-title"
                   >
@@ -2860,7 +2952,7 @@ function PurchaseOrdersTab() {
                   {colVisible("category") && (
                   <TableHead
                     style={{ width: 130, minWidth: 130 }}
-                    className="sticky top-0 bg-card z-10 cursor-pointer select-none whitespace-nowrap"
+                    className="sticky top-8 bg-card z-10 cursor-pointer select-none whitespace-nowrap"
                     onClick={() => toggleSort("category")}
                     data-testid="sort-category"
                   >
@@ -2888,7 +2980,7 @@ function PurchaseOrdersTab() {
                   {colVisible("supplier") && (
                   <TableHead
                     style={{ width: 140, minWidth: 140 }}
-                    className="sticky top-0 bg-card z-10 cursor-pointer select-none whitespace-nowrap"
+                    className="sticky top-8 bg-card z-10 cursor-pointer select-none whitespace-nowrap"
                     onClick={() => toggleSort("supplier")}
                     data-testid="sort-supplier"
                   >
@@ -2912,22 +3004,22 @@ function PurchaseOrdersTab() {
                     </div>
                   </TableHead>
                   )}
-                  {/* Remaining sortable-only columns */}
+                  {/* Remaining sortable-only columns — ordered to match group boundaries */}
                   {[
-                    { key: "cost", label: "Cost", right: true, width: 70 },
+                    { key: "cost",      label: "Cost",     right: true, width: 70 },
                     { key: "available", label: "Available", right: true, width: 80 },
-                    { key: "incoming", label: "Incoming", right: true, width: 80 },
+                    { key: "incoming",  label: "Incoming",  right: true, width: 80 },
+                    { key: "amzn",      label: "Amzn",      right: true, width: 65 },
+                    { key: "wlmt",      label: "Wlmt",      right: true, width: 65 },
+                    { key: "in_kits",   label: "In Kits",   right: true, width: 70 },
+                    { key: "total",     label: "Total",     right: true, width: 70 },
                     { key: "lead_time", label: "Lead Time", right: true, width: 80 },
-                    { key: "moq", label: "MOQ", right: true, width: 65 },
-                    { key: "amzn", label: "Amzn", right: true, width: 65 },
-                    { key: "wlmt", label: "Wlmt", right: true, width: 65 },
-                    { key: "in_kits", label: "In Kits", right: true, width: 70 },
-                    { key: "total", label: "Total", right: true, width: 70 },
+                    { key: "moq",       label: "MOQ",       right: true, width: 65 },
                   ].filter((col) => colVisible(col.key)).map((col) => (
                     <TableHead
                       key={col.key}
                       style={{ width: col.width, minWidth: col.width }}
-                      className={`sticky top-0 bg-card z-10 cursor-pointer select-none whitespace-nowrap ${col.right ? "text-right" : ""}`}
+                      className={`sticky top-8 bg-card z-10 cursor-pointer select-none whitespace-nowrap ${col.right ? "text-right" : ""}`}
                       onClick={() => toggleSort(col.key)}
                       data-testid={`sort-${col.key}`}
                     >
@@ -2938,16 +3030,16 @@ function PurchaseOrdersTab() {
                     </TableHead>
                   ))}
                   {hasProjection && [
-                    { key: "proj_direct", label: "Proj. Direct", width: 90, tooltip: "Projected individual units sold (not part of a kit) over the selected window, using the chosen algorithm." },
-                    { key: "proj_kits", label: "Proj. Kits", width: 90, tooltip: "Projected kit-driven units (this SKU ships inside a kit) over the selected window, using the chosen algorithm." },
-                    { key: "growth_mult", label: "Growth Adj.", width: 70, tooltip: "The growth multiplier applied to this SKU's projections based on the selected growth factor method." },
-                    { key: "proj_total", label: "Proj. Total", width: 90, tooltip: "Total projected units needed (direct + kit-driven) over the selected window." },
+                    { key: "proj_direct",  label: "Proj. Direct",  width: 90, tooltip: "Projected individual units sold (not part of a kit) over the selected window, using the chosen algorithm." },
+                    { key: "proj_kits",    label: "Proj. Kits",    width: 90, tooltip: "Projected kit-driven units (this SKU ships inside a kit) over the selected window, using the chosen algorithm." },
+                    { key: "growth_mult",  label: "Growth Adj.",   width: 70, tooltip: "The growth multiplier applied to this SKU's projections based on the selected growth factor method." },
+                    { key: "proj_total",   label: "Proj. Total",   width: 90, tooltip: "Total projected units needed (direct + kit-driven) over the selected window." },
                     { key: "rec_purchase", label: "Rec. Purchase", width: 90, tooltip: "Recommended purchase qty: projected total minus current total stock. Negative means you have sufficient stock." },
                   ].filter((col) => colVisible(col.key)).map((col) => (
                     <TableHead
                       key={col.key}
                       style={{ width: col.width, minWidth: col.width }}
-                      className="text-right sticky top-0 bg-card z-10 cursor-pointer select-none whitespace-nowrap"
+                      className="text-right sticky top-8 bg-card z-10 cursor-pointer select-none whitespace-nowrap"
                       onClick={() => toggleSort(col.key)}
                       data-testid={`sort-${col.key}`}
                     >
@@ -2969,16 +3061,6 @@ function PurchaseOrdersTab() {
                       </span>
                     </TableHead>
                   ))}
-                  {/* Notes column — icon-only, no sort, always last */}
-                  {colVisible("notes") && (
-                    <TableHead
-                      style={{ width: 44, minWidth: 44 }}
-                      className="sticky top-0 bg-card z-10 select-none text-center"
-                      data-testid="col-notes"
-                    >
-                      <span className="sr-only">Notes</span>
-                    </TableHead>
-                  )}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -3015,12 +3097,12 @@ function PurchaseOrdersTab() {
                       {colVisible("cost") && <TableCell style={{ width: 70, minWidth: 70 }} className="text-right tabular-nums">{row.unit_cost ? `$${Number(row.unit_cost).toFixed(2)}` : "—"}</TableCell>}
                       {colVisible("available") && <TableCell style={{ width: 80, minWidth: 80 }} className={`text-right tabular-nums ${isLow ? "text-red-600 dark:text-red-400 font-semibold" : ""}`}>{avail}</TableCell>}
                       {colVisible("incoming") && <TableCell style={{ width: 80, minWidth: 80 }} className="text-right tabular-nums">{row.quantity_incoming ?? "—"}</TableCell>}
-                      {colVisible("lead_time") && <TableCell style={{ width: 80, minWidth: 80 }} className="text-right tabular-nums">{row.lead_time != null ? `${row.lead_time}d` : "—"}</TableCell>}
-                      {colVisible("moq") && <TableCell style={{ width: 65, minWidth: 65 }} className="text-right tabular-nums">{row.moq ?? "—"}</TableCell>}
                       {colVisible("amzn") && <TableCell style={{ width: 65, minWidth: 65 }} className="text-right tabular-nums">{row.ext_amzn_inv ?? "—"}</TableCell>}
                       {colVisible("wlmt") && <TableCell style={{ width: 65, minWidth: 65 }} className="text-right tabular-nums">{row.ext_wlmt_inv ?? "—"}</TableCell>}
                       {colVisible("in_kits") && <TableCell style={{ width: 70, minWidth: 70 }} className="text-right tabular-nums">{row.quantity_in_kits ?? "—"}</TableCell>}
                       {colVisible("total") && <TableCell style={{ width: 70, minWidth: 70 }} className="text-right tabular-nums">{row.total_stock ?? "—"}</TableCell>}
+                      {colVisible("lead_time") && <TableCell style={{ width: 80, minWidth: 80 }} className="text-right tabular-nums">{row.lead_time != null ? `${row.lead_time}d` : "—"}</TableCell>}
+                      {colVisible("moq") && <TableCell style={{ width: 65, minWidth: 65 }} className="text-right tabular-nums">{row.moq ?? "—"}</TableCell>}
                       {hasProjection && (() => {
                         const rawDirect = Math.round(Number(row.proj_direct ?? 0));
                         const rawKits = Math.round(Number(row.proj_kits ?? 0));
