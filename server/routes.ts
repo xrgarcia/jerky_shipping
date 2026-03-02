@@ -16386,6 +16386,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET quantity_ordered map for a snapshot date: { sku -> quantityOrdered | null }
+  app.get("/api/purchase-orders/quantities", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { purchaseOrderQuantities } = await import('../shared/schema');
+      const { eq } = await import('drizzle-orm');
+      const date = req.query.date as string;
+      if (!date) return res.status(400).json({ error: "date query param required" });
+      const rows = await db.select().from(purchaseOrderQuantities).where(eq(purchaseOrderQuantities.snapshotDate, date));
+      const map: Record<string, number | null> = {};
+      for (const row of rows) {
+        map[row.sku] = row.quantityOrdered ?? null;
+      }
+      res.json(map);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch quantities", message: error.message });
+    }
+  });
+
+  // PUT upsert quantity_ordered for a specific SKU + date
+  app.put("/api/purchase-orders/quantities/:sku", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { purchaseOrderQuantities } = await import('../shared/schema');
+      const { sku } = req.params;
+      const { date, quantityOrdered } = req.body;
+      if (!date) return res.status(400).json({ error: "date is required" });
+      const [updated] = await db
+        .insert(purchaseOrderQuantities)
+        .values({ sku, snapshotDate: date, quantityOrdered: quantityOrdered ?? null })
+        .onConflictDoUpdate({
+          target: [purchaseOrderQuantities.sku, purchaseOrderQuantities.snapshotDate],
+          set: { quantityOrdered: quantityOrdered ?? null, updatedAt: new Date() },
+        })
+        .returning();
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to upsert quantity", message: error.message });
+    }
+  });
+
   app.get("/api/user-preferences/:namespace", requireAuth, async (req: Request, res: Response) => {
     try {
       const user = (req as any).user;

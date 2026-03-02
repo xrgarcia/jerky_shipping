@@ -2195,3 +2195,15 @@ export const purchaseOrderSkuNotes = pgTable("purchase_order_sku_notes", {
 
 export const upsertPurchaseOrderSkuNoteSchema = createInsertSchema(purchaseOrderSkuNotes);
 export type PurchaseOrderSkuNote = typeof purchaseOrderSkuNotes.$inferSelect;
+
+export const purchaseOrderQuantities = pgTable(
+  "purchase_order_quantities",
+  {
+    sku:             text("sku").notNull(),
+    snapshotDate:    text("snapshot_date").notNull(),
+    quantityOrdered: integer("quantity_ordered"),
+    updatedAt:       timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => ({ pk: primaryKey({ columns: [t.sku, t.snapshotDate] }) })
+);
+export type PurchaseOrderQuantity = typeof purchaseOrderQuantities.$inferSelect;

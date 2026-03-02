@@ -1979,6 +1979,7 @@ const PO_COLUMNS = [
   { key: "growth_mult",  label: "Growth Adj.",   group: "projection" },
   { key: "proj_total",   label: "Proj. Total",   group: "projection" },
   { key: "rec_purchase", label: "Rec. Purchase", group: "projection" },
+  { key: "qty_ordered",  label: "Qty Ordered",   group: "projection" },
   { key: "notes",        label: "Notes" },
 ] as const;
 type PoColumnKey = (typeof PO_COLUMNS)[number]["key"];
@@ -2087,6 +2088,8 @@ function PurchaseOrdersTab() {
   );
   const [copiedSku, setCopiedSku] = useState<string | null>(null);
   const [noteModalSku, setNoteModalSku] = useState<string | null>(null);
+  const [editingQtySku, setEditingQtySku] = useState<string | null>(null);
+  const [editingQtyValue, setEditingQtyValue] = useState<string>("");
   const { value: projFilterDirect, setValue: setProjFilterDirect } = useUserPreference<ProjFilter>(
     "purchase-orders", "proj-filter-direct", PROJ_FILTER_DEFAULT, { debounceMs: 300 }
   );
@@ -2177,6 +2180,28 @@ function PurchaseOrdersTab() {
 
   const skuNotesQuery = useQuery<Record<string, string>>({
     queryKey: ["/api/purchase-orders/sku-notes"],
+  });
+
+  const quantitiesQuery = useQuery<Record<string, number | null>>({
+    queryKey: ["/api/purchase-orders/quantities", selectedDate],
+    queryFn: () => fetch(`/api/purchase-orders/quantities?date=${selectedDate}`).then((r) => r.json()),
+    enabled: !!selectedDate,
+  });
+
+  const saveQuantityMutation = useMutation({
+    mutationFn: async ({ sku, quantityOrdered }: { sku: string; quantityOrdered: number | null }) => {
+      const res = await apiRequest("PUT", `/api/purchase-orders/quantities/${encodeURIComponent(sku)}`, {
+        date: selectedDate,
+        quantityOrdered,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/purchase-orders/quantities", selectedDate] });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to save quantity.", variant: "destructive" });
+    },
   });
 
   const growthFactorsQuery = useQuery<Record<string, { trendFactor: number | null; yoyGrowthFactor: number | null }>>({
@@ -2328,6 +2353,7 @@ function PurchaseOrdersTab() {
           case "proj_kits": aVal = Math.round(Number(a.proj_kits ?? 0) * getGrowthMultiplier(a.sku)); bVal = Math.round(Number(b.proj_kits ?? 0) * getGrowthMultiplier(b.sku)); break;
           case "proj_total": { const fa = getGrowthMultiplier(a.sku); const fb = getGrowthMultiplier(b.sku); aVal = Math.round(Number(a.proj_direct ?? 0) * fa) + Math.round(Number(a.proj_kits ?? 0) * fa); bVal = Math.round(Number(b.proj_direct ?? 0) * fb) + Math.round(Number(b.proj_kits ?? 0) * fb); break; }
           case "rec_purchase": { const fa = getGrowthMultiplier(a.sku); const fb = getGrowthMultiplier(b.sku); aVal = Math.round(Number(a.proj_direct ?? 0) * fa) + Math.round(Number(a.proj_kits ?? 0) * fa) - Math.round(Number(a.total_stock ?? 0)); bVal = Math.round(Number(b.proj_direct ?? 0) * fb) + Math.round(Number(b.proj_kits ?? 0) * fb) - Math.round(Number(b.total_stock ?? 0)); break; }
+          case "qty_ordered": aVal = quantitiesQuery.data?.[a.sku] ?? 0; bVal = quantitiesQuery.data?.[b.sku] ?? 0; break;
           default: aVal = 0; bVal = 0;
         }
         if (typeof aVal === "string") {
@@ -2385,7 +2411,7 @@ function PurchaseOrdersTab() {
   const exportCsv = useCallback(() => {
     if (filtered.length === 0) return;
     const headers = ["SKU", "Title", "Category", "Supplier", "Unit Cost", "Available", "Incoming", "Lead Time (days)", "MOQ", "Amazon Inv", "Walmart Inv", "In Kits", "Total Stock"];
-    if (hasProjection) headers.push("Proj. Direct", "Proj. Kits", "Growth Adj.", "Proj. Total", "Rec. Purchase");
+    if (hasProjection) headers.push("Proj. Direct", "Proj. Kits", "Growth Adj.", "Proj. Total", "Rec. Purchase", "Qty Ordered");
     const csvRows = [headers.join(",")];
     for (const r of filtered) {
       const row = [
@@ -2410,6 +2436,7 @@ function PurchaseOrdersTab() {
           growthFactorMethod === "none" ? "—" : csvFactor.toFixed(2) + "x",
           String(csvAdjTotal),
           String(csvAdjRec),
+          String(quantitiesQuery.data?.[r.sku] ?? ""),
         );
       }
       csvRows.push(row.join(","));
@@ -2994,6 +3021,7 @@ function PurchaseOrdersTab() {
                     { key: "growth_mult",  label: "Growth Adj.",   width: 70, tooltip: "The growth multiplier applied to this SKU's projections based on the selected growth factor method." },
                     { key: "proj_total",   label: "Proj. Total",   width: 90, tooltip: "Total projected units needed (direct + kit-driven) over the selected window." },
                     { key: "rec_purchase", label: "Rec. Purchase", width: 90, tooltip: "Recommended purchase qty: projected total minus current total stock. Negative means you have sufficient stock." },
+                    { key: "qty_ordered",  label: "Qty Ordered",   width: 90, tooltip: "The quantity your team decided to order for this SKU. Click any cell to enter or edit the value." },
                   ].filter((col) => colVisible(col.key)).map((col) => (
                     <TableHead
                       key={col.key}
@@ -3209,6 +3237,47 @@ function PurchaseOrdersTab() {
                             {colVisible("rec_purchase") && (
                               <TableCell style={{ width: 90, minWidth: 90 }} className={`text-right tabular-nums font-semibold ${adjRec > 0 ? "text-red-600 dark:text-red-400" : ""}`}>
                                 {adjRec.toLocaleString()}
+                              </TableCell>
+                            )}
+                            {colVisible("qty_ordered") && (
+                              <TableCell
+                                style={{ width: 90, minWidth: 90 }}
+                                className="text-right tabular-nums p-0"
+                                onClick={() => {
+                                  if (editingQtySku !== row.sku) {
+                                    setEditingQtySku(row.sku);
+                                    setEditingQtyValue(String(quantitiesQuery.data?.[row.sku] ?? ""));
+                                  }
+                                }}
+                              >
+                                {editingQtySku === row.sku ? (
+                                  <input
+                                    type="number"
+                                    autoFocus
+                                    value={editingQtyValue}
+                                    onChange={(e) => setEditingQtyValue(e.target.value)}
+                                    onBlur={() => {
+                                      const parsed = editingQtyValue === "" ? null : parseInt(editingQtyValue, 10);
+                                      if (!isNaN(parsed as number) || parsed === null) {
+                                        saveQuantityMutation.mutate({ sku: row.sku, quantityOrdered: parsed });
+                                      }
+                                      setEditingQtySku(null);
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter") e.currentTarget.blur();
+                                      if (e.key === "Escape") { setEditingQtySku(null); }
+                                    }}
+                                    className="w-full h-full px-3 py-2 text-right bg-primary/5 border border-primary/30 rounded focus:outline-none focus:ring-1 focus:ring-primary text-sm tabular-nums"
+                                    style={{ minWidth: 80 }}
+                                  />
+                                ) : (
+                                  <div className="px-3 py-2 cursor-pointer hover-elevate rounded text-sm">
+                                    {quantitiesQuery.data?.[row.sku] != null
+                                      ? Number(quantitiesQuery.data[row.sku]).toLocaleString()
+                                      : <span className="text-muted-foreground/40">—</span>
+                                    }
+                                  </div>
+                                )}
                               </TableCell>
                             )}
                           </>
