@@ -16279,7 +16279,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/purchase-orders/growth-factors", requireAuth, async (_req: Request, res: Response) => {
     try {
       const { getRedisClient } = await import('./utils/queue');
-      const CACHE_KEY = 'po:growth-factors';
+      const CACHE_KEY = 'po:growth-factors:v2';
       const CACHE_TTL = 3600;
 
       let redis: any = null;
@@ -16291,16 +16291,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       } catch (_e) { /* redis unavailable, fall through */ }
 
+      // trend_factor and yoy_growth_factor often lag behind the latest order_date.
+      // Use DISTINCT ON per sku+channel to grab the most recent non-null value
+      // within the last 90 days, then volume-weight across channels.
       const rows = await reportingSql<{ sku: string; trend_factor: string | null; yoy_growth_factor: string | null }[]>`
+        WITH latest_factors AS (
+          SELECT DISTINCT ON (sku, sales_channel)
+            sku,
+            sales_channel,
+            trend_factor::numeric       AS trend_factor,
+            yoy_growth_factor::numeric  AS yoy_growth_factor
+          FROM sales_metrics_lookup
+          WHERE order_date >= (SELECT MAX(order_date) FROM sales_metrics_lookup) - INTERVAL '90 days'
+            AND (trend_factor IS NOT NULL OR yoy_growth_factor IS NOT NULL)
+          ORDER BY sku, sales_channel, order_date DESC
+        ),
+        channel_weights AS (
+          SELECT sku, sales_channel,
+            SUM(daily_sales_quantity::numeric) AS weight
+          FROM sales_metrics_lookup
+          WHERE order_date >= (SELECT MAX(order_date) FROM sales_metrics_lookup) - INTERVAL '30 days'
+            AND daily_sales_quantity IS NOT NULL
+            AND daily_sales_quantity::numeric > 0
+          GROUP BY sku, sales_channel
+        )
         SELECT
-          sku,
-          SUM(CASE WHEN trend_factor IS NOT NULL THEN trend_factor::numeric * daily_sales_quantity::numeric ELSE 0 END) / NULLIF(SUM(CASE WHEN trend_factor IS NOT NULL THEN daily_sales_quantity::numeric ELSE 0 END), 0) AS trend_factor,
-          SUM(CASE WHEN yoy_growth_factor IS NOT NULL THEN yoy_growth_factor::numeric * daily_sales_quantity::numeric ELSE 0 END) / NULLIF(SUM(CASE WHEN yoy_growth_factor IS NOT NULL THEN daily_sales_quantity::numeric ELSE 0 END), 0) AS yoy_growth_factor
-        FROM sales_metrics_lookup
-        WHERE order_date = (SELECT MAX(order_date) FROM sales_metrics_lookup)
-          AND daily_sales_quantity IS NOT NULL
-          AND daily_sales_quantity::numeric > 0
-        GROUP BY sku
+          f.sku,
+          SUM(CASE WHEN f.trend_factor IS NOT NULL
+                THEN f.trend_factor * COALESCE(w.weight, 1) ELSE 0 END)
+          / NULLIF(SUM(CASE WHEN f.trend_factor IS NOT NULL
+                THEN COALESCE(w.weight, 1) ELSE 0 END), 0)      AS trend_factor,
+          SUM(CASE WHEN f.yoy_growth_factor IS NOT NULL
+                THEN f.yoy_growth_factor * COALESCE(w.weight, 1) ELSE 0 END)
+          / NULLIF(SUM(CASE WHEN f.yoy_growth_factor IS NOT NULL
+                THEN COALESCE(w.weight, 1) ELSE 0 END), 0)      AS yoy_growth_factor
+        FROM latest_factors f
+        LEFT JOIN channel_weights w ON f.sku = w.sku AND f.sales_channel = w.sales_channel
+        GROUP BY f.sku
       `;
 
       const result: Record<string, { trendFactor: number | null; yoyGrowthFactor: number | null }> = {};
