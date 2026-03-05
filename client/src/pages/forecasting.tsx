@@ -2249,13 +2249,13 @@ function PurchaseOrdersTab() {
 
   const regenerateForecastsMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/forecasting/generate");
+      const res = await apiRequest("POST", "/api/forecasting/generate", { force: true });
       return res.json();
     },
     onSuccess: (data) => {
       toast({
         title: "Forecasts Regenerated",
-        description: `${data.totalRows} new rows generated across ${data.daysProcessed} days`,
+        description: `${data.totalRows} rows rebuilt across ${data.daysProcessed} days`,
       });
       queryClient.invalidateQueries({ queryKey: ["/api/purchase-orders/snapshot"] });
       queryClient.invalidateQueries({ queryKey: ["/api/purchase-orders/readiness"] });

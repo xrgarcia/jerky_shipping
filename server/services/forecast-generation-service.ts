@@ -375,7 +375,7 @@ async function getExistingForecastDates(todayStr: string): Promise<Set<string>> 
   return dates;
 }
 
-export async function generateForecasts(): Promise<{ totalRows: number; daysProcessed: number; errors: number }> {
+export async function generateForecasts(opts?: { force?: boolean }): Promise<{ totalRows: number; daysProcessed: number; errors: number }> {
   if (isGenerationRunning) {
     logger.info('Sales forecast generation already in progress, skipping');
     return { totalRows: 0, daysProcessed: 0, errors: 0 };
@@ -385,7 +385,8 @@ export async function generateForecasts(): Promise<{ totalRows: number; daysProc
   const jobStart = Date.now();
 
   try {
-    logger.info('Sales forecast generation starting');
+    const force = opts?.force ?? false;
+    logger.info(`Sales forecast generation starting (force=${force})`);
 
     // Establish the Central date before the cleanup query so both sides agree on "today".
     // The Neon DB timezone is GMT; using CURRENT_DATE directly would be 1 day ahead of
@@ -395,8 +396,14 @@ export async function generateForecasts(): Promise<{ totalRows: number; daysProc
     const forecastEndDate = addMonths(today, 6);
     const forecastEndStr = formatDateStr(forecastEndDate);
 
-    const deleted = await db.execute(sql`DELETE FROM sales_forecasting WHERE order_date::date < ${todayStr}::date OR order_date::date > ${forecastEndStr}::date`);
-    logger.info(`Sales forecast cleanup: deleted ${deleted.rowCount ?? 0} past-dated or beyond-6-month rows`);
+    if (force) {
+      // Wipe all rows in the 6-month window so we regenerate everything from scratch.
+      const wiped = await db.execute(sql`DELETE FROM sales_forecasting WHERE order_date::date >= ${todayStr}::date AND order_date::date <= ${forecastEndStr}::date`);
+      logger.info(`Force regeneration: wiped ${wiped.rowCount ?? 0} existing rows in 6-month window`);
+    } else {
+      const deleted = await db.execute(sql`DELETE FROM sales_forecasting WHERE order_date::date < ${todayStr}::date OR order_date::date > ${forecastEndStr}::date`);
+      logger.info(`Sales forecast cleanup: deleted ${deleted.rowCount ?? 0} past-dated or beyond-6-month rows`);
+    }
 
     // Always refresh current velocity on every run, even if generation is skipped below
     const velocityMap = await loadCurrentVelocity();
@@ -409,14 +416,14 @@ export async function generateForecasts(): Promise<{ totalRows: number; daysProc
     const totalDaysNeeded = differenceInCalendarDays(forecastEndDate, today) + 1;
     const existingCount = existingDates.size;
 
-    if (existingCount >= totalDaysNeeded - 1) {
+    if (!force && existingCount >= totalDaysNeeded - 1) {
       const cleared = await invalidateForecastingCache();
       const elapsed = ((Date.now() - jobStart) / 1000).toFixed(1);
       logger.info(`Sales forecast already complete: ${existingCount}/${totalDaysNeeded} days covered, skipping generation (${elapsed}s, cleared ${cleared} stale cache keys)`);
       return { totalRows: 0, daysProcessed: 0, errors: 0 };
     }
 
-    logger.info(`Sales forecast coverage: ${existingCount}/${totalDaysNeeded} days — generating missing days`);
+    logger.info(`Sales forecast coverage: ${existingCount}/${totalDaysNeeded} days — ${force ? 'force rebuilding all days' : 'generating missing days'}`);
 
     const [targetYearWindows, sourceYearWindows, nextYearWindows, prevYearWindows] = await Promise.all([
       loadPeakSeasonWindows(targetYear),

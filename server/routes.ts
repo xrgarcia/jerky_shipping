@@ -16169,7 +16169,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/forecasting/generate", requireAuth, async (req: Request, res: Response) => {
     try {
       const { generateForecasts } = await import('./services/forecast-generation-service');
-      const result = await generateForecasts();
+      const force = !!(req.body?.force);
+      const result = await generateForecasts({ force });
       res.json(result);
     } catch (error: any) {
       res.status(500).json({ error: "Failed to generate forecasts", message: error.message });
