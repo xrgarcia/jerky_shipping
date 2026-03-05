@@ -18,7 +18,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
-import { TrendingUp, TrendingDown, ChevronDown, ChevronUp, ChevronsUpDown, Check, Loader2, CalendarIcon, Pencil, Trash2, MessageSquarePlus, X, DollarSign, Package, Activity, ShieldCheck, Search, ListFilter, RefreshCw, Download, AlertCircle, CheckCircle2, Clock, SlidersHorizontal, Copy, Info, BarChart2, MessageSquare } from "lucide-react";
+import { TrendingUp, TrendingDown, ChevronDown, ChevronUp, ChevronsUpDown, Check, Loader2, CalendarIcon, Pencil, Trash2, MessageSquarePlus, X, DollarSign, Package, Activity, ShieldCheck, Search, ListFilter, RefreshCw, RotateCcw, Download, AlertCircle, CheckCircle2, Clock, SlidersHorizontal, Copy, Info, BarChart2, MessageSquare } from "lucide-react";
 import { Tooltip as HoverTooltip, TooltipTrigger as HoverTooltipTrigger, TooltipContent as HoverTooltipContent } from "@/components/ui/tooltip";
 import {
   Table,
@@ -2247,6 +2247,28 @@ function PurchaseOrdersTab() {
     },
   });
 
+  const regenerateForecastsMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/forecasting/generate");
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Forecasts Regenerated",
+        description: `${data.totalRows} new rows generated across ${data.daysProcessed} days`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/purchase-orders/snapshot"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/purchase-orders/readiness"] });
+    },
+    onError: (err: any) => {
+      toast({
+        title: "Regeneration Failed",
+        description: err.message ?? "An unexpected error occurred",
+        variant: "destructive",
+      });
+    },
+  });
+
   const configQuery = useQuery<PurchaseOrderConfig>({
     queryKey: ["/api/purchase-orders/config"],
   });
@@ -2480,6 +2502,20 @@ function PurchaseOrdersTab() {
             {readinessQuery.isLoading ? "Checking..." : readiness?.reason ?? "Unknown"}
           </HoverTooltipContent>
         </HoverTooltip>
+
+        <Button
+          variant="outline"
+          onClick={() => regenerateForecastsMutation.mutate()}
+          disabled={regenerateForecastsMutation.isPending}
+          data-testid="button-regenerate-forecasts"
+        >
+          {regenerateForecastsMutation.isPending ? (
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+          ) : (
+            <RotateCcw className="w-4 h-4 mr-2" />
+          )}
+          {regenerateForecastsMutation.isPending ? "Regenerating…" : "Regenerate Forecasts"}
+        </Button>
 
         {(datesQuery.data?.length ?? 0) > 0 && (
           <Select value={selectedDate ?? ""} onValueChange={(v) => { setSelectedDate(v || undefined); saveConfigMutation.mutate({ activeSnapshotDate: v || null }); }}>
