@@ -2190,8 +2190,10 @@ function PurchaseOrdersTab() {
 
   const saveQuantityMutation = useMutation({
     mutationFn: async ({ sku, quantityOrdered }: { sku: string; quantityOrdered: number | null }) => {
+      const effectiveDate = selectedDate ?? datesQuery.data?.[0];
+      if (!effectiveDate) throw new Error("No snapshot date available to save against.");
       const res = await apiRequest("PUT", `/api/purchase-orders/quantities/${encodeURIComponent(sku)}`, {
-        date: selectedDate,
+        date: effectiveDate,
         quantityOrdered,
       });
       return res.json();
@@ -2199,8 +2201,8 @@ function PurchaseOrdersTab() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/purchase-orders/quantities", selectedDate] });
     },
-    onError: () => {
-      toast({ title: "Error", description: "Failed to save quantity.", variant: "destructive" });
+    onError: (err: any) => {
+      toast({ title: "Error", description: err?.message ?? "Failed to save quantity.", variant: "destructive" });
     },
   });
 
