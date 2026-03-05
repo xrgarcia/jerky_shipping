@@ -2,7 +2,7 @@ import { reportingSql } from '../reporting-db';
 import { db } from '../db';
 import { salesForecasting, skuvaultProducts, kitComponentMappings } from '@shared/schema';
 import { sql } from 'drizzle-orm';
-import { format, addDays, addMonths, differenceInCalendarDays, addYears, subYears } from 'date-fns';
+import { format, addDays, subDays, addMonths, differenceInCalendarDays, addYears, subYears } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
 import logger from '../utils/logger';
 import { invalidateForecastingCache } from './forecasting-service';
@@ -69,6 +69,15 @@ function mapPeakDateToSourceYear(
   if (mappedStr > sourceEndStr) return sourceWindow.endDate;
 
   return mappedDate;
+}
+
+function findMostRecentBaselineDate(startDate: Date, sourceWindows: PeakSeasonWindow[]): Date {
+  let candidate = subDays(startDate, 1);
+  for (let i = 0; i < 90; i++) {
+    if (!findPeakWindow(candidate, sourceWindows)) return candidate;
+    candidate = subDays(candidate, 1);
+  }
+  return candidate;
 }
 
 async function loadPeakSeasonWindows(year: number): Promise<PeakSeasonWindow[]> {
@@ -472,6 +481,12 @@ export async function generateForecasts(opts?: { force?: boolean }): Promise<{ t
           sourceDate = mappedDate ?? subYears(currentDate, 1);
         } else {
           sourceDate = subYears(currentDate, 1);
+          const sourcePeakWindow = findPeakWindow(sourceDate, allSourceWindows);
+          if (sourcePeakWindow) {
+            const adjustedDate = findMostRecentBaselineDate(sourceDate, allSourceWindows);
+            logger.info(`Baseline backfill: ${targetDateStr} → source ${formatDateStr(sourceDate)} is peak-inflated (${sourcePeakWindow.notes ?? 'peak'}), using ${formatDateStr(adjustedDate)} instead`);
+            sourceDate = adjustedDate;
+          }
         }
 
         const sourceDateStr = formatDateStr(sourceDate);
