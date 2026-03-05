@@ -2059,7 +2059,9 @@ function applyProjFilter(rows: any[], filter: ProjFilter, getValue: (r: any) => 
 function PurchaseOrdersTab() {
   const { toast } = useToast();
   const [selectedDate, setSelectedDate] = useState<string | undefined>();
-  const [searchTerm, setSearchTerm] = useState("");
+  const { value: searchTerm, setValue: setSearchTerm } = useUserPreference<string>(
+    "purchase-orders", "searchTerm", "", { debounceMs: 800 }
+  );
   const { value: categoryFilter, setValue: setCategoryFilter } = useUserPreference<string[]>(
     "purchase-orders", "category-filter", [], { debounceMs: 300 }
   );
