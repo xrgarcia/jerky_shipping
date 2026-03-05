@@ -288,13 +288,17 @@ function buildForecastRow(
   targetDate: Date,
   sourceDate: string,
   lookups: ProductLookupMaps,
-  velocityMap: Map<string, CurrentVelocityEntry>
+  velocityMap: Map<string, CurrentVelocityEntry>,
+  resolvedEventType: string
 ): any {
   const sku = sourceRow.sku;
   const salesChannel = sourceRow.sales_channel;
   const product = lookups.productMap.get(sku);
   const parentKits = lookups.kitComponentMap.get(sku) || [];
-  const isBaseline = sourceRow.event_type === 'baseline';
+  // Use resolvedEventType (derived from target date's peak window), not sourceRow.event_type.
+  // If we used the source row's event_type, a shifted holiday (e.g. Easter 2025 vs 2026)
+  // would tag non-holiday target dates as peak and inflate velocity/projection values.
+  const isBaseline = resolvedEventType === 'baseline';
   const velocity = isBaseline ? velocityMap.get(`${sku}::${salesChannel}`) : undefined;
 
   return {
@@ -324,7 +328,7 @@ function buildForecastRow(
     sales15To44Days: sourceRow.sales_15_to_44_days?.toString() ?? null,
     sales45To74Days: sourceRow.sales_45_to_74_days?.toString() ?? null,
     sales75To104Days: sourceRow.sales_75_to_104_days?.toString() ?? null,
-    eventType: sourceRow.event_type ?? null,
+    eventType: resolvedEventType,
     eventDate: sourceRow.event_date ? new Date(sourceRow.event_date) : null,
     eventWindowSales: sourceRow.event_window_sales?.toString() ?? null,
     eventLyWindowSales: sourceRow.event_ly_window_sales?.toString() ?? null,
@@ -448,6 +452,13 @@ export async function generateForecasts(): Promise<{ totalRows: number; daysProc
       try {
         const targetPeakWindow = findPeakWindow(currentDate, allTargetWindows);
 
+        // Determine event_type from the TARGET date's peak window, not the source row.
+        // If we inherit from the source, a shifted holiday (e.g. Easter 2025 vs 2026)
+        // tags non-holiday target dates as peak and inflates projections.
+        const resolvedEventType = targetPeakWindow
+          ? (targetPeakWindow.notes ?? 'peak')
+          : 'baseline';
+
         let sourceDate: Date;
         if (targetPeakWindow) {
           const mappedDate = mapPeakDateToSourceYear(currentDate, targetPeakWindow, allSourceWindows);
@@ -466,7 +477,7 @@ export async function generateForecasts(): Promise<{ totalRows: number; daysProc
         }
 
         for (const row of sourceRows) {
-          batch.push(buildForecastRow(row, currentDate, sourceDateStr, productLookups, velocityMap));
+          batch.push(buildForecastRow(row, currentDate, sourceDateStr, productLookups, velocityMap, resolvedEventType));
 
           if (batch.length >= BATCH_SIZE) {
             await db.insert(salesForecasting).values(batch);
