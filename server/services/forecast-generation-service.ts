@@ -302,12 +302,12 @@ function buildForecastRow(
     dailySalesRevenue: sourceRow.daily_sales_revenue?.toString() ?? null,
     kitDailySalesQuantity: sourceRow.kit_daily_sales_quantity?.toString() ?? null,
     kitDailySalesRevenue: sourceRow.kit_daily_sales_revenue?.toString() ?? null,
-    yoyDailySalesQuantity: sourceRow.daily_sales_quantity?.toString() ?? null,
-    yoyDailySalesRevenue: sourceRow.daily_sales_revenue?.toString() ?? null,
-    yoyKitDailySalesQuantity: sourceRow.kit_daily_sales_quantity?.toString() ?? null,
-    yoyKitDailySalesRevenue: sourceRow.kit_daily_sales_revenue?.toString() ?? null,
-    yoyGrowthFactor: '1',
-    yoyKitGrowthFactor: '1',
+    yoyDailySalesQuantity: sourceRow.yoy_daily_sales_quantity?.toString() ?? null,
+    yoyDailySalesRevenue: sourceRow.yoy_daily_sales_revenue?.toString() ?? null,
+    yoyKitDailySalesQuantity: sourceRow.yoy_kit_daily_sales_quantity?.toString() ?? null,
+    yoyKitDailySalesRevenue: sourceRow.yoy_kit_daily_sales_revenue?.toString() ?? null,
+    yoyGrowthFactor: sourceRow.yoy_growth_factor?.toString() ?? null,
+    yoyKitGrowthFactor: sourceRow.yoy_kit_growth_factor?.toString() ?? null,
     trendFactor: sourceRow.trend_factor?.toString() ?? null,
     confidenceLevel: sourceRow.confidence_level ?? null,
     calculatedConfidenceFactor: sourceRow.calculated_confidence_factor?.toString() ?? null,
@@ -395,7 +395,7 @@ export async function generateForecasts(): Promise<{ totalRows: number; daysProc
     const totalDaysNeeded = differenceInCalendarDays(forecastEndDate, today) + 1;
     const existingCount = existingDates.size;
 
-    if (existingCount >= totalDaysNeeded - 5) {
+    if (existingCount >= totalDaysNeeded - 1) {
       const cleared = await invalidateForecastingCache();
       const elapsed = ((Date.now() - jobStart) / 1000).toFixed(1);
       logger.info(`Sales forecast already complete: ${existingCount}/${totalDaysNeeded} days covered, skipping generation (${elapsed}s, cleared ${cleared} stale cache keys)`);
