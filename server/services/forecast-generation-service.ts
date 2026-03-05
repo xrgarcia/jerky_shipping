@@ -150,6 +150,9 @@ async function loadCurrentVelocity(): Promise<Map<string, CurrentVelocityEntry>>
       SELECT DISTINCT order_date::date AS d
       FROM sales_metrics_lookup
       WHERE event_type = 'baseline'
+        -- NOTE: This query runs against the GCP reporting DB whose timezone is America/Chicago.
+        -- CURRENT_DATE here resolves to the Central calendar date, matching nowCentral() in JS.
+        -- If the reporting DB timezone ever changes, this 14-day velocity window will silently shift.
         AND order_date < CURRENT_DATE
         AND order_date >= CURRENT_DATE - INTERVAL '180 days'
     ),
@@ -296,6 +299,9 @@ function buildForecastRow(
 
   return {
     sku,
+    // order_date is a timestamp column storing Central-local calendar dates (not UTC).
+    // ::date casts yield the correct calendar date for Central-time consumers;
+    // comparing against UTC timestamps would produce incorrect results.
     orderDate: targetDate,
     salesChannel,
     dailySalesQuantity: sourceRow.daily_sales_quantity?.toString() ?? null,
@@ -353,10 +359,10 @@ function buildForecastRow(
   };
 }
 
-async function getExistingForecastDates(): Promise<Set<string>> {
+async function getExistingForecastDates(todayStr: string): Promise<Set<string>> {
   const rows = await db.execute(sql`
     SELECT DISTINCT order_date::date::text AS d FROM sales_forecasting
-    WHERE order_date >= CURRENT_DATE
+    WHERE order_date::date >= ${todayStr}::date
   `);
   const dates = new Set<string>();
   for (const r of rows.rows) {
@@ -377,21 +383,25 @@ export async function generateForecasts(): Promise<{ totalRows: number; daysProc
   try {
     logger.info('Sales forecast generation starting');
 
-    const deleted = await db.execute(sql`DELETE FROM sales_forecasting WHERE order_date < CURRENT_DATE OR order_date > CURRENT_DATE + INTERVAL '6 months'`);
+    // Establish the Central date before the cleanup query so both sides agree on "today".
+    // The Neon DB timezone is GMT; using CURRENT_DATE directly would be 1 day ahead of
+    // Central time between midnight–6 AM Central (6 AM–noon UTC), creating a tail gap.
+    const today = nowCentral();
+    const todayStr = formatDateStr(today);
+    const forecastEndDate = addMonths(today, 6);
+    const forecastEndStr = formatDateStr(forecastEndDate);
+
+    const deleted = await db.execute(sql`DELETE FROM sales_forecasting WHERE order_date::date < ${todayStr}::date OR order_date::date > ${forecastEndStr}::date`);
     logger.info(`Sales forecast cleanup: deleted ${deleted.rowCount ?? 0} past-dated or beyond-6-month rows`);
 
     // Always refresh current velocity on every run, even if generation is skipped below
     const velocityMap = await loadCurrentVelocity();
     await bulkUpdateCurrentVelocity(velocityMap);
 
-    const today = nowCentral();
     const targetYear = today.getFullYear();
     const sourceYear = targetYear - 1;
 
-    const forecastEndDate = addMonths(today, 6);
-    const forecastEndStr = formatDateStr(forecastEndDate);
-
-    const existingDates = await getExistingForecastDates();
+    const existingDates = await getExistingForecastDates(todayStr);
     const totalDaysNeeded = differenceInCalendarDays(forecastEndDate, today) + 1;
     const existingCount = existingDates.size;
 
