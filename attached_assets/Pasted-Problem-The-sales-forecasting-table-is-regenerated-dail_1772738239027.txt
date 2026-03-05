@@ -1,0 +1,67 @@
+Problem
+The sales_forecasting table is regenerated daily on a 24-hour cron cycle, but the current generateForecasts() function only does incremental updates — it deletes past-dated/beyond-6-month rows, checks coverage, and early-returns if the table is already fully covered. There's no way to force a full wipe and rebuild from the UI.
+
+After deploying forecast bug fixes (#10, #11, #12), clicking the button when the table is already full is a no-op — returns "0 new rows" because the coverage check passes and the function skips regeneration.
+
+Impact
+After deploying fixes, stale/incorrect forecast data remains because existing rows are never replaced
+The incremental path skips generation when the table is fully covered, so bug-fix corrections never propagate
+No self-service option for the engineering lead to force a clean rebuild
+Required Changes
+1. Backend: Add force flag to forecast generation service
+File: server/services/forecast-generation-service.ts
+
+Add a force?: boolean parameter to generateForecasts(). When true:
+
+Delete all rows in the 6-month window (not just past-dated/expired rows)
+Skip the coverage check that causes the early return
+Regenerate everything from scratch
+export async function generateForecasts(opts?: { force?: boolean }) {
+  if (opts?.force) {
+    await db.execute(sql`DELETE FROM sales_forecasting WHERE order_date >= CURRENT_DATE AND order_date <= CURRENT_DATE + INTERVAL '6 months'`);
+    // skip coverage check — fall through to full generation
+  } else {
+    // existing cleanup + coverage check logic (unchanged)
+  }
+  // ... rest of generation
+}
+2. Backend: Pass force through the route
+File: server/routes.ts (line 16169)
+
+app.post("/api/forecasting/generate", requireAuth, async (req, res) => {
+  const { force } = req.body ?? {};
+  const result = await generateForecasts({ force: !!force });
+  res.json(result);
+});
+3. Frontend: Add "Regenerate Forecasts" button
+File: client/src/pages/forecasting.tsx — near the existing "Create Snapshot" button in the Purchase Orders tab (around line 2374), or in a shared header area visible from both tabs.
+
+Behavior:
+
+Button calls POST /api/forecasting/generate with { force: true }
+Show a loading/spinner state while generation runs (takes a few minutes for ~1,000 SKUs × 6 months × multiple channels)
+On success, show toast confirming the rebuild (e.g., "Forecasts regenerated: X rows rebuilt") and refresh the current view data
+On failure, show an error toast
+Verification
+
+Button visible on the Forecasting page
+
+Clicking deletes all rows in the 6-month window and regenerates (check row count and updated timestamps)
+
+Loading state shown during generation
+
+Success toast confirms rebuild with row count
+
+Data refreshes after completion
+
+Existing 24h cron continues to work (incremental mode, no force flag)
+
+Without force, the endpoint still behaves as before (coverage check, early return if full)
+Priority
+S3 — Improvement / developer productivity
+
+References
+jerky_com_sre [SRE] Add manual Regenerate Forecasts button to Forecasting page #13 (original request)
+jerky_shipping [SRE] Fix YoY fields in forecast generation — duplicated daily values instead of actual 2-year-ago data #10 (YoY field fix)
+jerky_shipping [SRE] Timezone mismatch in forecast generation causes date boundary bugs #11 (timezone fix)
+jerky_shipping [SRE] Easter peak season mapping inflates forecast projections — event_type inherited from source year #12 (Easter peak season mapping fix)
