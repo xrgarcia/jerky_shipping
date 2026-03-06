@@ -2056,6 +2056,10 @@ function applyProjFilter(rows: any[], filter: ProjFilter, getValue: (r: any) => 
   });
 }
 
+function parseLocalDate(dateStr: string): Date {
+  return new Date(dateStr + 'T00:00:00');
+}
+
 function PurchaseOrdersTab() {
   const { toast } = useToast();
   const [selectedDate, setSelectedDate] = useState<string | undefined>();
@@ -2070,16 +2074,18 @@ function PurchaseOrdersTab() {
   );
   const [activeProjectionMethod, setActiveProjectionMethod] = useState<string>("yoy");
   const [growthFactorMethod, setGrowthFactorMethod] = useState<string>("none");
-  const [velocityStart, setVelocityStart] = useState<Date>(() => {
-    const d = new Date();
-    d.setHours(0, 0, 0, 0);
-    return d;
-  });
-  const [velocityEnd, setVelocityEnd] = useState<Date>(() => {
-    const d = new Date();
-    d.setDate(d.getDate() + 30);
-    return d;
-  });
+  const { value: savedVelocityStart, setValue: setSavedVelocityStart } = useUserPreference<string>(
+    "purchase-orders", "velocity-start",
+    new Date().toLocaleDateString('en-CA'),
+    { debounceMs: 300 }
+  );
+  const { value: savedVelocityEnd, setValue: setSavedVelocityEnd } = useUserPreference<string>(
+    "purchase-orders", "velocity-end",
+    (() => { const d = new Date(); d.setDate(d.getDate() + 30); return d.toLocaleDateString('en-CA'); })(),
+    { debounceMs: 300 }
+  );
+  const velocityStart = parseLocalDate(savedVelocityStart);
+  const velocityEnd = parseLocalDate(savedVelocityEnd);
   const [velocityStartPopoverOpen, setVelocityStartPopoverOpen] = useState(false);
   const [velocityEndPopoverOpen, setVelocityEndPopoverOpen] = useState(false);
   const { value: sortCol, setValue: setSortCol } = useUserPreference<string | null>(
@@ -2162,8 +2168,8 @@ function PurchaseOrdersTab() {
     queryKey: ["/api/purchase-orders/dates"],
   });
 
-  const windowStartStr = velocityStart.toLocaleDateString('en-CA');
-  const windowEndStr = velocityEnd.toLocaleDateString('en-CA');
+  const windowStartStr = savedVelocityStart;
+  const windowEndStr = savedVelocityEnd;
 
   const snapshotQuery = useQuery<any[]>({
     queryKey: ["/api/purchase-orders/snapshot", selectedDate, activeProjectionMethod, windowStartStr, windowEndStr],
@@ -2294,14 +2300,6 @@ function PurchaseOrdersTab() {
       if (cfg.activeSnapshotDate) setSelectedDate(cfg.activeSnapshotDate);
       if (cfg.activeProjectionMethod) setActiveProjectionMethod(cfg.activeProjectionMethod);
       if (cfg.growthFactorMethod) setGrowthFactorMethod(cfg.growthFactorMethod);
-      if (cfg.velocityWindowStart) {
-        const d = new Date(cfg.velocityWindowStart);
-        if (!isNaN(d.getTime())) setVelocityStart(d);
-      }
-      if (cfg.velocityWindowEnd) {
-        const d = new Date(cfg.velocityWindowEnd);
-        if (!isNaN(d.getTime())) setVelocityEnd(d);
-      }
       configInitialized.current = true;
     }
   }, [configQuery.data]);
@@ -2585,7 +2583,7 @@ function PurchaseOrdersTab() {
                     selected={velocityStart}
                     onSelect={(date) => {
                       if (date) {
-                        setVelocityStart(date);
+                        setSavedVelocityStart(date.toLocaleDateString('en-CA'));
                         setVelocityStartPopoverOpen(false);
                         saveConfigMutation.mutate({ velocityWindowStart: date.toLocaleDateString('en-CA') });
                       }
@@ -2608,7 +2606,7 @@ function PurchaseOrdersTab() {
                     selected={velocityEnd}
                     onSelect={(date) => {
                       if (date) {
-                        setVelocityEnd(date);
+                        setSavedVelocityEnd(date.toLocaleDateString('en-CA'));
                         setVelocityEndPopoverOpen(false);
                         saveConfigMutation.mutate({ velocityWindowEnd: date.toLocaleDateString('en-CA') });
                       }
