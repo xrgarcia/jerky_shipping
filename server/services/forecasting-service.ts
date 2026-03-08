@@ -404,7 +404,7 @@ export class ForecastingService {
         })
           .from(salesForecasting)
           .where(where!)
-          .groupBy(drizzleSql`1`)
+          .groupBy(drizzleSql`1, 2`)
           .orderBy(drizzleSql`1`);
         allRows.push(...forecastRows.map(r => ({
           order_day: String(r.order_day),
@@ -493,7 +493,7 @@ export class ForecastingService {
         })
           .from(salesForecasting)
           .where(where!)
-          .groupBy(drizzleSql`1`)
+          .groupBy(drizzleSql`1, 2`)
           .orderBy(drizzleSql`1`);
         allRows.push(...forecastRows.map(r => ({
           order_day: String(r.order_day),
