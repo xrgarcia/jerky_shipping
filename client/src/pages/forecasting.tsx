@@ -438,10 +438,11 @@ function SalesChart({ data, channels, isLoading, chartType, startDate, endDate }
   };
 
   const renderAnnotationDot = (props: any) => {
-    const { cx, payload } = props;
+    const { cx, payload, index } = props;
     if (!payload?.hasNote) return null;
     return (
       <circle
+        key={index}
         cx={cx}
         cy={10}
         r={4}
@@ -753,10 +754,11 @@ function DualLineChart({ data, line1Key, line1Label, line1Color, line2Key, line2
   };
 
   const renderAnnotationDot = (props: any) => {
-    const { cx, payload } = props;
+    const { cx, payload, index } = props;
     if (!payload?.hasNote) return null;
     return (
       <circle
+        key={index}
         cx={cx}
         cy={10}
         r={4}
