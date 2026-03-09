@@ -290,7 +290,12 @@ function TimeRangeSelector({ value, onChange, peakSeasons, onPeakSeasonSelect, a
 type MultiSelectOption = string | { label: string; value: string; sublabel?: string };
 
 function normalizeOpt(opt: MultiSelectOption): { label: string; value: string; sublabel?: string } {
-  return typeof opt === "string" ? { label: opt, value: opt } : opt;
+  if (typeof opt === "string") return { label: opt, value: opt };
+  return {
+    label: opt.label != null ? String(opt.label) : "",
+    value: opt.value != null ? String(opt.value) : "",
+    sublabel: opt.sublabel,
+  };
 }
 
 
@@ -2056,7 +2061,12 @@ function applyProjFilter(rows: any[], filter: ProjFilter, getValue: (r: any) => 
   });
 }
 
-function parseLocalDate(dateStr: string): Date {
+function parseLocalDate(dateStr: string | null | undefined): Date {
+  if (!dateStr || typeof dateStr !== 'string') {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }
   return new Date(dateStr + 'T00:00:00');
 }
 
@@ -2332,12 +2342,12 @@ function PurchaseOrdersTab() {
 
   const filtered = useMemo(() => {
     let rows = snapshot;
-    if (searchTerm) {
+    if (searchTerm && typeof searchTerm === 'string') {
       const lower = searchTerm.toLowerCase();
       rows = rows.filter((r: any) =>
-        r.sku?.toLowerCase().includes(lower) ||
-        r.product_title?.toLowerCase().includes(lower) ||
-        r.description?.toLowerCase().includes(lower)
+        (typeof r.sku === 'string' && r.sku.toLowerCase().includes(lower)) ||
+        (typeof r.product_title === 'string' && r.product_title.toLowerCase().includes(lower)) ||
+        (typeof r.description === 'string' && r.description.toLowerCase().includes(lower))
       );
     }
     if (categoryFilter.length > 0) {
