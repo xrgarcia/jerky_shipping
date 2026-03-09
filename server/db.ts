@@ -120,22 +120,31 @@ export function startDatabaseHeartbeat() {
     }
     
     // Container keep-alive self-ping
-    if (publicUrl) {
+    const localUrl = `http://localhost:${process.env.PORT || 5000}`;
+    const pingUrls = publicUrl ? [publicUrl, localUrl] : [localUrl];
+
+    for (const url of pingUrls) {
       try {
         const httpStart = Date.now();
-        const response = await fetch(`${publicUrl}/api/health/heart-beat`, {
+        const response = await fetch(`${url}/api/health/heart-beat`, {
           method: 'GET',
           headers: { 'User-Agent': 'Heartbeat-Self-Ping' },
+          signal: AbortSignal.timeout(5000),
         });
         const httpDuration = Date.now() - httpStart;
         if (response.ok) {
-          console.log(`[Heartbeat] Container ping successful (${httpDuration}ms)`);
+          console.log(`[Heartbeat] Container ping successful via ${url} (${httpDuration}ms)`);
+          break;
         } else {
-          console.warn(`[Heartbeat] Container ping returned ${response.status}`);
+          console.warn(`[Heartbeat] Container ping returned ${response.status} via ${url}`);
         }
-      } catch (error) {
-        // Don't log full error - likely ECONNREFUSED in dev which is expected
-        console.warn('[Heartbeat] Container ping failed (expected in dev)');
+      } catch (error: any) {
+        const isProduction = process.env.NODE_ENV === 'production';
+        if (isProduction) {
+          console.error(`[Heartbeat] Container ping FAILED in production via ${url}:`, error?.message || error);
+        } else {
+          console.warn(`[Heartbeat] Container ping failed via ${url}:`, error?.message);
+        }
       }
     }
   }, HEARTBEAT_INTERVAL_MS);
