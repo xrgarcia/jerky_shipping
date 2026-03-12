@@ -1788,7 +1788,7 @@ function MultiSelectFilter({
         <Button
           variant="outline"
           size="default"
-          className={`justify-between gap-2 transition-all${active ? " ring-1 ring-primary/50 border-primary/50" : ""}`}
+          className={`max-w-[400px] justify-between gap-2 transition-all${active ? " ring-1 ring-primary/50 border-primary/50" : ""}`}
           data-testid={testId}
         >
           {active && <ListFilter className="h-3.5 w-3.5 shrink-0 text-primary" />}
