@@ -1197,6 +1197,7 @@ function SalesTab() {
 
   return (
     <div className="space-y-3">
+      {/* Row 1: Date Range + Sales Channel */}
       <div className="flex flex-wrap items-end gap-3">
           <div className="flex flex-col gap-1">
             <span className="text-xs font-semibold text-foreground">Date Range</span>
@@ -1246,49 +1247,6 @@ function SalesTab() {
           <div className="h-8 w-px bg-border self-end" />
 
           <div className="flex flex-col gap-1">
-            <span className="text-xs font-semibold text-foreground">Products</span>
-            <div className="flex flex-wrap items-center gap-2">
-              {allProducts.length > 0 && (
-                <MultiSelectFilter
-                  label="Product"
-                  options={allProducts.map((p) => ({ label: p.title, value: p.sku, sublabel: p.sku }))}
-                  selected={activeFilters.skus ?? []}
-                  onChange={(skus) => updateFilter('skus', skus.length > 0 ? skus : undefined)}
-                  popoverWidth="w-[300px]"
-                  data-testid="select-products-filter"
-                />
-              )}
-              {filterCategories.length > 0 && (
-                <MultiSelectFilter
-                  label="Category"
-                  options={filterCategories}
-                  selected={activeFilters.categories ?? []}
-                  onChange={(cats) => updateFilter('categories', cats.length > 0 ? cats : undefined)}
-                  data-testid="select-category-filter"
-                />
-              )}
-              <Select
-                value={activeFilters.isAssembledProduct ?? 'either'}
-                onValueChange={(v) => updateFilter('isAssembledProduct', v as BooleanFilter)}
-              >
-                <SelectTrigger className={`w-[185px] transition-all${activeFilters.isAssembledProduct && activeFilters.isAssembledProduct !== 'either' ? " ring-1 ring-primary/50 border-primary/50" : ""}`} data-testid="select-assembled">
-                  {activeFilters.isAssembledProduct && activeFilters.isAssembledProduct !== 'either' && <ListFilter className="mr-1 h-3.5 w-3.5 shrink-0 text-primary" />}
-                  <span className="truncate text-sm">
-                    {"Assembled: " + (activeFilters.isAssembledProduct === 'true' ? 'Yes' : activeFilters.isAssembledProduct === 'false' ? 'No' : 'Either')}
-                  </span>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="either" data-testid="option-assembled-either">Either</SelectItem>
-                  <SelectItem value="true" data-testid="option-assembled-true">Yes</SelectItem>
-                  <SelectItem value="false" data-testid="option-assembled-false">No</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="h-8 w-px bg-border self-end" />
-
-          <div className="flex flex-col gap-1">
             <span className="text-xs font-semibold text-foreground">Sales Channel</span>
             <div className="flex flex-wrap items-center gap-2">
               {!channelsLoading && allChannels.length > 0 && (
@@ -1318,6 +1276,45 @@ function SalesTab() {
               </Button>
             </div>
           )}
+      </div>
+
+      {/* Row 2: Products */}
+      <div className="flex flex-wrap items-center gap-2">
+        {allProducts.length > 0 && (
+          <MultiSelectFilter
+            label="Product"
+            options={allProducts.map((p) => ({ label: p.title, value: p.sku, sublabel: p.sku }))}
+            selected={activeFilters.skus ?? []}
+            onChange={(skus) => updateFilter('skus', skus.length > 0 ? skus : undefined)}
+            popoverWidth="w-[300px]"
+            data-testid="select-products-filter"
+          />
+        )}
+        {filterCategories.length > 0 && (
+          <MultiSelectFilter
+            label="Category"
+            options={filterCategories}
+            selected={activeFilters.categories ?? []}
+            onChange={(cats) => updateFilter('categories', cats.length > 0 ? cats : undefined)}
+            data-testid="select-category-filter"
+          />
+        )}
+        <Select
+          value={activeFilters.isAssembledProduct ?? 'either'}
+          onValueChange={(v) => updateFilter('isAssembledProduct', v as BooleanFilter)}
+        >
+          <SelectTrigger className={`w-[185px] transition-all${activeFilters.isAssembledProduct && activeFilters.isAssembledProduct !== 'either' ? " ring-1 ring-primary/50 border-primary/50" : ""}`} data-testid="select-assembled">
+            {activeFilters.isAssembledProduct && activeFilters.isAssembledProduct !== 'either' && <ListFilter className="mr-1 h-3.5 w-3.5 shrink-0 text-primary" />}
+            <span className="truncate text-sm">
+              {"Assembled: " + (activeFilters.isAssembledProduct === 'true' ? 'Yes' : activeFilters.isAssembledProduct === 'false' ? 'No' : 'Either')}
+            </span>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="either" data-testid="option-assembled-either">Either</SelectItem>
+            <SelectItem value="true" data-testid="option-assembled-true">Yes</SelectItem>
+            <SelectItem value="false" data-testid="option-assembled-false">No</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-8 gap-3">
