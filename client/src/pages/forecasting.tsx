@@ -2933,7 +2933,7 @@ function PurchaseOrdersTab() {
                     return (
                       <TableHead
                         colSpan={cnt}
-                        className="sticky top-0 bg-border/50 z-20 text-center text-[10px] font-bold text-foreground/70 uppercase tracking-widest py-1.5 border-b border-border"
+                        className="sticky top-0 bg-card z-20 text-center text-[10px] font-bold text-foreground/70 uppercase tracking-widest py-1.5 border-b border-border"
                       >
                         {group.label}
                       </TableHead>
@@ -2947,7 +2947,7 @@ function PurchaseOrdersTab() {
                     return (
                       <TableHead
                         colSpan={cnt}
-                        className="sticky top-0 bg-border/50 z-20 text-center text-[10px] font-bold text-foreground/70 uppercase tracking-widest py-1.5 border-l-2 border-b border-border"
+                        className="sticky top-0 bg-card z-20 text-center text-[10px] font-bold text-foreground/70 uppercase tracking-widest py-1.5 border-l-2 border-b border-border"
                       >
                         Projection
                       </TableHead>
@@ -2961,7 +2961,7 @@ function PurchaseOrdersTab() {
                     return (
                       <TableHead
                         colSpan={cnt}
-                        className="sticky top-0 bg-border/50 z-20 text-center text-[10px] font-bold text-foreground/70 uppercase tracking-widest py-1.5 border-l-2 border-b border-border"
+                        className="sticky top-0 bg-card z-20 text-center text-[10px] font-bold text-foreground/70 uppercase tracking-widest py-1.5 border-l-2 border-b border-border"
                       >
                         {group.label}
                       </TableHead>
@@ -2975,7 +2975,7 @@ function PurchaseOrdersTab() {
                     return (
                       <TableHead
                         colSpan={cnt}
-                        className="sticky top-0 bg-border/50 z-20 text-center text-[10px] font-bold text-foreground/70 uppercase tracking-widest py-1.5 border-l-2 border-b border-border"
+                        className="sticky top-0 bg-card z-20 text-center text-[10px] font-bold text-foreground/70 uppercase tracking-widest py-1.5 border-l-2 border-b border-border"
                       >
                         {group.label}
                       </TableHead>
