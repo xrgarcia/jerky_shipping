@@ -1982,10 +1982,11 @@ const PO_COLUMNS = [
   { key: "cost",         label: "Cost",         group: "ordering"   },
   { key: "lead_time",    label: "Lead Time",    group: "ordering"   },
   { key: "moq",          label: "MOQ",          group: "ordering"   },
-  { key: "proj_direct",  label: "Proj. Direct",  group: "projection" },
+  { key: "proj_direct",   label: "Proj. Direct",  group: "projection" },
   { key: "proj_kits",    label: "Proj. Kits",    group: "projection" },
   { key: "growth_mult",  label: "Growth Adj.",   group: "projection" },
   { key: "proj_total",   label: "Proj. Total",   group: "projection" },
+  { key: "base_velocity", label: "Base Vel.",    group: "projection" },
   { key: "rec_purchase", label: "Rec. Purchase", group: "projection" },
   { key: "qty_ordered",  label: "Qty Ordered",   group: "projection" },
   { key: "notes",        label: "Notes" },
@@ -3078,10 +3079,11 @@ function PurchaseOrdersTab() {
                   )}
                   {/* Projection columns — between Product and Inventory */}
                   {hasProjection && [
-                    { key: "proj_direct",  label: "Proj. Direct",  width: 90, tooltip: "Projected individual units sold (not part of a kit) over the selected window, using the chosen algorithm." },
+                    { key: "proj_direct",   label: "Proj. Direct",  width: 90, tooltip: "Projected individual units sold (not part of a kit) over the selected window, using the chosen algorithm." },
                     { key: "proj_kits",    label: "Proj. Kits",    width: 90, tooltip: "Projected kit-driven units (this SKU ships inside a kit) over the selected window, using the chosen algorithm." },
                     { key: "growth_mult",  label: "Growth Adj.",   width: 70, tooltip: "The growth multiplier applied to this SKU's projections based on the selected growth factor method." },
                     { key: "proj_total",   label: "Proj. Total",   width: 90, tooltip: "Total projected units needed (direct + kit-driven) over the selected window." },
+                    { key: "base_velocity", label: "Base Vel.",    width: 80, tooltip: "Daily run rate before growth adjustment: proj_total ÷ days in the selected window." },
                     { key: "rec_purchase", label: "Rec. Purchase", width: 90, tooltip: "Recommended purchase qty: projected total minus current total stock. Negative means you have sufficient stock." },
                     { key: "qty_ordered",  label: "Qty Ordered",   width: 90, tooltip: "The quantity your team decided to order for this SKU. Click any cell to enter or edit the value." },
                   ].filter((col) => colVisible(col.key)).map((col, idx) => (
@@ -3294,6 +3296,11 @@ function PurchaseOrdersTab() {
                               <TableCell style={{ width: 90, minWidth: 90 }} className="text-right tabular-nums font-semibold">
                                 {adjTotal.toLocaleString()}
                                 {isAdjusted && <div className="text-xs text-muted-foreground font-normal">{(rawDirect + rawKits).toLocaleString()}</div>}
+                              </TableCell>
+                            )}
+                            {colVisible("base_velocity") && (
+                              <TableCell style={{ width: 80, minWidth: 80 }} className="text-right tabular-nums">
+                                {Number(row.base_velocity ?? 0).toFixed(1)}
                               </TableCell>
                             )}
                             {colVisible("rec_purchase") && (

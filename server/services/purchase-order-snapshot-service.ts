@@ -176,6 +176,9 @@ export async function getSnapshot(date?: string, method?: string, windowStart?: 
         ROUND(COALESCE(proj.proj_direct, 0)) AS proj_direct,
         ROUND(COALESCE(proj.proj_kits, 0)) AS proj_kits,
         ROUND(COALESCE(proj.proj_direct, 0) + COALESCE(proj.proj_kits, 0)) AS proj_total,
+        ROUND((COALESCE(proj.proj_direct, 0) + COALESCE(proj.proj_kits, 0))
+          / GREATEST(${windowEnd}::date - ${windowStart}::date + 1, 1)
+        , 2) AS base_velocity,
         ROUND(COALESCE(proj.proj_direct, 0) + COALESCE(proj.proj_kits, 0)) - COALESCE(pos.total_stock, 0) AS rec_purchase
       FROM purchase_order_snapshots pos
       LEFT JOIN (
