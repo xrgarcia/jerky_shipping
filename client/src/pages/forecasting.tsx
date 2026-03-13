@@ -921,12 +921,16 @@ function DateRangePicker({ startDate, endDate, onStartChange, onEndChange }: Dat
   const endValue = endDate ? parseISO(endDate) : undefined;
   const [endMonth, setEndMonth] = useState<Date>(endValue ?? startValue ?? new Date());
 
+  useEffect(() => {
+    if (endValue) setEndMonth(endValue);
+  }, [endDate]);
+
   const handleStartSelect = useCallback((day: Date | undefined) => {
     if (!day) return;
     onStartChange(formatDateParam(day));
-    setEndMonth(day);
     if (endValue && day > endValue) {
       onEndChange(formatDateParam(day));
+      setEndMonth(day);
     }
   }, [endValue, onStartChange, onEndChange]);
 
