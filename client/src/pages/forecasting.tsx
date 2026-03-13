@@ -2147,7 +2147,13 @@ function PurchaseOrdersTab() {
   );
   useEffect(() => {
     const allKeys = PO_COLUMNS.map((c) => c.key);
-    const missing = PO_DEFAULT_COLUMNS.filter((k) => !visibleColumns.includes(k));
+    // PO_DEFAULT_COLUMNS covers non-projection defaults; PO_NEW_COLUMNS auto-adds
+    // newly introduced columns so existing saved prefs pick them up automatically.
+    const PO_NEW_COLUMNS: PoColumnKey[] = ["base_velocity"];
+    const missing = [
+      ...PO_DEFAULT_COLUMNS.filter((k) => !visibleColumns.includes(k)),
+      ...PO_NEW_COLUMNS.filter((k) => !visibleColumns.includes(k)),
+    ];
     const merged = [...visibleColumns, ...missing].sort(
       (a, b) => allKeys.indexOf(a as PoColumnKey) - allKeys.indexOf(b as PoColumnKey)
     );
