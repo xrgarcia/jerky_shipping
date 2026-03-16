@@ -2709,6 +2709,7 @@ function PurchaseOrdersTab() {
           </PopoverTrigger>
           <PopoverContent className="w-[230px] p-2" align="start">
             <div className="flex flex-col gap-1">
+              <div className="overflow-y-auto max-h-[min(65vh,460px)] flex flex-col gap-1">
               {(() => {
                 const allColKeys = PO_COLUMNS.map((c) => c.key) as PoColumnKey[];
                 const renderGroup = (label: string, keys: readonly PoColumnKey[]) => {
@@ -2764,6 +2765,7 @@ function PurchaseOrdersTab() {
                   </>
                 );
               })()}
+              </div>
               <div className="border-t mt-1 pt-1 flex gap-1">
                 <button
                   type="button"
