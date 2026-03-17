@@ -115,42 +115,46 @@ async function runSync(): Promise<void> {
       }
     }
     
-    // Phase 1: Clear names to temp values for all records being updated
-    // This prevents unique constraint violations when swapping names
-    for (const update of updates) {
-      await db
-        .update(packagingTypes)
-        .set({ name: `__temp_${update.packageId}__` })
-        .where(eq(packagingTypes.id, update.id));
-    }
-    
-    // Phase 2: Apply all updates with final names
-    for (const update of updates) {
-      await db
-        .update(packagingTypes)
-        .set(update.data)
-        .where(eq(packagingTypes.id, update.id));
-      updatedCount++;
-      log(`Updated: "${update.name}" (id: ${update.id})`);
-    }
-    
-    // Phase 3: Insert new records
-    for (const insert of inserts) {
-      try {
-        await db
-          .insert(packagingTypes)
-          .values(insert);
-        insertedCount++;
-        log(`Inserted: "${insert.name}" (package_id: ${insert.packageId})`);
-      } catch (error: any) {
-        if (error.code === '23505') {
-          log(`Duplicate name conflict for "${insert.name}" - skipping insert`);
-          skippedCount++;
-        } else {
-          throw error;
+    // Wrap all phases in a transaction so temp names never leak if the process
+    // crashes between Phase 1 and Phase 2.
+    await db.transaction(async (tx) => {
+      // Phase 1: Clear names to temp values for all records being updated
+      // This prevents unique constraint violations when swapping names
+      for (const update of updates) {
+        await tx
+          .update(packagingTypes)
+          .set({ name: `__temp_${update.packageId}__` })
+          .where(eq(packagingTypes.id, update.id));
+      }
+
+      // Phase 2: Apply all updates with final names
+      for (const update of updates) {
+        await tx
+          .update(packagingTypes)
+          .set(update.data)
+          .where(eq(packagingTypes.id, update.id));
+        updatedCount++;
+        log(`Updated: "${update.name}" (id: ${update.id})`);
+      }
+
+      // Phase 3: Insert new records
+      for (const insert of inserts) {
+        try {
+          await tx
+            .insert(packagingTypes)
+            .values(insert);
+          insertedCount++;
+          log(`Inserted: "${insert.name}" (package_id: ${insert.packageId})`);
+        } catch (error: any) {
+          if (error.code === '23505') {
+            log(`Duplicate name conflict for "${insert.name}" - skipping insert`);
+            skippedCount++;
+          } else {
+            throw error;
+          }
         }
       }
-    }
+    });
     
     workerStats.lastSyncAt = new Date();
     workerStats.lastInsertedCount = insertedCount;
