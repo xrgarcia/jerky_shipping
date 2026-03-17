@@ -13,6 +13,7 @@ import type { InsertShipmentRateAnalysis, Shipment } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 import { queueLifecycleEvaluation } from './lifecycle-service';
 import { getCarriers, getRatesEstimate } from '../utils/shipstation-api';
+import { sanitizeShipmentItemOptionsIfNeeded } from '../utils/shipstation-helpers';
 import { RateCheckEligibility } from './rate-check-eligibility';
 import { customerShippingMethodConfig } from './shipping-method-config-service';
 import { withSpan } from '../utils/tracing';
@@ -164,7 +165,22 @@ export class SmartCarrierRateService {
     
     try {
       console.log(`[SmartCarrierRate] Using package for ${shipmentId}: ${eligibility.weightOz?.toFixed(2)}oz, ${eligibility.packagingName}`);
-      
+
+      // Sanitize item options on ShipStation before fetching rates.
+      // ShipStation reads item details server-side when the rates API is called with a
+      // shipment_id, so bad options (null/empty values injected by Shopify apps) must
+      // be cleaned on the stored shipment before we request rates — stripping from
+      // our own request payload has no effect.
+      try {
+        const { sanitized } = await sanitizeShipmentItemOptionsIfNeeded(shipmentId);
+        if (sanitized) {
+          console.log(`[SmartCarrierRate] Sanitized item options for ${shipmentId} before rate fetch`);
+        }
+      } catch (sanitizeErr: any) {
+        // Non-fatal: log and continue — the rate call may still succeed if options are fine
+        console.warn(`[SmartCarrierRate] Item option sanitization failed for ${shipmentId} (continuing): ${sanitizeErr.message}`);
+      }
+
       // Use rates estimate API with shipment_id only - ShipStation uses the existing shipment's details
       const rates = await this.fetchRatesEstimate({
         shipmentId,

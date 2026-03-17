@@ -4,7 +4,6 @@ import { shipments, shipmentItems, shipmentQcItems, skuvaultProducts } from '@sh
 import { eq, and, isNull, inArray, isNotNull, exists, sql, notExists } from 'drizzle-orm';
 import { broadcastQueueStatus } from './websocket';
 import type { SkuVaultOrderSession, SkuVaultOrderSessionItem } from '@shared/firestore-schema';
-import { onSessionClosed, isPackingReady, isPackingReadyWithReason, buildShipmentContext, type ShipmentContext } from './services/qcsale-cache-warmer';
 import { queueLifecycleEvaluation } from './services/lifecycle-service';
 import { hydrateShipment, calculateFingerprint } from './services/qc-item-hydrator';
 import { getRedisClient } from './utils/queue';
@@ -473,123 +472,8 @@ async function detectClosedSessionTransitions(
  * we clear the stale timestamp and re-warm.
  */
 async function ensureClosedSessionsWarmed(): Promise<number> {
-  // Find ALL packing-ready shipments (closed, no tracking, pending status)
-  // We'll check Redis to determine which ones actually need warming
-  const packingReadyStatuses = ['pending', 'label_pending'];
-  const packingReadyShipments = await db
-    .select({
-      id: shipments.id,
-      orderNumber: shipments.orderNumber,
-      sessionId: shipments.sessionId,
-      trackingNumber: shipments.trackingNumber,
-      shipmentStatus: shipments.shipmentStatus,
-      cacheWarmedAt: shipments.cacheWarmedAt,
-    })
-    .from(shipments)
-    .where(
-      and(
-        eq(shipments.sessionStatus, 'closed'),
-        isNull(shipments.trackingNumber),
-        inArray(shipments.shipmentStatus, packingReadyStatuses),
-        isNotNull(shipments.sessionId)
-      )
-    )
-    .limit(100); // Check up to 100 per cycle
-
-  if (packingReadyShipments.length === 0) {
-    return 0;
-  }
-
-  // Import Redis client to verify cache entries actually exist
-  const { getRedisClient } = await import('./utils/queue');
-  const redis = getRedisClient();
-  const WARM_CACHE_KEY_PREFIX = 'skuvault:qcsale:warm:';
-
-  // Separate into: never warmed, and potentially stale (has timestamp but maybe no Redis entry)
-  const neverWarmed: typeof packingReadyShipments = [];
-  const potentiallyStale: typeof packingReadyShipments = [];
-
-  for (const shipment of packingReadyShipments) {
-    if (!shipment.cacheWarmedAt) {
-      neverWarmed.push(shipment);
-    } else {
-      potentiallyStale.push(shipment);
-    }
-  }
-
-  // Check Redis for potentially stale entries (batch check for efficiency)
-  let staleCount = 0;
-  const staleShipments: typeof packingReadyShipments = [];
-  
-  if (potentiallyStale.length > 0) {
-    // Batch check Redis keys using pipeline for efficiency
-    const shipmentsByKey = new Map<string, typeof packingReadyShipments[0]>();
-    const keysToCheck: string[] = [];
-    
-    for (const shipment of potentiallyStale) {
-      if (!shipment.orderNumber) continue;
-      const warmKey = `${WARM_CACHE_KEY_PREFIX}${shipment.orderNumber}`;
-      keysToCheck.push(warmKey);
-      shipmentsByKey.set(warmKey, shipment);
-    }
-    
-    // Batch exists check - Upstash Redis supports exists with multiple keys
-    // Check in batches of 20 to avoid overwhelming Redis
-    const BATCH_SIZE = 20;
-    for (let i = 0; i < keysToCheck.length; i += BATCH_SIZE) {
-      const batchKeys = keysToCheck.slice(i, i + BATCH_SIZE);
-      // Check each key in parallel within the batch
-      const existsResults = await Promise.all(
-        batchKeys.map(key => redis.exists(key))
-      );
-      
-      for (let j = 0; j < batchKeys.length; j++) {
-        if (existsResults[j] === 0) {
-          const shipment = shipmentsByKey.get(batchKeys[j])!;
-          staleShipments.push(shipment);
-          staleCount++;
-        }
-      }
-    }
-    
-    // Clear cacheWarmedAt for stale entries BEFORE warming
-    // This moves them to "never-warmed" bucket so failed warms don't cause endless Redis checks
-    if (staleShipments.length > 0) {
-      const staleIds = staleShipments.map(s => s.id);
-      await db.update(shipments)
-        .set({ cacheWarmedAt: null })
-        .where(inArray(shipments.id, staleIds));
-      log(`Found ${staleCount} stale cache entries (cacheWarmedAt set but Redis missing), cleared timestamps`);
-    }
-  }
-
-  // Combine never-warmed and stale shipments for warming
-  const shipmentsToWarm = [...neverWarmed, ...staleShipments].slice(0, 50); // Limit to 50 per cycle
-
-  if (shipmentsToWarm.length === 0) {
-    return 0;
-  }
-
-  log(`Found ${shipmentsToWarm.length} packing-ready shipments needing cache (${neverWarmed.length} new, ${staleShipments.length} stale), warming...`);
-  
-  let warmedCount = 0;
-  for (const shipment of shipmentsToWarm) {
-    if (!shipment.orderNumber) continue;
-    
-    // Use buildShipmentContext to ensure all required fields are included
-    // Override sessionStatus to 'closed' since the query already filters for sessionStatus='closed'
-    const shipmentContext = buildShipmentContext(shipment, 'closed');
-    
-    try {
-      await onSessionClosed(shipment.orderNumber, shipmentContext);
-      warmedCount++;
-    } catch (err: any) {
-      log(`Failed to warm cache for ${shipment.orderNumber}: ${err.message}`);
-    }
-  }
-  
-  log(`Warmed cache for ${warmedCount}/${shipmentsToWarm.length} packing-ready shipments`);
-  return warmedCount;
+  // Cache warming is disabled — packing pages query SkuVault API directly.
+  return 0;
 }
 
 /**

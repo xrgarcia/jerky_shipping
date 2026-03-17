@@ -25,7 +25,7 @@ import { shopifyOrderETL } from "./services/shopify-order-etl-service";
 import { shipStationShipmentETL } from "./services/shipstation-shipment-etl-service";
 import { extractShipmentStatus } from "./shipment-sync-worker";
 import { skuVaultService, SkuVaultError, qcSaleCache } from "./services/skuvault-service";
-import { onLabelCreated, refreshCacheForOrder, refreshCacheForOrderDetailed, getCacheWarmerMetrics, getWarmCache, getInactiveSessionShipments, getWarmCacheStatusBatch, invalidateCacheForOrder, updateCacheAfterScan, getShippableShipmentsForOrder, warmCacheForOrder } from "./services/qcsale-cache-warmer";
+import { getCacheWarmerMetrics, getInactiveSessionShipments, getShippableShipmentsForOrder } from "./services/qcsale-cache-warmer";
 import { analyzeShippableShipments, type ShippableShipmentsResult } from "./utils/shipment-eligibility";
 import { qcPassItemRequestSchema, qcPassKitSaleItemRequestSchema } from "@shared/skuvault-types";
 import { fromZonedTime, toZonedTime, formatInTimeZone } from 'date-fns-tz';
@@ -1695,18 +1695,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log(`[QC Pass] Attempting QC pass with SaleId: ${saleId}`);
           const result = await skuVaultService.passQCItem(qcData);
           
-          // Update cache to keep it in sync with SkuVault after successful pass
-          if (result?.Success && parseResult.data.OrderNumber) {
-            updateCacheAfterScan({
-              orderNumber: parseResult.data.OrderNumber,
-              sku: parseResult.data.ScannedCode,
-              scannedCode: parseResult.data.ScannedCode,
-              quantity: parseResult.data.Quantity,
-              itemId: parseResult.data.IdItem,
-              userName: (req.user as any)?.displayName || (req.user as any)?.email || undefined,
-            }).catch(err => console.warn(`[QC Pass] Cache update failed (non-blocking):`, err.message));
-          }
-          
           res.json(result);
         } catch (error: any) {
           // Graceful degradation: Log but return success so packing continues
@@ -1790,19 +1778,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           console.log(`[QC Kit Pass] Attempting kit QC pass with SaleId: ${saleId}, KitId: ${qcData.KitId}`);
           const result = await skuVaultService.passKitQCItem(qcData);
-          
-          // Update cache to keep it in sync with SkuVault after successful pass
-          if (result?.Success && parseResult.data.OrderNumber) {
-            updateCacheAfterScan({
-              orderNumber: parseResult.data.OrderNumber,
-              sku: parseResult.data.ScannedCode,
-              scannedCode: parseResult.data.ScannedCode,
-              quantity: parseResult.data.Quantity,
-              itemId: parseResult.data.IdItem,
-              kitId: parseResult.data.KitId,
-              userName: (req.user as any)?.displayName || (req.user as any)?.email || undefined,
-            }).catch(err => console.warn(`[QC Kit Pass] Cache update failed (non-blocking):`, err.message));
-          }
           
           res.json(result);
         } catch (error: any) {
@@ -7911,63 +7886,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Force refresh the cache from SkuVault - use detailed function for logging
-      const refreshResult = await refreshCacheForOrderDetailed(orderNumber);
-      
-      // Log the refresh attempt to packing_logs for analysis
-      try {
-        await storage.createPackingLog({
-          userId: user.id,
-          shipmentId: refreshResult.shipmentId || shipment.id,
-          orderNumber,
-          action: 'cache_refresh_attempt',
-          productSku: null,
-          scannedCode: null,
-          skuVaultProductId: refreshResult.saleId || null,
-          success: refreshResult.success,
-          errorMessage: refreshResult.errorMessage || null,
-          skuVaultRawResponse: {
-            ...(refreshResult.skuvaultRawResponse || {}),
-            shipstationId: refreshResult.shipstationId || null,
-            saleId: refreshResult.saleId || null,
-            skuvaultOrderId: refreshResult.skuvaultOrderId || null,
-            qcSaleStatus: refreshResult.qcSaleStatus || null,
-            itemsFound: refreshResult.itemsFound ?? 0,
-            barcodesFound: refreshResult.barcodesFound ?? 0,
-            passedItemsCount: refreshResult.passedItemsCount ?? 0,
-            errorStage: refreshResult.errorStage || null,
-          },
-          station: null,
-          stationId: null,
-        });
-      } catch (logError: any) {
-        console.error(`[Packing] Failed to log cache refresh attempt: ${logError.message}`);
-      }
-      
-      if (refreshResult.success) {
-        res.json({
-          success: true,
-          message: "Cache refreshed successfully",
-          orderNumber,
-          details: {
-            saleId: refreshResult.saleId,
-            itemsFound: refreshResult.itemsFound,
-            barcodesFound: refreshResult.barcodesFound,
-          }
-        });
-      } else {
-        res.status(500).json({
-          success: false,
-          error: "Failed to refresh cache - order may not be sessioned in SkuVault",
-          orderNumber,
-          resolution: "The order may not have been picked yet. Check SkuVault session status.",
-          details: {
-            errorStage: refreshResult.errorStage,
-            errorMessage: refreshResult.errorMessage,
-            shipstationId: refreshResult.shipstationId,
-          }
-        });
-      }
+      // Cache warming is disabled — packing pages query SkuVault API directly.
+      return res.json({
+        success: false,
+        message: "Cache warming is disabled. Packing pages fetch data directly from SkuVault.",
+        orderNumber,
+      });
     } catch (error: any) {
       console.error("[Packing] Error refreshing cache:", error);
       res.status(500).json({ 
@@ -7987,16 +7911,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Order number is required" });
       }
       
-      // Get the raw cache data
-      const cacheData = await getWarmCache(orderNumber);
-      
-      if (!cacheData) {
-        return res.status(404).json({ 
-          error: "No cache found",
-          orderNumber,
-          message: "This order is not in the warm cache. It may not be ready for packing or the cache has expired."
-        });
-      }
+      // Cache warming is disabled — return empty response.
+      return res.status(404).json({
+        error: "Cache disabled",
+        orderNumber,
+        message: "Cache warming is disabled. Packing pages fetch data directly from SkuVault.",
+      });
       
       // Get all shipments for this order from the database
       const shipments = await storage.getShipmentsByOrderNumber(orderNumber);
@@ -8111,13 +8031,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Maximum 100 order numbers per request" });
       }
       
-      const statusMap = await getWarmCacheStatusBatch(orderNumbers);
-      
-      // Convert Map to object for JSON response
+      // Cache warming is disabled — return empty statuses.
       const statuses: Record<string, { isWarmed: boolean; warmedAt: number | null }> = {};
-      statusMap.forEach((value, key) => {
-        statuses[key] = value;
-      });
       
       res.json({ statuses });
     } catch (error: any) {
@@ -8186,13 +8101,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 status: 'updated',
                 trackingNumber: updatedShipment.trackingNumber
               });
-              // Invalidate cache for this order since it now has tracking
-              try {
-                await invalidateCacheForOrder(shipment.orderNumber);
-                console.log(`[TrackingBackfill] Invalidated cache for ${shipment.orderNumber}`);
-              } catch (cacheError: any) {
-                console.error(`[TrackingBackfill] Failed to invalidate cache for ${shipment.orderNumber}:`, cacheError.message);
-              }
             }
           }
           
@@ -8972,17 +8880,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (result.Success) {
         console.log(`[Packing QC] Successfully passed QC: ${sku} for order ${orderNumber}`);
         
-        // Update cache to keep it in sync with SkuVault after successful pass
-        // This ensures scan progress persists across page reloads
-        updateCacheAfterScan({
-          orderNumber,
-          sku: String(sku),          // Component/item SKU
-          scannedCode: String(sku),  // What was scanned (same as SKU in this flow)
-          quantity: Number(quantity),
-          itemId: idItem,
-          kitId: kitId || undefined,
-          userName: userEmail,
-        }).catch(err => console.warn(`[Packing QC] Cache update failed (non-blocking):`, err.message));
         
         // Build response with kit info if applicable
         const response: any = { 
@@ -9256,15 +9153,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
               });
               logger.info(`[Packing] Created and saved new label: ${labelUrl}, updated shipmentStatus to label_created`, withOrder(shipment.orderNumber, shipment.shipmentId));
               
-              // CACHE INVALIDATION: For boxing workflow, label created means order is complete
-              // For bagging workflow (skipCacheInvalidation=true), we keep the cache until QC scanning is done
-              if (shipment.orderNumber && !skipCacheInvalidation) {
-                onLabelCreated(shipment.orderNumber).catch(err => {
-                  console.warn(`[Packing] Cache invalidation error for ${shipment.orderNumber}:`, err.message);
-                });
-              } else if (skipCacheInvalidation) {
-                logger.debug(`[Packing] Skipping cache invalidation for ${shipment.orderNumber} (bagging workflow - QC scans pending)`, withOrder(shipment.orderNumber, shipment.shipmentId));
-              }
             }
           }
         } catch (error: any) {
@@ -9519,14 +9407,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         logger.info(`[Bagging] Marked QC complete for shipment ${shipmentId} (order ${orderNumber})`, withOrder(orderNumber, shipmentId));
       }
       
-      // BAGGING WORKFLOW: Now that QC is complete, invalidate the warm cache
-      // This was deferred from label creation to allow product scans during QC
-      if (orderNumber) {
-        invalidateCacheForOrder(orderNumber).catch(err => {
-          console.warn(`[Bagging] Cache invalidation error for ${orderNumber}:`, err.message);
-        });
-        logger.info(`[Bagging] Invalidated cache for order ${orderNumber} (QC complete)`, withOrder(orderNumber, shipmentId));
-      }
       
       res.json({ 
         success: true, 
@@ -9731,14 +9611,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
         logger.info(`[Packing] Updated shipment with new label URL and tracking number`, withOrder(shipment.orderNumber, shipStationShipmentId));
         
-        // Invalidate QC cache for this order (so fresh data is fetched)
-        try {
-          const { qcSaleCache } = await import("./services/qcsale-cache-warmer");
-          await qcSaleCache.invalidate(shipment.orderNumber);
-          logger.info(`[Packing] Invalidated QC cache for voided order ${shipment.orderNumber}`, withOrder(shipment.orderNumber, shipStationShipmentId));
-        } catch (err) {
-          logger.debug(`[Packing] Cache invalidation skipped`, withOrder(shipment.orderNumber, shipStationShipmentId));
-        }
         
         // Log the new label creation (replacing voided label)
         await storage.createShipmentEvent({

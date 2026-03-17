@@ -3,6 +3,7 @@ import { shipstationWriteQueue, shipments } from '@shared/schema';
 import type { InsertShipstationWriteQueue } from '@shared/schema';
 import { eq, and, lte, or, isNull, asc, sql } from 'drizzle-orm';
 import { resolveCarrierIdFromServiceCode } from '../utils/shipstation-api';
+import { sanitizeItemOptions } from '../utils/shipstation-helpers';
 import logger, { withOrder } from '../utils/logger';
 import { withSpan } from '../utils/tracing';
 
@@ -199,35 +200,6 @@ function applyPatch(currentShipment: Record<string, any>, patch: Record<string, 
   return merged;
 }
 
-// Shopify apps (e.g. Bold Commerce, Frequently Bought Together) can inject
-// item-level options with empty/null values into orders. When these orders
-// sync to ShipStation, the empty option values are stored on the shipment.
-// ShipStation's PUT /shipments endpoint rejects payloads containing
-// items[].options[] entries where the value is empty, null, or undefined,
-// causing the entire write to fail. Because the SSWriteQueue's
-// GET-merge-PUT flow reads these bad options back from ShipStation and
-// sends them in the update, every subsequent write attempt for the same
-// shipment will also fail — including rate checks that reference it.
-// Stripping these entries here prevents the cascade of failures.
-function sanitizeItemOptions(payload: Record<string, any>): Record<string, any> {
-  if (!payload.items || !Array.isArray(payload.items)) return payload;
-
-  let strippedCount = 0;
-  payload.items = payload.items.map((item: any) => {
-    if (!item.options || !Array.isArray(item.options)) return item;
-    const before = item.options.length;
-    item.options = item.options.filter((opt: any) =>
-      opt.value !== null && opt.value !== undefined && opt.value !== ''
-    );
-    strippedCount += before - item.options.length;
-    return item;
-  });
-
-  if (strippedCount > 0) {
-    log(`Stripped ${strippedCount} item option(s) with empty values`);
-  }
-  return payload;
-}
 
 function stripReadOnlyFields(payload: Record<string, any>): Record<string, any> {
   const cleaned = { ...payload };
