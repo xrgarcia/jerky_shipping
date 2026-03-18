@@ -667,8 +667,9 @@ export default function Packing() {
   const hasGiftTag = shipmentTags.some(tag => tag.name === 'Gift');
   const isGift = hasGiftTag || Boolean(currentShipment?.isGift);
   
-  // Check if shipment has MOVE OVER tag (means it's shippable)
-  const hasMoveOverTag = shipmentTags.some(tag => tag.name === 'MOVE OVER');
+  // Check if shipment has any shippable tag ('MOVE OVER' or 'READY FOR SHIPDOT')
+  const SHIPPABLE_TAGS = ['MOVE OVER', 'READY FOR SHIPDOT'] as const;
+  const hasMoveOverTag = shipmentTags.some(tag => (SHIPPABLE_TAGS as readonly string[]).includes(tag.name));
   
   // Helper to normalize SKUs for comparison (uppercase, trimmed)
   const normalizeSku = (sku: string) => sku.trim().toUpperCase();

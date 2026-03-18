@@ -163,8 +163,9 @@ export default function ShipmentDetails() {
     }
   };
 
-  // Derive hasMoveOverTag from tags array
-  const hasMoveOverTag = tags?.some(tag => tag.name === 'MOVE OVER') ?? false;
+  // Derive hasShippableTag from tags array ('MOVE OVER' or 'READY FOR SHIPDOT')
+  const SHIPPABLE_TAGS = ['MOVE OVER', 'READY FOR SHIPDOT'] as const;
+  const hasMoveOverTag = tags?.some(tag => (SHIPPABLE_TAGS as readonly string[]).includes(tag.name)) ?? false;
 
   type LifecyclePhase = 'delivered' | 'in_transit' | 'on_dock' | 'ready_to_fulfill' | 'picking_issues' | 'packing_ready' | 'picking' | 'ready_to_pick' | 'ready_to_session' | 'ready_for_skuvault' | 'fulfillment_prep' | 'cancelled' | 'problem';
   
@@ -209,7 +210,7 @@ export default function ShipmentDetails() {
     },
     ready_to_fulfill: {
       phase: 'ready_to_fulfill', label: 'Ready to Fulfill', description: 'On hold in ShipStation, waiting to be released',
-      whyThisStatus: 'Order is on hold with "MOVE OVER" tag.', whatHappensNext: 'Will be released when the hold date passes.',
+      whyThisStatus: 'Order is on hold with a shippable tag ("MOVE OVER" or "READY FOR SHIPDOT").', whatHappensNext: 'Will be released when the hold date passes.',
       colorClass: 'bg-amber-600', badgeClass: 'bg-amber-600 text-white',
     },
     picking_issues: {
@@ -505,15 +506,18 @@ export default function ShipmentDetails() {
             <div className="border-t pt-4">
               <p className="text-sm font-medium text-muted-foreground mb-2">Tags</p>
               <div className="flex flex-wrap gap-2">
-                {tags.map((tag, index) => (
-                  <Badge 
-                    key={index} 
-                    variant={tag.name === 'MOVE OVER' ? 'default' : 'secondary'}
-                    className={tag.name === 'MOVE OVER' ? 'bg-green-600 hover:bg-green-700' : ''}
-                  >
-                    {tag.name}
-                  </Badge>
-                ))}
+                {tags.map((tag, index) => {
+                  const isShippableTag = (SHIPPABLE_TAGS as readonly string[]).includes(tag.name);
+                  return (
+                    <Badge 
+                      key={index} 
+                      variant={isShippableTag ? 'default' : 'secondary'}
+                      className={isShippableTag ? 'bg-green-600 hover:bg-green-700' : ''}
+                    >
+                      {tag.name}
+                    </Badge>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -804,7 +808,7 @@ export default function ShipmentDetails() {
                       <code className="block font-mono">{shipment.sessionStatus || 'null'}</code>
                     </div>
                     <div className="bg-muted/50 rounded p-2">
-                      <span className="text-muted-foreground">hasMoveOverTag:</span>
+                      <span className="text-muted-foreground">hasShippableTag:</span>
                       <code className="block font-mono">{hasMoveOverTag ? 'true' : 'false'}</code>
                     </div>
                     <div className="bg-muted/50 rounded p-2">
@@ -826,13 +830,13 @@ export default function ShipmentDetails() {
                       <li>IN_TRANSIT: status='IT' or 'SHIPPED'</li>
                       <li>PROBLEM: status IN ('UN', 'EX')</li>
                       <li>ON_DOCK: shipmentStatus='label_purchased' AND status IN ('NY', 'AC', 'NEW')</li>
-                      <li>READY_TO_FULFILL: shipmentStatus='on_hold' AND hasMoveOverTag</li>
+                      <li>READY_TO_FULFILL: shipmentStatus='on_hold' AND hasShippableTag</li>
                       <li>PICKING_ISSUES: sessionStatus='inactive'</li>
                       <li>PACKING_READY: sessionStatus='closed' AND !trackingNumber AND shipmentStatus='pending'</li>
                       <li>PICKING: sessionStatus='active'</li>
                       <li>READY_TO_PICK: sessionStatus='new'</li>
                       <li>READY_FOR_SKUVAULT: has fulfillmentSessionId AND !sessionStatus AND shipmentStatus='pending'</li>
-                      <li>READY_TO_SESSION: shipmentStatus='pending' AND hasMoveOverTag AND !sessionStatus AND !fulfillmentSessionId</li>
+                      <li>READY_TO_SESSION: shipmentStatus='pending' AND hasShippableTag AND !sessionStatus AND !fulfillmentSessionId</li>
                       <li>FULFILLMENT_PREP: fallback</li>
                     </ol>
                   </div>
@@ -1170,7 +1174,7 @@ export default function ShipmentDetails() {
                 <div className="text-center py-8 text-muted-foreground border rounded-lg">
                   <PackageCheck className="h-8 w-8 mx-auto mb-2 opacity-50" />
                   <p>No QC items yet</p>
-                  <p className="text-sm mt-1">QC items appear once the order is tagged "MOVE OVER" and ready for picking</p>
+                  <p className="text-sm mt-1">QC items appear once the order has a shippable tag and is ready for picking</p>
                 </div>
               )}
             </TabsContent>

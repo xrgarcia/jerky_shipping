@@ -3,8 +3,8 @@
  * 
  * Provides a single source of truth for determining if a shipment is shippable.
  * Used by:
- * - Cache warmer service (qcsale-cache-warmer.ts)
- * - Firestore sync worker (firestore-sync.ts)  
+ * - Lifecycle service (lifecycle-service.ts)
+ * - Fulfillment session service (fulfillment-session-service.ts)
  * - Order validation endpoint (routes.ts)
  * - Shipments page (filters and badges)
  * - Boxing and Bagging pages (packing workflow)
@@ -14,21 +14,22 @@
  * 
  * ALWAYS EXCLUDED (hard filters applied first):
  * - Shipments that are already shipped (have a tracking number)
- * - Shipments that are on_hold
+ * - Shipments that are on_hold  (EXCEPTION: 'READY FOR SHIPDOT' tag bypasses this)
  * - Shipments with package type "**DO NOT SHIP (ALERT MGR)**"
  * - Shipments with missing serviceCode (no carrier/service selected)
  * 
  * PRIMARY: A shipment is fully shippable if (after hard filters):
- * 1. It has the "MOVE OVER" tag (indicates picking is complete in SkuVault)
+ * 1. It has any tag in SHIPPABLE_TAGS ('MOVE OVER' or 'READY FOR SHIPDOT')
  * 
  * FALLBACK: When NO shipments pass the primary criteria, we fall back to:
  * - All shipments that pass the hard filters (not shipped, not on_hold)
  * 
  * This fallback handles cases where split orders have some shipments on hold
- * and others pending, but none have been tagged with MOVE OVER yet.
+ * and others pending, but none have been tagged yet.
  */
 
 import type { Shipment, ShipmentTag, ShipmentPackage } from '@shared/schema';
+import { SHIPPABLE_TAGS, hasShippableTag as checkShippableTag } from './shippable-tags';
 
 /**
  * Package name that indicates a shipment should NOT be shipped.
@@ -73,6 +74,10 @@ export function hasDoNotShipPackage(
  * - It has a "DO NOT SHIP (ALERT MGR)" package (when packages are provided)
  * - It is missing a serviceCode (carrier/service not selected)
  * 
+ * NOTE: The 'READY FOR SHIPDOT' tag bypasses the on_hold check at the
+ * isShipmentShippable level, not here. passesHardFilters is intentionally
+ * tag-agnostic so it can be used for the fallback eligible-set calculation.
+ * 
  * @param shipment - The shipment record
  * @param packages - Optional array of packages for this shipment (for DO NOT SHIP check)
  * @returns true if shipment is NOT excluded (passes hard filters)
@@ -92,9 +97,9 @@ export function passesHardFilters(
  * Check if a shipment is shippable based on its status, tags, and packages.
  * This is the main function for determining if a shipment can be shipped today.
  * 
- * A shipment is shippable if:
- * 1. It passes hard filters (not shipped, not on hold, no DO NOT SHIP package)
- * 2. It has the "MOVE OVER" tag (indicates picking is complete)
+ * A shipment is shippable if it has any tag in SHIPPABLE_TAGS AND meets the
+ * relevant hard filters. The 'READY FOR SHIPDOT' tag bypasses the on_hold check
+ * (allowing packing even while the shipment is technically on hold in ShipStation).
  * 
  * @param shipment - The shipment record
  * @param tags - Array of tags associated with this shipment
@@ -106,15 +111,27 @@ export function isShipmentShippable(
   tags: Pick<ShipmentTag, 'shipmentId' | 'name'>[],
   packages: PackageForEligibility[] = []
 ): boolean {
+  // 'READY FOR SHIPDOT' bypasses the on_hold hard filter.
+  // All other hard filters (already shipped, DO NOT SHIP package, missing service code)
+  // still apply regardless of which shippable tag is present.
+  const hasReadyForShipDot = tags.some(
+    t => t.shipmentId === shipment.id && t.name === 'READY FOR SHIPDOT'
+  );
+
+  if (hasReadyForShipDot) {
+    const notShipped = !shipment.trackingNumber;
+    const notDoNotShip = !hasDoNotShipPackage(shipment.id, packages);
+    const hasServiceCode = !!shipment.serviceCode;
+    return notShipped && notDoNotShip && hasServiceCode;
+  }
+
+  // Standard path: must pass ALL hard filters (including not on_hold)
+  // AND have any shippable tag.
   if (!passesHardFilters(shipment, packages)) {
     return false;
   }
-  
-  const hasMoveOverTag = tags.some(tag => 
-    tag.shipmentId === shipment.id && tag.name === 'MOVE OVER'
-  );
-  
-  return hasMoveOverTag;
+
+  return checkShippableTag(tags, shipment.id);
 }
 
 /**
@@ -134,12 +151,13 @@ export function filterEligibleShipments<T extends ShipmentForEligibility>(
 
 /**
  * Filter an array of shipments to only those that are shippable (primary criteria).
- * This applies hard filters first, then checks for MOVE OVER tag.
+ * This applies hard filters first (with READY FOR SHIPDOT bypass), then checks for
+ * any shippable tag.
  * 
  * @param shipments - Array of shipment records
  * @param allTags - Array of all tags for these shipments
  * @param packages - Optional array of all packages for these shipments
- * @returns Array of shippable shipments (passes hard filters AND has MOVE OVER tag)
+ * @returns Array of shippable shipments
  */
 export function filterShippableShipments<T extends ShipmentForEligibility>(
   shipments: T[],
@@ -163,21 +181,32 @@ export function filterNotOnHoldShipments<T extends ShipmentForEligibility>(
 }
 
 /**
- * Build a map of shipmentId -> hasMoveOverTag for efficient lookups.
+ * Build a map of shipmentId -> hasShippableTag for efficient lookups.
+ * Returns true for any shipment that has at least one tag in SHIPPABLE_TAGS.
  * 
  * @param tags - Array of all tags
- * @returns Map from shipmentId to whether it has the MOVE OVER tag
+ * @returns Map from shipmentId to whether it has any shippable tag
+ */
+export function buildShippableTagMap(
+  tags: Pick<ShipmentTag, 'shipmentId' | 'name'>[]
+): Map<string, boolean> {
+  const result = new Map<string, boolean>();
+  for (const tag of tags) {
+    if ((SHIPPABLE_TAGS as readonly string[]).includes(tag.name)) {
+      result.set(tag.shipmentId, true);
+    }
+  }
+  return result;
+}
+
+/**
+ * @deprecated Use buildShippableTagMap instead.
+ * Build a map of shipmentId -> hasMoveOverTag for efficient lookups.
  */
 export function buildMoveOverTagMap(
   tags: Pick<ShipmentTag, 'shipmentId' | 'name'>[]
 ): Map<string, boolean> {
-  const hasMoveOverTag = new Map<string, boolean>();
-  for (const tag of tags) {
-    if (tag.name === 'MOVE OVER') {
-      hasMoveOverTag.set(tag.shipmentId, true);
-    }
-  }
-  return hasMoveOverTag;
+  return buildShippableTagMap(tags);
 }
 
 /**
@@ -254,11 +283,11 @@ export interface ShippableShipmentsResult<T> {
  * 
  * HARD FILTERS (always applied):
  * - Exclude shipments with tracking numbers (already shipped)
- * - Exclude shipments that are on_hold
+ * - Exclude shipments that are on_hold  (bypassed for 'READY FOR SHIPDOT')
  * - Exclude shipments with "DO NOT SHIP (ALERT MGR)" package
  * - Exclude shipments with missing serviceCode
  * 
- * PRIMARY: Shipments that pass hard filters AND have MOVE OVER tag
+ * PRIMARY: Shipments with any shippable tag (passing applicable hard filters)
  * FALLBACK: If none match primary, use all shipments that pass hard filters
  * 
  * @param shipments - All shipments for an order
@@ -277,17 +306,14 @@ export function analyzeShippableShipments<T extends ShipmentForEligibility>(
   // First apply hard filters: not shipped AND not on_hold AND no DO NOT SHIP package
   const eligibleShipments = filterEligibleShipments(shipments, packages);
   
-  // Try primary criteria: eligible + MOVE OVER tag
-  let shippableShipments = eligibleShipments.filter(shipment => {
-    const hasMoveOverTag = allTags.some(tag => 
-      tag.shipmentId === shipment.id && tag.name === 'MOVE OVER'
-    );
-    return hasMoveOverTag;
-  });
+  // Try primary criteria: eligible (or READY FOR SHIPDOT bypass) + any shippable tag
+  let shippableShipments = shipments.filter(shipment =>
+    isShipmentShippable(shipment, allTags, packages)
+  );
   
   // FALLBACK: If no shipments pass primary criteria, use all eligible shipments
   // This handles split orders where some shipments are on hold and others are pending,
-  // but none have been tagged with MOVE OVER yet.
+  // but none have been tagged yet.
   if (shippableShipments.length === 0) {
     shippableShipments = eligibleShipments;
   }

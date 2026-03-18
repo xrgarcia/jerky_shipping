@@ -27,6 +27,7 @@ import { extractShipmentStatus } from "./shipment-sync-worker";
 import { skuVaultService, SkuVaultError, qcSaleCache } from "./services/skuvault-service";
 import { getCacheWarmerMetrics, getInactiveSessionShipments, getShippableShipmentsForOrder } from "./services/qcsale-cache-warmer";
 import { analyzeShippableShipments, type ShippableShipmentsResult } from "./utils/shipment-eligibility";
+import { SHIPPABLE_TAGS } from "./utils/shippable-tags";
 import { qcPassItemRequestSchema, qcPassKitSaleItemRequestSchema } from "@shared/skuvault-types";
 import { fromZonedTime, toZonedTime, formatInTimeZone } from 'date-fns-tz';
 import { checkRateLimit } from "./utils/rate-limiter";
@@ -2148,7 +2149,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`========== LIFECYCLE BACKFILL STARTED (${daysLabel}) ==========`);
       
       const shipmentsWithMoveOver = await storage.getShipmentsForLifecycleBackfill(days);
-      console.log(`[Backfill] Found ${shipmentsWithMoveOver.length} shipments with MOVE OVER tag (${daysLabel})`);
+      console.log(`[Backfill] Found ${shipmentsWithMoveOver.length} shipments with shippable tags (${daysLabel})`);
       
       const events = shipmentsWithMoveOver.map(s => ({
         shipmentId: s.id,
@@ -7143,7 +7144,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   explanation = 'This shipment is currently on hold.';
                   resolution = 'Check ShipStation for the hold date, or contact a supervisor if unexpected.';
                 } else if (exclusionReason === 'missing_move_over_tag') {
-                  explanation = 'This shipment doesn\'t have the "MOVE OVER" tag yet.';
+                  explanation = 'This shipment doesn\'t have a shippable tag ("MOVE OVER" or "READY FOR SHIPDOT") yet.';
                   resolution = 'Wait for picking to complete in SkuVault, or check with a supervisor.';
                 } else if (exclusionReason === 'do_not_ship_package') {
                   explanation = 'This shipment has a "DO NOT SHIP" package type.';
@@ -7437,20 +7438,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // SHIPPABILITY CHECK: Verify order has "MOVE OVER" tag before allowing packing
+      // SHIPPABILITY CHECK: Verify order has a shippable tag before allowing packing
       // Skip this check if we already selected from shippable shipments (they're pre-filtered)
       // Only run if we got here via legacy path or allowNotShippable fallback
       if (!shippableShipments.some((s: any) => s.id === shipment?.id) && shipment && !notShippable) {
         const shipmentTagsData = await storage.getShipmentTags(shipment.id);
-        const hasMoveOverTag = shipmentTagsData.some((tag: { name: string }) => tag.name === 'MOVE OVER');
+        const hasShippableTag = shipmentTagsData.some((tag: { name: string }) => (SHIPPABLE_TAGS as readonly string[]).includes(tag.name));
         
-        if (!hasMoveOverTag) {
-          console.log(`[Packing Validation] Order ${resolvedOrderNumber} is not shippable - missing MOVE OVER tag`);
+        if (!hasShippableTag) {
+          console.log(`[Packing Validation] Order ${resolvedOrderNumber} is not shippable - missing shippable tag`);
           
           const notShippableError = {
             code: 'NOT_SHIPPABLE',
             message: 'This order is not shippable',
-            explanation: 'The order does not have the "MOVE OVER" tag. This means the order may still be in picking, or it hasn\'t been released from SkuVault yet.',
+            explanation: 'The order does not have a shippable tag ("MOVE OVER" or "READY FOR SHIPDOT"). This means the order may still be in picking, or it hasn\'t been released from SkuVault yet.',
             resolution: 'Wait for the order to complete picking in SkuVault, or check with a supervisor if you believe this order should be ready to ship.'
           };
           
@@ -9011,10 +9012,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       orderNumber = shipment.orderNumber;
       
-      // Check if order is shippable (has MOVE OVER tag)
+      // Check if order is shippable (has any shippable tag)
       const shipmentTags = await storage.getShipmentTags(shipment.id);
-      const hasMoveOverTag = shipmentTags.some((tag: { name: string }) => tag.name === 'MOVE OVER');
-      isNotShippable = !hasMoveOverTag;
+      const hasShippableTagOnScan = shipmentTags.some((tag: { name: string }) => (SHIPPABLE_TAGS as readonly string[]).includes(tag.name));
+      isNotShippable = !hasShippableTagOnScan;
       
       // Validate skipLabel is only allowed when order is not shippable
       if (skipLabel && !isNotShippable) {
@@ -9048,7 +9049,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Log the QC-only completion
         await logPackingAction('boxing_completed_without_label', true, {
           responseData: { 
-            reason: 'Order missing MOVE OVER tag',
+            reason: 'Order missing shippable tag',
             qcOnly: true,
             stationId: webSession.stationId
           }
@@ -9065,7 +9066,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           success: true,
           printQueued: false,
           qcOnly: true,
-          message: "QC complete! Label not printed - order is not yet shippable (missing MOVE OVER tag).",
+          message: "QC complete! Label not printed - order is not yet shippable (missing shippable tag).",
           orderNumber: shipment.orderNumber
         });
       }
@@ -11943,9 +11944,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const fullShipment = await storage.getShipment(shipment.id);
           if (!fullShipment) continue;
           
-          // Get tags for MOVE OVER detection
+          // Get tags for shippable tag detection
           const tags = await storage.getShipmentTagsByShipmentId(shipment.id);
-          const hasMoveOverTag = tags.some(t => t.name === 'MOVE OVER');
+          const hasShippableTag = tags.some(t => (SHIPPABLE_TAGS as readonly string[]).includes(t.name));
           
           // Derive the correct phase
           const derivedState = deriveLifecyclePhase({
@@ -11954,7 +11955,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             trackingNumber: fullShipment.trackingNumber,
             sessionStatus: fullShipment.sessionStatus,
             qcCompleted: fullShipment.qcCompleted || false,
-            hasMoveOverTag,
+            hasShippableTag,
             fingerprintId: fullShipment.fingerprintId,
           });
           

@@ -17,6 +17,7 @@
 import logger, { withOrder } from './utils/logger';
 import { withSpan, tagCurrentSpan } from './utils/tracing';
 import { db } from './db';
+import { SHIPPABLE_TAGS } from './utils/shippable-tags';
 import { syncCursors, shipments, shipmentSyncFailures } from '@shared/schema';
 import { eq, sql, and, isNull, lt, or, count, inArray } from 'drizzle-orm';
 import { shipStationShipmentETL } from './services/shipstation-shipment-etl-service';
@@ -532,12 +533,15 @@ async function refreshTagsForPreSessionShipments(): Promise<{ processed: number;
       const freshTagNames = new Set(freshTags.map((t: any) => t.name?.trim()).filter(Boolean));
       const localTagNames = new Set(localTags.map(t => t.name));
       
-      // Check if tags differ
-      const hasMoveOverLocally = localTagNames.has('MOVE OVER');
-      const hasMoveOverInShipStation = freshTagNames.has('MOVE OVER');
-      
-      if (hasMoveOverLocally !== hasMoveOverInShipStation) {
-        logger.info(`[UnifiedSync] Tag change detected for ${shipment.orderNumber}: MOVE OVER ${hasMoveOverLocally ? 'removed' : 'added'} in ShipStation`, withOrder(shipment.orderNumber, shipment.shipmentId));
+      // Check if any shippable tag has changed
+      const hasShippableTagLocally = SHIPPABLE_TAGS.some(t => localTagNames.has(t));
+      const hasShippableTagInShipStation = SHIPPABLE_TAGS.some(t => freshTagNames.has(t));
+
+      if (hasShippableTagLocally !== hasShippableTagInShipStation) {
+        const addedTags = SHIPPABLE_TAGS.filter(t => !localTagNames.has(t) && freshTagNames.has(t));
+        const removedTags = SHIPPABLE_TAGS.filter(t => localTagNames.has(t) && !freshTagNames.has(t));
+        const changeDesc = [...addedTags.map(t => `'${t}' added`), ...removedTags.map(t => `'${t}' removed`)].join(', ');
+        logger.info(`[UnifiedSync] Shippable tag change for ${shipment.orderNumber}: ${changeDesc}`, withOrder(shipment.orderNumber, shipment.shipmentId));
         
         // Update tags: delete all and re-insert from ShipStation
         await db.delete(shipmentTags).where(eq(shipmentTags.shipmentId, shipment.id));

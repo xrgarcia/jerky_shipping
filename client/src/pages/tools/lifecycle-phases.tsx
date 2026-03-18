@@ -99,7 +99,7 @@ const PHASE_META: Record<
 > = {
   ready_to_fulfill: {
     label: "Ready to Fulfill",
-    description: "On hold, waiting to be released (MOVE OVER tag)",
+    description: "On hold, waiting to be released (shippable tag)",
     colorClass: "bg-amber-100 dark:bg-amber-900/30 border-amber-300 dark:border-amber-700",
     category: "pre",
   },

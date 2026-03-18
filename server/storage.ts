@@ -1,4 +1,5 @@
 import { eq, ne, desc, or, ilike, and, sql, isNull, isNotNull, gte, lte, inArray, asc, count, exists } from "drizzle-orm";
+import { SHIPPABLE_TAGS } from './utils/shippable-tags';
 import { db } from "./db";
 import {
   type User,
@@ -1078,12 +1079,12 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 
-  // Get all shipments with MOVE OVER tag for lifecycle phase backfill
+  // Get all shipments with any shippable tag for lifecycle phase backfill
   // Returns shipments that might need lifecycle_phase recalculation
   // Optional days parameter filters to shipments created within the last N days
   async getShipmentsForLifecycleBackfill(days?: number): Promise<Shipment[]> {
     const conditions = [
-      eq(shipmentTags.name, 'MOVE OVER'),
+      inArray(shipmentTags.name, [...SHIPPABLE_TAGS]),
       ne(shipments.status, 'cancelled')
     ];
     
@@ -1310,7 +1311,7 @@ export class DatabaseStorage implements IStorage {
           conditions.push(eq(shipments.lifecyclePhase, 'ready_to_fulfill'));
           break;
         case 'ready_to_session':
-          // Ready to Session: On-hold + MOVE OVER tag + no SkuVault session yet + not cancelled
+          // Ready to Session: On-hold + any shippable tag + no SkuVault session yet + not cancelled
           // This is where fingerprinting and QC explosion should happen
           conditions.push(eq(shipments.shipmentStatus, 'on_hold'));
           conditions.push(sql`${shipments.sessionStatus} IS NULL`);
@@ -1323,7 +1324,7 @@ export class DatabaseStorage implements IStorage {
                 .where(
                   and(
                     eq(shipmentTags.shipmentId, shipments.id),
-                    eq(shipmentTags.name, 'MOVE OVER')
+                    inArray(shipmentTags.name, [...SHIPPABLE_TAGS])
                   )
                 )
             )

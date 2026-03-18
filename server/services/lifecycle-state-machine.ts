@@ -83,7 +83,7 @@ export interface ShipmentLifecycleData {
   packagingTypeId?: string | null;
   fulfillmentSessionId?: string | number | null; // Local fulfillment session ID
   fingerprintId?: string | null;
-  hasMoveOverTag?: boolean;         // Whether shipment has the "MOVE OVER" tag (for ready_to_session detection)
+  hasShippableTag?: boolean;        // Whether shipment has any shippable tag ('MOVE OVER' or 'READY FOR SHIPDOT')
   rateCheckStatus?: string | null;  // Rate check status: 'pending' | 'complete' | 'failed' | 'skipped' | null
   shipmentId?: string | null;       // ShipStation shipment ID (for rate check eligibility)
   shipToPostalCode?: string | null; // Destination postal code (for rate check eligibility)
@@ -112,13 +112,13 @@ const PROBLEM_STATUSES = ['UN', 'EX'];
  * 3. IN_TRANSIT - status IN ('IT', 'shipped') (regardless of shipmentStatus)
  * 4. PROBLEM - status IN ('SP', 'UN', 'EX') (terminal, regardless of shipmentStatus)
  * 5. ON_DOCK - status IN ('NY', 'AC', 'new') AND shipmentStatus='label_purchased'
- * 6. READY_TO_FULFILL - shipmentStatus='on_hold' AND hasMoveOverTag
+ * 6. READY_TO_FULFILL - shipmentStatus='on_hold' AND hasShippableTag
  * 7. PICKING_ISSUES - sessionStatus='inactive'
  * 8. PACKING_READY - sessionStatus='closed' AND no tracking AND shipmentStatus='pending'
  * 9. PICKING - sessionStatus='active'
  * 10. READY_TO_PICK - sessionStatus='new'
  * 11. READY_FOR_SKUVAULT - has fulfillmentSessionId, no sessionStatus, shipmentStatus='pending'
- * 12. READY_TO_SESSION - shipmentStatus='pending' AND hasMoveOverTag AND no session
+ * 12. READY_TO_SESSION - shipmentStatus='pending' AND hasShippableTag AND no session
  * 13. FULFILLMENT_PREP - Default fallback
  */
 export function deriveLifecyclePhase(shipment: ShipmentLifecycleData): LifecycleState {
@@ -165,10 +165,10 @@ export function deriveLifecyclePhase(shipment: ShipmentLifecycleData): Lifecycle
   // OPERATIONAL PHASES (based on shipmentStatus and session state)
   // ========================================================================
 
-  // READY_TO_FULFILL: On hold + MOVE OVER tag (regardless of session state)
+  // READY_TO_FULFILL: On hold + any shippable tag (regardless of session state)
   // This MUST be checked BEFORE session-based phases to properly reset orders that go back to on_hold
   if (shipment.shipmentStatus === 'on_hold' && 
-      shipment.hasMoveOverTag === true) {
+      shipment.hasShippableTag === true) {
     const subphase = deriveDecisionSubphase(shipment);
     return { phase: LIFECYCLE_PHASES.READY_TO_FULFILL, subphase };
   }
@@ -202,9 +202,9 @@ export function deriveLifecyclePhase(shipment: ShipmentLifecycleData): Lifecycle
     return { phase: LIFECYCLE_PHASES.READY_FOR_SKUVAULT, subphase: null };
   }
 
-  // READY_TO_SESSION: Pending + MOVE OVER tag + no session
+  // READY_TO_SESSION: Pending + any shippable tag + no session
   if (shipment.shipmentStatus === 'pending' && 
-      shipment.hasMoveOverTag === true && 
+      shipment.hasShippableTag === true && 
       !shipment.sessionStatus &&
       !shipment.fulfillmentSessionId) {
     const subphase = deriveDecisionSubphase(shipment);

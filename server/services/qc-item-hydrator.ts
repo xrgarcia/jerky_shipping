@@ -32,6 +32,7 @@ import {
   type InsertFingerprint,
 } from '@shared/schema';
 import { eq, and, or, exists, sql, notExists, inArray, isNull } from 'drizzle-orm';
+import { SHIPPABLE_TAGS } from '../utils/shippable-tags';
 import { 
   isKit, 
   getKitComponents,
@@ -88,14 +89,14 @@ async function findShipmentsNeedingHydration(limit: number = 50): Promise<{ id: 
         // Status is pending (READY_TO_SESSION phase criteria)
         // on_hold is BEFORE fulfillment starts
         eq(shipments.shipmentStatus, 'pending'),
-        // Has MOVE OVER tag (READY_TO_SESSION phase criteria)
+        // Has any shippable tag (READY_TO_SESSION phase criteria)
         exists(
           db.select({ one: sql`1` })
             .from(shipmentTags)
             .where(
               and(
                 eq(shipmentTags.shipmentId, shipments.id),
-                eq(shipmentTags.name, 'MOVE OVER')
+                inArray(shipmentTags.name, [...SHIPPABLE_TAGS])
               )
             )
         ),

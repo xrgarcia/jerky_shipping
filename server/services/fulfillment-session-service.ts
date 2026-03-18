@@ -26,6 +26,7 @@ import {
   type FulfillmentSessionStatus,
 } from "@shared/schema";
 import { eq, and, or, isNull, isNotNull, ne, desc, asc, inArray, sql, exists } from "drizzle-orm";
+import { SHIPPABLE_TAGS } from '../utils/shippable-tags';
 import { queueLifecycleEvaluationBatch } from "./lifecycle-service";
 import { skuVaultService } from "./skuvault-service";
 
@@ -261,13 +262,13 @@ export class FulfillmentSessionService {
   async findSessionableShipments(
     stationType?: string
   ): Promise<SessionableShipment[]> {
-    // Subquery to check for MOVE OVER tag existence
-    const hasMoveOverTag = exists(
+    // Subquery to check for any shippable tag existence
+    const hasShippableTag = exists(
       db.select({ id: shipmentTags.id })
         .from(shipmentTags)
         .where(and(
           eq(shipmentTags.shipmentId, shipments.id),
-          eq(shipmentTags.name, 'MOVE OVER')
+          inArray(shipmentTags.name, [...SHIPPABLE_TAGS])
         ))
     );
 

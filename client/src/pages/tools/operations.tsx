@@ -1217,7 +1217,7 @@ function LifecycleBackfillButton() {
           <AlertDialogHeader>
             <AlertDialogTitle>Backfill Lifecycle Phases?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will enqueue shipments with the MOVE OVER tag for lifecycle evaluation by the worker. 
+              This will enqueue shipments with a shippable tag ("MOVE OVER" or "READY FOR SHIPDOT") for lifecycle evaluation by the worker. 
               The worker will recalculate phases and trigger any needed side effects. Select a time range to limit scope.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -2784,7 +2784,7 @@ Please analyze this failure and help me understand:
               <div className="space-y-1 flex-1">
                 <p className="text-sm font-medium">Lifecycle Phase Backfill</p>
                 <p className="text-sm text-muted-foreground">
-                  Recalculate lifecycle phases for all MOVE OVER shipments using the current state machine logic.
+                  Recalculate lifecycle phases for all shipments with shippable tags using the current state machine logic.
                   Run this after changing lifecycle phase criteria.
                 </p>
               </div>
