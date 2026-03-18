@@ -443,8 +443,8 @@ export default function Fingerprints() {
   const [selectedBuildTags, setSelectedBuildTags] = useState<Set<string>>(new Set());
   const [buildTagsInitialized, setBuildTagsInitialized] = useState(false);
   
-  // Required tags that cannot be unchecked
-  const REQUIRED_BUILD_TAGS = ['MOVE OVER'];
+  // Shippable tags - orders must have at least ONE of these to appear in Build Sessions
+  const SHIPPABLE_TAGS = ['MOVE OVER', 'READY FOR SHIPDOT'] as const;
 
   useEffect(() => {
     const timeouts: NodeJS.Timeout[] = [];
@@ -589,7 +589,7 @@ export default function Fingerprints() {
         order.tags?.forEach(tag => allTagNames.add(tag.name));
       });
       // Always include required tags even if not in data
-      REQUIRED_BUILD_TAGS.forEach(tag => allTagNames.add(tag));
+      SHIPPABLE_TAGS.forEach(tag => allTagNames.add(tag));
       setSelectedBuildTags(allTagNames);
       setBuildTagsInitialized(true);
     }
@@ -943,8 +943,8 @@ export default function Fingerprints() {
     return readyToSessionOrdersData.orders.filter(order => {
       const orderTagNames = order.tags?.map(t => t.name) || [];
       // Must have ALL required tags
-      const hasAllRequiredTags = REQUIRED_BUILD_TAGS.every(reqTag => orderTagNames.includes(reqTag));
-      return hasAllRequiredTags;
+      const hasShippableTag = (SHIPPABLE_TAGS as readonly string[]).some(tag => orderTagNames.includes(tag));
+      return hasShippableTag;
     }).length;
   }, [readyToSessionOrdersData]);
   
@@ -954,11 +954,11 @@ export default function Fingerprints() {
     return readyToSessionOrdersData.orders.filter(order => {
       const orderTagNames = order.tags?.map(t => t.name) || [];
       // Must have ALL required tags
-      const hasAllRequiredTags = REQUIRED_BUILD_TAGS.every(reqTag => orderTagNames.includes(reqTag));
-      if (!hasAllRequiredTags) return false;
+      const hasShippableTag = (SHIPPABLE_TAGS as readonly string[]).some(tag => orderTagNames.includes(tag));
+      if (!hasShippableTag) return false;
       // Compute unchecked optional tags
       const uncheckedOptionalTags = orderTagNames.filter(tag => 
-        !selectedBuildTags.has(tag) && !REQUIRED_BUILD_TAGS.includes(tag)
+        !selectedBuildTags.has(tag) && !SHIPPABLE_TAGS.includes(tag)
       );
       if (uncheckedOptionalTags.length > 0) return false;
       return true;
@@ -2220,11 +2220,11 @@ export default function Fingerprints() {
                       // Tag filter - order must have required tags AND NOT have any unchecked optional tags
                       const orderTagNames = order.tags?.map(t => t.name) || [];
                       // Must have ALL required tags
-                      const hasAllRequiredTags = REQUIRED_BUILD_TAGS.every(reqTag => orderTagNames.includes(reqTag));
-                      if (!hasAllRequiredTags) return false;
+                      const hasShippableTag = (SHIPPABLE_TAGS as readonly string[]).some(tag => orderTagNames.includes(tag));
+                      if (!hasShippableTag) return false;
                       // Compute unchecked optional tags (all tags in order that are NOT selected, excluding required tags)
                       const uncheckedOptionalTags = orderTagNames.filter(tag => 
-                        !selectedBuildTags.has(tag) && !REQUIRED_BUILD_TAGS.includes(tag)
+                        !selectedBuildTags.has(tag) && !SHIPPABLE_TAGS.includes(tag)
                       );
                       // If order has any unchecked optional tag, exclude it
                       if (uncheckedOptionalTags.length > 0) return false;
@@ -2269,11 +2269,11 @@ export default function Fingerprints() {
                               // Tag filter - order must have required tags AND NOT have any unchecked optional tags
                               const orderTagNames = order.tags?.map(t => t.name) || [];
                               // Must have ALL required tags
-                              const hasAllRequiredTags = REQUIRED_BUILD_TAGS.every(reqTag => orderTagNames.includes(reqTag));
-                              if (!hasAllRequiredTags) return false;
+                              const hasShippableTag = (SHIPPABLE_TAGS as readonly string[]).some(tag => orderTagNames.includes(tag));
+                              if (!hasShippableTag) return false;
                               // Compute unchecked optional tags
                               const uncheckedOptionalTags = orderTagNames.filter(tag => 
-                                !selectedBuildTags.has(tag) && !REQUIRED_BUILD_TAGS.includes(tag)
+                                !selectedBuildTags.has(tag) && !SHIPPABLE_TAGS.includes(tag)
                               );
                               if (uncheckedOptionalTags.length > 0) return false;
                               return true;
@@ -2402,7 +2402,7 @@ export default function Fingerprints() {
                                         readyToSessionOrdersData.orders.forEach(order => {
                                           order.tags?.forEach(tag => allTagNames.add(tag.name));
                                         });
-                                        REQUIRED_BUILD_TAGS.forEach(tag => allTagNames.add(tag));
+                                        SHIPPABLE_TAGS.forEach(tag => allTagNames.add(tag));
                                         setSelectedBuildTags(allTagNames);
                                       }}
                                       data-testid="button-check-all-tags"
@@ -2415,7 +2415,7 @@ export default function Fingerprints() {
                                       className="h-6 px-2 text-xs"
                                       onClick={() => {
                                         // Keep only required tags
-                                        setSelectedBuildTags(new Set(REQUIRED_BUILD_TAGS));
+                                        setSelectedBuildTags(new Set(SHIPPABLE_TAGS));
                                       }}
                                       data-testid="button-uncheck-all-tags"
                                     >
@@ -2436,9 +2436,9 @@ export default function Fingerprints() {
                                     });
                                     // Sort: required tags first (in order), then optional tags alphabetically
                                     const sortedTags = [...allTags.entries()].sort((a, b) => {
-                                      const aRequired = REQUIRED_BUILD_TAGS.indexOf(a[0]);
-                                      const bRequired = REQUIRED_BUILD_TAGS.indexOf(b[0]);
-                                      // Both required: sort by their order in REQUIRED_BUILD_TAGS
+                                      const aRequired = SHIPPABLE_TAGS.indexOf(a[0]);
+                                      const bRequired = SHIPPABLE_TAGS.indexOf(b[0]);
+                                      // Both shippable: sort by their order in SHIPPABLE_TAGS
                                       if (aRequired !== -1 && bRequired !== -1) return aRequired - bRequired;
                                       // Only a is required: a comes first
                                       if (aRequired !== -1) return -1;
@@ -2453,7 +2453,7 @@ export default function Fingerprints() {
                                     }
                                     
                                     return sortedTags.map(([tagName, tagColor]) => {
-                                      const isRequired = REQUIRED_BUILD_TAGS.includes(tagName);
+                                      const isRequired = SHIPPABLE_TAGS.includes(tagName);
                                       return (
                                       <div key={tagName} className="flex items-center space-x-2 py-1">
                                         <Checkbox
@@ -2506,11 +2506,11 @@ export default function Fingerprints() {
                           // Tag filter - order must have required tags AND NOT have any unchecked optional tags
                           const orderTagNames = order.tags?.map(t => t.name) || [];
                           // Must have ALL required tags
-                          const hasAllRequiredTags = REQUIRED_BUILD_TAGS.every(reqTag => orderTagNames.includes(reqTag));
-                          if (!hasAllRequiredTags) return false;
+                          const hasShippableTag = (SHIPPABLE_TAGS as readonly string[]).some(tag => orderTagNames.includes(tag));
+                          if (!hasShippableTag) return false;
                           // Compute unchecked optional tags
                           const uncheckedOptionalTags = orderTagNames.filter(tag => 
-                            !selectedBuildTags.has(tag) && !REQUIRED_BUILD_TAGS.includes(tag)
+                            !selectedBuildTags.has(tag) && !SHIPPABLE_TAGS.includes(tag)
                           );
                           if (uncheckedOptionalTags.length > 0) return false;
                           return true;
@@ -2562,7 +2562,7 @@ export default function Fingerprints() {
                           </td>
                           <td className="py-2 px-3 text-sm">
                             {(() => {
-                              const optionalTags = order.tags?.filter(t => !REQUIRED_BUILD_TAGS.includes(t.name)) || [];
+                              const optionalTags = order.tags?.filter(t => !SHIPPABLE_TAGS.includes(t.name)) || [];
                               if (optionalTags.length === 0) {
                                 return <span className="text-muted-foreground/50">-</span>;
                               }
@@ -2663,11 +2663,11 @@ export default function Fingerprints() {
                       // Tag filter - order must have required tags AND NOT have any unchecked optional tags
                       const orderTagNames = order.tags?.map(t => t.name) || [];
                       // Must have ALL required tags
-                      const hasAllRequiredTags = REQUIRED_BUILD_TAGS.every(reqTag => orderTagNames.includes(reqTag));
-                      if (!hasAllRequiredTags) return false;
+                      const hasShippableTag = (SHIPPABLE_TAGS as readonly string[]).some(tag => orderTagNames.includes(tag));
+                      if (!hasShippableTag) return false;
                       // Compute unchecked optional tags
                       const uncheckedOptionalTags = orderTagNames.filter(tag => 
-                        !selectedBuildTags.has(tag) && !REQUIRED_BUILD_TAGS.includes(tag)
+                        !selectedBuildTags.has(tag) && !SHIPPABLE_TAGS.includes(tag)
                       );
                       if (uncheckedOptionalTags.length > 0) return false;
                       return true;
