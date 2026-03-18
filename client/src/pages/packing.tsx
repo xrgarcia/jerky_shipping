@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import { SHIPPABLE_TAGS } from "@shared/constants";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -668,8 +669,7 @@ export default function Packing() {
   const isGift = hasGiftTag || Boolean(currentShipment?.isGift);
   
   // Check if shipment has any shippable tag ('MOVE OVER' or 'READY FOR SHIPDOT')
-  const SHIPPABLE_TAGS = ['MOVE OVER', 'READY FOR SHIPDOT'] as const;
-  const hasMoveOverTag = shipmentTags.some(tag => (SHIPPABLE_TAGS as readonly string[]).includes(tag.name));
+  const hasShippableTag = shipmentTags.some(tag => (SHIPPABLE_TAGS as readonly string[]).includes(tag.name));
   
   // Helper to normalize SKUs for comparison (uppercase, trimmed)
   const normalizeSku = (sku: string) => sku.trim().toUpperCase();
@@ -2890,7 +2890,7 @@ export default function Packing() {
                 <div>
                   <div className="text-xs text-muted-foreground font-semibold mb-1">Status</div>
                   <div className="flex items-center gap-2">
-                    {hasMoveOverTag ? (
+                    {hasShippableTag ? (
                       <Badge 
                         className="bg-green-600 hover:bg-green-600 text-white text-sm px-3 py-1"
                         data-testid="badge-shippable"

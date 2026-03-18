@@ -70,26 +70,30 @@ export function hasDoNotShipPackage(
  * Check if a shipment passes the hard filters (excluded from ALL eligibility).
  * A shipment is excluded if:
  * - It already has a tracking number (already shipped)
- * - Its status is 'on_hold'
+ * - Its status is 'on_hold' (bypassed when shipment has 'READY FOR SHIPDOT' tag)
  * - It has a "DO NOT SHIP (ALERT MGR)" package (when packages are provided)
  * - It is missing a serviceCode (carrier/service not selected)
- * 
- * NOTE: The 'READY FOR SHIPDOT' tag bypasses the on_hold check at the
- * isShipmentShippable level, not here. passesHardFilters is intentionally
- * tag-agnostic so it can be used for the fallback eligible-set calculation.
- * 
+ *
  * @param shipment - The shipment record
  * @param packages - Optional array of packages for this shipment (for DO NOT SHIP check)
+ * @param tags     - Optional array of tags; when provided, 'READY FOR SHIPDOT' bypasses the on_hold check
  * @returns true if shipment is NOT excluded (passes hard filters)
  */
 export function passesHardFilters(
   shipment: ShipmentForEligibility,
-  packages: PackageForEligibility[] = []
+  packages: PackageForEligibility[] = [],
+  tags: Pick<ShipmentTag, 'shipmentId' | 'name'>[] = []
 ): boolean {
   const notShipped = !shipment.trackingNumber;
-  const notOnHold = shipment.shipmentStatus !== 'on_hold';
   const notDoNotShip = !hasDoNotShipPackage(shipment.id, packages);
   const hasServiceCode = !!shipment.serviceCode;
+
+  // 'READY FOR SHIPDOT' bypasses the on_hold hard filter
+  const hasReadyForShipDot = tags.some(
+    (t) => t.shipmentId === shipment.id && t.name === 'READY FOR SHIPDOT'
+  );
+  const notOnHold = hasReadyForShipDot || shipment.shipmentStatus !== 'on_hold';
+
   return notShipped && notOnHold && notDoNotShip && hasServiceCode;
 }
 
@@ -111,42 +115,28 @@ export function isShipmentShippable(
   tags: Pick<ShipmentTag, 'shipmentId' | 'name'>[],
   packages: PackageForEligibility[] = []
 ): boolean {
-  // 'READY FOR SHIPDOT' bypasses the on_hold hard filter.
-  // All other hard filters (already shipped, DO NOT SHIP package, missing service code)
-  // still apply regardless of which shippable tag is present.
-  const hasReadyForShipDot = tags.some(
-    t => t.shipmentId === shipment.id && t.name === 'READY FOR SHIPDOT'
-  );
-
-  if (hasReadyForShipDot) {
-    const notShipped = !shipment.trackingNumber;
-    const notDoNotShip = !hasDoNotShipPackage(shipment.id, packages);
-    const hasServiceCode = !!shipment.serviceCode;
-    return notShipped && notDoNotShip && hasServiceCode;
-  }
-
-  // Standard path: must pass ALL hard filters (including not on_hold)
-  // AND have any shippable tag.
-  if (!passesHardFilters(shipment, packages)) {
+  // Pass tags into passesHardFilters so 'READY FOR SHIPDOT' can bypass on_hold.
+  if (!passesHardFilters(shipment, packages, tags)) {
     return false;
   }
-
   return checkShippableTag(tags, shipment.id);
 }
 
 /**
  * Filter an array of shipments to only those that pass hard filters.
- * (Not shipped AND not on_hold AND no DO NOT SHIP package)
- * 
+ * When tags are provided, 'READY FOR SHIPDOT' bypasses the on_hold check.
+ *
  * @param shipments - Array of shipment records
- * @param packages - Optional array of all packages for these shipments
+ * @param packages  - Optional array of all packages for these shipments
+ * @param tags      - Optional array of all tags; enables READY FOR SHIPDOT bypass
  * @returns Array of shipments that pass hard filters
  */
 export function filterEligibleShipments<T extends ShipmentForEligibility>(
   shipments: T[],
-  packages: PackageForEligibility[] = []
+  packages: PackageForEligibility[] = [],
+  tags: Pick<ShipmentTag, 'shipmentId' | 'name'>[] = []
 ): T[] {
-  return shipments.filter(shipment => passesHardFilters(shipment, packages));
+  return shipments.filter(shipment => passesHardFilters(shipment, packages, tags));
 }
 
 /**

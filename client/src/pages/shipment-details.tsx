@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { SHIPPABLE_TAGS } from "@shared/constants";
 import { useRoute, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -164,8 +165,7 @@ export default function ShipmentDetails() {
   };
 
   // Derive hasShippableTag from tags array ('MOVE OVER' or 'READY FOR SHIPDOT')
-  const SHIPPABLE_TAGS = ['MOVE OVER', 'READY FOR SHIPDOT'] as const;
-  const hasMoveOverTag = tags?.some(tag => (SHIPPABLE_TAGS as readonly string[]).includes(tag.name)) ?? false;
+  const hasShippableTag = tags?.some(tag => (SHIPPABLE_TAGS as readonly string[]).includes(tag.name)) ?? false;
 
   type LifecyclePhase = 'delivered' | 'in_transit' | 'on_dock' | 'ready_to_fulfill' | 'picking_issues' | 'packing_ready' | 'picking' | 'ready_to_pick' | 'ready_to_session' | 'ready_for_skuvault' | 'fulfillment_prep' | 'cancelled' | 'problem';
   
@@ -809,7 +809,7 @@ export default function ShipmentDetails() {
                     </div>
                     <div className="bg-muted/50 rounded p-2">
                       <span className="text-muted-foreground">hasShippableTag:</span>
-                      <code className="block font-mono">{hasMoveOverTag ? 'true' : 'false'}</code>
+                      <code className="block font-mono">{hasShippableTag ? 'true' : 'false'}</code>
                     </div>
                     <div className="bg-muted/50 rounded p-2">
                       <span className="text-muted-foreground">fingerprintStatus:</span>

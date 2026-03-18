@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { SHIPPABLE_TAGS } from "@shared/constants";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
@@ -443,9 +444,6 @@ export default function Fingerprints() {
   const [selectedBuildTags, setSelectedBuildTags] = useState<Set<string>>(new Set());
   const [buildTagsInitialized, setBuildTagsInitialized] = useState(false);
   
-  // Shippable tags - orders must have at least ONE of these to appear in Build Sessions
-  const SHIPPABLE_TAGS = ['MOVE OVER', 'READY FOR SHIPDOT'] as const;
-
   useEffect(() => {
     const timeouts: NodeJS.Timeout[] = [];
     Object.entries(inlineStatus).forEach(([id, status]) => {

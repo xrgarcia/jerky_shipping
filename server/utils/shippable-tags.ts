@@ -1,17 +1,13 @@
 /**
- * Centralized shippable tag definitions.
+ * Centralized shippable tag utilities for the server.
  *
- * Shipments with any of these tags are considered "shippable" — they have
- * been flagged by an operator or automation as ready to process.
- *
- * 'MOVE OVER': Standard tag applied after SkuVault wave picking session closes.
- * 'READY FOR SHIPDOT': Pre-tag applied by Marc's automation before hold release,
- *   allowing Ship.dot to start packing earlier and spread load throughout the day.
- *   Unlike MOVE OVER, this tag can be present while the shipment is still on_hold.
+ * Re-exports SHIPPABLE_TAGS from shared/constants so all server code
+ * imports from the same source of truth.
  */
 
-export const SHIPPABLE_TAGS = ['MOVE OVER', 'READY FOR SHIPDOT'] as const;
-export type ShippableTag = (typeof SHIPPABLE_TAGS)[number];
+import { SHIPPABLE_TAGS } from '@shared/constants';
+
+export { SHIPPABLE_TAGS, type ShippableTag } from '@shared/constants';
 
 /**
  * Check whether a collection of tags contains any shippable tag.
@@ -39,7 +35,7 @@ export function hasShippableTag(
  */
 export function hasSpecificShippableTag(
   tags: { name: string; shipmentId?: string }[],
-  tagName: ShippableTag,
+  tagName: string,
   shipmentId?: string
 ): boolean {
   return tags.some(
