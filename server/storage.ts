@@ -1307,7 +1307,7 @@ export class DatabaseStorage implements IStorage {
       switch (workflowTab) {
         case 'ready_to_fulfill':
           // Ready to Fulfill: Use lifecycle_phase column (single source of truth)
-          // Orders on hold with MOVE OVER tag - waiting to be released from ShipStation
+          // Orders with a shippable tag - waiting to be released from ShipStation
           conditions.push(eq(shipments.lifecyclePhase, 'ready_to_fulfill'));
           break;
         case 'ready_to_session':
@@ -1606,13 +1606,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getShipmentTabCounts(): Promise<{ readyToFulfill: number; readyToSession: number; inProgress: number; shipped: number; all: number }> {
-    // Ready to Fulfill: Use lifecycle_phase as source of truth (on_hold + MOVE OVER)
+    // Ready to Fulfill: Use lifecycle_phase as source of truth (on_hold + shippable tag)
     const readyToFulfillResult = await db
       .select({ count: count() })
       .from(shipments)
       .where(eq(shipments.lifecyclePhase, 'ready_to_fulfill'));
 
-    // Ready to Session: Use lifecycle_phase as source of truth (pending + MOVE OVER)
+    // Ready to Session: Use lifecycle_phase as source of truth (pending + shippable tag)
     const readyToSessionResult = await db
       .select({ count: count() })
       .from(shipments)
@@ -1691,13 +1691,13 @@ export class DatabaseStorage implements IStorage {
       .select({ count: count() })
       .from(shipments);
 
-    // Ready to Fulfill: Use lifecycle_phase as source of truth (on_hold + MOVE OVER)
+    // Ready to Fulfill: Use lifecycle_phase as source of truth (on_hold + shippable tag)
     const readyToFulfillResult = await db
       .select({ count: count() })
       .from(shipments)
       .where(eq(shipments.lifecyclePhase, 'ready_to_fulfill'));
 
-    // Ready to Session: Use lifecycle_phase as source of truth (pending + MOVE OVER)
+    // Ready to Session: Use lifecycle_phase as source of truth (pending + shippable tag)
     const readyToSessionResult = await db
       .select({ count: count() })
       .from(shipments)

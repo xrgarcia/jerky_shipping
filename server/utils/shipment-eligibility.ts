@@ -29,7 +29,7 @@
  */
 
 import type { Shipment, ShipmentTag, ShipmentPackage } from '@shared/schema';
-import { SHIPPABLE_TAGS, hasShippableTag as checkShippableTag } from './shippable-tags';
+import { SHIPPABLE_TAGS, hasShippableTag as checkShippableTag, hasSpecificShippableTag } from './shippable-tags';
 
 /**
  * Package name that indicates a shipment should NOT be shipped.
@@ -89,9 +89,7 @@ export function passesHardFilters(
   const hasServiceCode = !!shipment.serviceCode;
 
   // 'READY FOR SHIPDOT' bypasses the on_hold hard filter
-  const hasReadyForShipDot = tags.some(
-    (t) => t.shipmentId === shipment.id && t.name === 'READY FOR SHIPDOT'
-  );
+  const hasReadyForShipDot = hasSpecificShippableTag(tags, 'READY FOR SHIPDOT', shipment.id);
   const notOnHold = hasReadyForShipDot || shipment.shipmentStatus !== 'on_hold';
 
   return notShipped && notOnHold && notDoNotShip && hasServiceCode;
@@ -191,7 +189,7 @@ export function buildShippableTagMap(
 
 /**
  * @deprecated Use buildShippableTagMap instead.
- * Build a map of shipmentId -> hasMoveOverTag for efficient lookups.
+ * Build a map of shipmentId -> hasShippableTag for efficient lookups.
  */
 export function buildMoveOverTagMap(
   tags: Pick<ShipmentTag, 'shipmentId' | 'name'>[]

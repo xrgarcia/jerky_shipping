@@ -461,8 +461,8 @@ async function refreshTagsForPreSessionShipments(): Promise<{ processed: number;
   const { shipmentTags, LIFECYCLE_PHASES } = await import('@shared/schema');
   const { queueLifecycleEvaluation } = await import('./services/lifecycle-service');
   
-  // Find shipments in phases where MOVE OVER tag matters:
-  // - ready_to_session: On hold + MOVE OVER tag - fingerprinting happens here
+  // Find shipments in phases where shippable tags matter:
+  // - ready_to_session: On hold + shippable tag - fingerprinting happens here
   // - fulfillment_prep: Has fingerprint, may still be sensitive to tag changes
   const shipmentsToRefresh = await db
     .select({

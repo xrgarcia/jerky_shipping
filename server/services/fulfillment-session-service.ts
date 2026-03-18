@@ -25,8 +25,7 @@ import {
   type Station,
   type FulfillmentSessionStatus,
 } from "@shared/schema";
-import { eq, and, or, isNull, isNotNull, ne, desc, asc, inArray, sql, exists } from "drizzle-orm";
-import { SHIPPABLE_TAGS } from '../utils/shippable-tags';
+import { eq, and, or, isNull, isNotNull, ne, desc, asc, inArray, sql } from "drizzle-orm";
 import { queueLifecycleEvaluationBatch } from "./lifecycle-service";
 import { skuVaultService } from "./skuvault-service";
 
@@ -251,7 +250,7 @@ export class FulfillmentSessionService {
    * Ready = in 'needs_session' subphase (has packaging, station, and no existing session)
    * AND meets lifecycle state machine criteria for READY_TO_SESSION:
    * - shipmentStatus = 'pending' (ready for fulfillment processing)
-   * - has MOVE OVER tag (explicitly flagged for session building)
+   * - has a shippable tag ('MOVE OVER' or 'READY FOR SHIPDOT')
    * - status != 'cancelled' (not cancelled in ShipStation)
    * 
    * Note: on_hold is BEFORE fulfillment starts, pending is when orders are ready to be sessioned
@@ -262,16 +261,6 @@ export class FulfillmentSessionService {
   async findSessionableShipments(
     stationType?: string
   ): Promise<SessionableShipment[]> {
-    // Subquery to check for any shippable tag existence
-    const hasShippableTag = exists(
-      db.select({ id: shipmentTags.id })
-        .from(shipmentTags)
-        .where(and(
-          eq(shipmentTags.shipmentId, shipments.id),
-          inArray(shipmentTags.name, [...SHIPPABLE_TAGS])
-        ))
-    );
-
     const conditions = [
       // Use lifecycle_phase as single source of truth
       eq(shipments.lifecyclePhase, 'ready_to_session'),
