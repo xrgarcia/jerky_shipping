@@ -156,7 +156,7 @@ type PendingPrintJob = {
   createdAt: string;
 };
 
-// Warning when order is missing MOVE OVER tag (only when boxing allows loading anyway)
+// Warning when order is missing shippable tag (only when boxing allows loading anyway)
 type NotShippableWarning = {
   code: string;
   message: string;
@@ -207,7 +207,7 @@ type ShipmentWithItems = {
   // Pre-calculated pending print jobs (immediate display on order load)
   pendingPrintJobs?: PendingPrintJob[];
   hasPendingPrintJobs?: boolean;
-  // Shippability warning (present when order loaded with allowNotShippable=true but missing MOVE OVER tag)
+  // Shippability warning (present when order loaded with allowNotShippable=true but missing shippable tag)
   notShippable?: NotShippableWarning | null;
   // Package details from ShipStation
   packages?: Array<{

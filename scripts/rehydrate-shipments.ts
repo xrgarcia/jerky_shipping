@@ -2,7 +2,7 @@
  * One-Time Shipment Rehydration Script
  * 
  * Manually triggers QC item hydration for specific shipments, bypassing
- * the normal worker rules (on_hold + MOVE OVER tag + no session).
+ * the normal worker rules (on_hold + shippable tag + no session).
  * 
  * Uses the same hydrateShipment service to ensure consistent behavior.
  * 

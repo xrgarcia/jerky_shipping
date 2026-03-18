@@ -30,6 +30,7 @@
 
 import type { Shipment, ShipmentTag, ShipmentPackage } from '@shared/schema';
 import { SHIPPABLE_TAGS, hasShippableTag as checkShippableTag, hasSpecificShippableTag } from './shippable-tags';
+import { ON_HOLD_BYPASS_TAG } from '@shared/constants';
 
 /**
  * Package name that indicates a shipment should NOT be shipped.
@@ -88,8 +89,8 @@ export function passesHardFilters(
   const notDoNotShip = !hasDoNotShipPackage(shipment.id, packages);
   const hasServiceCode = !!shipment.serviceCode;
 
-  // 'READY FOR SHIPDOT' bypasses the on_hold hard filter
-  const hasReadyForShipDot = hasSpecificShippableTag(tags, 'READY FOR SHIPDOT', shipment.id);
+  // ON_HOLD_BYPASS_TAG ('READY FOR SHIPDOT') bypasses the on_hold hard filter
+  const hasReadyForShipDot = hasSpecificShippableTag(tags, ON_HOLD_BYPASS_TAG, shipment.id);
   const notOnHold = hasReadyForShipDot || shipment.shipmentStatus !== 'on_hold';
 
   return notShipped && notOnHold && notDoNotShip && hasServiceCode;
@@ -156,19 +157,6 @@ export function filterShippableShipments<T extends ShipmentForEligibility>(
 }
 
 /**
- * @deprecated Use filterEligibleShipments instead. This is kept for backward compatibility.
- * Filter an array of shipments to only those that are NOT on hold (but may be shipped).
- * 
- * @param shipments - Array of shipment records
- * @returns Array of shipments that are not on hold
- */
-export function filterNotOnHoldShipments<T extends ShipmentForEligibility>(
-  shipments: T[]
-): T[] {
-  return shipments.filter(shipment => shipment.shipmentStatus !== 'on_hold');
-}
-
-/**
  * Build a map of shipmentId -> hasShippableTag for efficient lookups.
  * Returns true for any shipment that has at least one tag in SHIPPABLE_TAGS.
  * 
@@ -188,16 +176,6 @@ export function buildShippableTagMap(
 }
 
 /**
- * @deprecated Use buildShippableTagMap instead.
- * Build a map of shipmentId -> hasShippableTag for efficient lookups.
- */
-export function buildMoveOverTagMap(
-  tags: Pick<ShipmentTag, 'shipmentId' | 'name'>[]
-): Map<string, boolean> {
-  return buildShippableTagMap(tags);
-}
-
-/**
  * Exclusion reasons for shipments that are not eligible for packing.
  */
 export type ShipmentExclusionReason = 'already_shipped' | 'on_hold' | 'do_not_ship_package' | 'missing_service_code' | 'eligible';
@@ -212,19 +190,24 @@ export interface ShipmentStatus {
 
 /**
  * Get the exclusion reason for a shipment.
- * 
+ * When tags are provided, ON_HOLD_BYPASS_TAG ('READY FOR SHIPDOT') makes
+ * an on_hold shipment report as 'eligible' rather than 'on_hold'.
+ *
  * @param shipment - The shipment to check
  * @param packages - Optional array of packages for DO NOT SHIP check
+ * @param tags     - Optional array of tags; enables ON_HOLD_BYPASS_TAG bypass
  * @returns The reason why it's excluded, or 'eligible' if it passes hard filters
  */
 export function getShipmentExclusionReason(
   shipment: ShipmentForEligibility,
-  packages: PackageForEligibility[] = []
+  packages: PackageForEligibility[] = [],
+  tags: Pick<ShipmentTag, 'shipmentId' | 'name'>[] = []
 ): ShipmentExclusionReason {
   if (shipment.trackingNumber) {
     return 'already_shipped';
   }
-  if (shipment.shipmentStatus === 'on_hold') {
+  const hasBypassTag = hasSpecificShippableTag(tags, ON_HOLD_BYPASS_TAG, shipment.id);
+  if (shipment.shipmentStatus === 'on_hold' && !hasBypassTag) {
     return 'on_hold';
   }
   if (hasDoNotShipPackage(shipment.id, packages)) {
@@ -238,18 +221,22 @@ export function getShipmentExclusionReason(
 
 /**
  * Get exclusion reasons for all shipments in an order.
- * 
+ * When tags are provided, ON_HOLD_BYPASS_TAG ('READY FOR SHIPDOT') shipments
+ * report as 'eligible' rather than 'on_hold'.
+ *
  * @param shipments - All shipments for an order
  * @param packages - Optional array of all packages for these shipments
+ * @param tags     - Optional array of all tags; enables ON_HOLD_BYPASS_TAG bypass
  * @returns Array of shipment statuses with their exclusion reasons
  */
 export function getShipmentStatuses<T extends ShipmentForEligibility>(
   shipments: T[],
-  packages: PackageForEligibility[] = []
+  packages: PackageForEligibility[] = [],
+  tags: Pick<ShipmentTag, 'shipmentId' | 'name'>[] = []
 ): ShipmentStatus[] {
   return shipments.map(shipment => ({
     id: shipment.id,
-    reason: getShipmentExclusionReason(shipment, packages),
+    reason: getShipmentExclusionReason(shipment, packages, tags),
   }));
 }
 
@@ -288,11 +275,11 @@ export function analyzeShippableShipments<T extends ShipmentForEligibility>(
   allTags: Pick<ShipmentTag, 'shipmentId' | 'name'>[],
   packages: PackageForEligibility[] = []
 ): ShippableShipmentsResult<T> {
-  // Get per-shipment exclusion reasons (including DO NOT SHIP package check)
-  const shipmentStatuses = getShipmentStatuses(shipments, packages);
+  // Get per-shipment exclusion reasons (with ON_HOLD_BYPASS_TAG awareness)
+  const shipmentStatuses = getShipmentStatuses(shipments, packages, allTags);
   
-  // First apply hard filters: not shipped AND not on_hold AND no DO NOT SHIP package
-  const eligibleShipments = filterEligibleShipments(shipments, packages);
+  // First apply hard filters (with ON_HOLD_BYPASS_TAG bypass for on_hold check)
+  const eligibleShipments = filterEligibleShipments(shipments, packages, allTags);
   
   // Try primary criteria: eligible (or READY FOR SHIPDOT bypass) + any shippable tag
   let shippableShipments = shipments.filter(shipment =>

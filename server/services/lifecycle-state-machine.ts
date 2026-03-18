@@ -5,8 +5,8 @@
  * ready_to_fulfill → ready_to_session → fulfillment_prep → ready_to_pick → picking → packing_ready → on_dock
  *                                                                        ↘ picking_issues (exception path)
  * 
- * READY_TO_FULFILL: On hold + MOVE OVER tag - waiting to be released from ShipStation hold
- * READY_TO_SESSION: Pending + MOVE OVER tag + no session - fingerprinting & QC explosion happens here
+ * READY_TO_FULFILL: On hold + shippable tag - waiting to be released from ShipStation hold
+ * READY_TO_SESSION: Pending + shippable tag + no session - fingerprinting & QC explosion happens here
  * ON_DOCK: Order has been packaged and is on the dock awaiting pickup from carrier
  *          Requires: shipmentStatus='label_purchased' AND status IN ('NY', 'AC')
  * IN_TRANSIT: Package is on its way to customer

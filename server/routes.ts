@@ -7143,9 +7143,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 if (exclusionReason === 'on_hold') {
                   explanation = 'This shipment is currently on hold.';
                   resolution = 'Check ShipStation for the hold date, or contact a supervisor if unexpected.';
-                } else if (exclusionReason === 'missing_move_over_tag') {
-                  explanation = 'This shipment doesn\'t have a shippable tag ("MOVE OVER" or "READY FOR SHIPDOT") yet.';
-                  resolution = 'Wait for picking to complete in SkuVault, or check with a supervisor.';
                 } else if (exclusionReason === 'do_not_ship_package') {
                   explanation = 'This shipment has a "DO NOT SHIP" package type.';
                   resolution = 'Contact a manager immediately before proceeding.';
@@ -7407,7 +7404,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           };
           
           // DO NOT SHIP orders should NEVER be packed - always return error
-          // Unlike missing MOVE OVER tag, this is a hard block even on boxing page
+          // Unlike missing shippable tag, this is a hard block even on boxing page
           if (allowNotShippable) {
             // Return noEligibleShipments response for boxing page UI
             return res.status(200).json({
@@ -7822,7 +7819,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         itemsSource: qcSale?.Items?.length ? 'skuvault' : 'shipstation', // Tell frontend which source was used
         cacheSource, // Whether data came from warm cache or direct API call
         sessionStatus: shipment.sessionStatus || null, // Explicitly include for refresh button gating
-        notShippable, // Warning if order is missing MOVE OVER tag (only present when allowNotShippable=true)
+        notShippable, // Warning if order is missing shippable tag (only present when allowNotShippable=true)
         alreadyPacked, // True if order has tracking number (label already purchased)
         alreadyPackedShipments, // Array of all shipped shipments for this order (multi-shipment support)
         scannedTrackingNumber, // If user scanned a tracking number, this is the tracking number they scanned (for filtering)
@@ -8932,7 +8929,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const user = req.user!;
     let orderNumber = 'unknown';
     let shipment: Awaited<ReturnType<typeof storage.getShipment>> | null = null;
-    let isNotShippable = false; // Track if order is missing MOVE OVER tag
+    let isNotShippable = false; // Track if order is missing shippable tag
     
     // Station info will be set after webSession is loaded
     let sessionStationId: string | null = null;

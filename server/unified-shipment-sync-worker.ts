@@ -449,9 +449,9 @@ const TAG_REFRESH_BATCH_SIZE = 10; // Max shipments to refresh tags for per poll
  * Refresh tags for shipments in pre-fingerprinting phases to catch tag removals
  * 
  * PURPOSE: ShipStation's modified_at cursor doesn't update when ONLY tags change.
- * This means if a "MOVE OVER" tag is removed, our cursor-based sync won't catch it.
+ * This means if a shippable tag is removed, our cursor-based sync won't catch it.
  * This job specifically re-fetches tags for shipments that are in lifecycle phases
- * where the MOVE OVER tag matters (ready_to_session, fulfillment_prep).
+ * where the shippable tag matters (ready_to_session, fulfillment_prep).
  * 
  * TRIGGERS: After main poll cycle when caught up (same as tracking backfill)
  * 

@@ -7,7 +7,7 @@
  * - Maps SKUs to collections for fingerprint calculation
  * - Calculates fingerprint signature and creates/matches fingerprints
  * 
- * Trigger: READY_TO_SESSION phase = on_hold + MOVE OVER tag + no session + no QC items
+ * Trigger: READY_TO_SESSION phase = on_hold + shippable tag + no session + no QC items
  * 
  * This must run BEFORE SkuVault picks up orders for sessioning to ensure:
  * 1. QC items are exploded and barcodes are available for scanning
@@ -70,7 +70,7 @@ interface HydrationStats {
 
 /**
  * Find shipments that need QC items hydrated
- * Criteria: pending status + MOVE OVER tag + no session yet + no existing shipment_qc_items
+ * Criteria: pending status + shippable tag + no session yet + no existing shipment_qc_items
  * 
  * This targets the READY_TO_SESSION lifecycle phase - shipments that need fingerprinting
  * before they can be picked up by SkuVault sessioning.

@@ -491,7 +491,7 @@ function validateLookupMapCompleteness(
  * Get all shippable shipments for an order using centralized eligibility logic.
  * 
  * A shipment is shippable if:
- * - Has "MOVE OVER" tag (picking complete in SkuVault)
+ * - Has a shippable tag ("MOVE OVER" or "READY FOR SHIPDOT")
  * - shipmentStatus is NOT 'on_hold'
  * - Does NOT have "**DO NOT SHIP (ALERT MGR)**" package
  * 

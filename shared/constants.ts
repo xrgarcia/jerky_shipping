@@ -14,3 +14,9 @@
  */
 export const SHIPPABLE_TAGS = ['MOVE OVER', 'READY FOR SHIPDOT'] as const;
 export type ShippableTag = (typeof SHIPPABLE_TAGS)[number];
+
+/**
+ * The shippable tag that bypasses the on_hold hard filter.
+ * Orders tagged with this can be packed while still on hold in ShipStation.
+ */
+export const ON_HOLD_BYPASS_TAG = 'READY FOR SHIPDOT' as const satisfies ShippableTag;

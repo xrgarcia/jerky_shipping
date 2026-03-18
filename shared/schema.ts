@@ -15,12 +15,12 @@ import { z } from "zod";
  * ready_to_fulfill → ready_to_session → fulfillment_prep → ready_to_pick → picking → packing_ready → on_dock
  *                                                                        ↘ picking_issues (exception path)
  * 
- * ready_to_fulfill: On hold + MOVE OVER tag (waiting to be released from ShipStation hold)
- * ready_to_session: Pending + MOVE OVER tag (released, ready for fingerprinting & sessioning)
+ * ready_to_fulfill: On hold + shippable tag (waiting to be released from ShipStation hold)
+ * ready_to_session: Pending + shippable tag (released, ready for fingerprinting & sessioning)
  */
 export const LIFECYCLE_PHASES = {
-  READY_TO_FULFILL: 'ready_to_fulfill',      // On hold + MOVE OVER tag - waiting to be released from hold
-  READY_TO_SESSION: 'ready_to_session',      // Pending + MOVE OVER tag + no session - fingerprinting & QC explosion happens here
+  READY_TO_FULFILL: 'ready_to_fulfill',      // On hold + shippable tag - waiting to be released from hold
+  READY_TO_SESSION: 'ready_to_session',      // Pending + shippable tag + no session - fingerprinting & QC explosion happens here
   READY_FOR_SKUVAULT: 'ready_for_skuvault',  // Local fulfillment session built, waiting for SkuVault wave picking
   FULFILLMENT_PREP: 'fulfillment_prep',      // Hydration, fingerprinting, packaging, rate check, sessioning
   READY_TO_PICK: 'ready_to_pick',            // Session created in SkuVault, waiting to start
