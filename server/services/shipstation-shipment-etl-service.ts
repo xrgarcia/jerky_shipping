@@ -15,6 +15,7 @@ import { db } from '../db';
 import { shipmentItems, shipmentTags, shipmentPackages, orderItems, shipmentQcItems, shipments } from '@shared/schema';
 import { eq, inArray } from 'drizzle-orm';
 import { queueLifecycleEvaluation } from './lifecycle-service';
+import { ON_HOLD_BYPASS_TAG } from '@shared/constants';
 import logger, { withOrder } from '../utils/logger';
 import { withSpan } from '../utils/tracing';
 
@@ -199,6 +200,7 @@ export class ShipStationShipmentETLService {
     //   - Previous status was on_hold, new status is pending → evaluate (manager released hold)
     //   - Shipment has been pending for 10+ minutes without lifecycle phase → evaluate (fallback
     //     for orders that never hit on_hold, e.g., automation disabled or manual changes)
+    //   - Shipment is on_hold, past grace period, and has the bypass tag → evaluate (READY FOR SHIPDOT)
     //   - Otherwise (new shipment or still in initial setup) → skip evaluation
     const previousStatus = existing?.shipmentStatus;
     const newStatus = shipmentRecord.shipmentStatus;
@@ -214,13 +216,24 @@ export class ShipStationShipmentETLService {
       && previousStatus === 'pending'
       && shipmentAge > AUTOMATION_GRACE_PERIOD_MS;
 
-    if (hasLifecyclePhase || isHoldRelease || isPendingPastGracePeriod) {
+    const incomingTagNames: string[] = Array.isArray(shipmentData?.tags)
+      ? shipmentData.tags.map((t: any) => t?.name?.trim()).filter(Boolean)
+      : [];
+    const isOnHoldWithBypassTag = !hasLifecyclePhase
+      && newStatus === 'on_hold'
+      && shipmentAge > AUTOMATION_GRACE_PERIOD_MS
+      && incomingTagNames.includes(ON_HOLD_BYPASS_TAG);
+
+    if (hasLifecyclePhase || isHoldRelease || isPendingPastGracePeriod || isOnHoldWithBypassTag) {
       await queueLifecycleEvaluation(finalShipmentId, 'shipment_sync', orderNumber || undefined);
       if (isHoldRelease && !hasLifecyclePhase) {
         logger.info(`[ETL] Hold released for ${orderNumber} (on_hold → pending) — lifecycle evaluation queued`, withOrder(orderNumber, String(shipmentId)));
       }
       if (isPendingPastGracePeriod) {
         logger.info(`[ETL] Fallback: ${orderNumber} has been pending for ${Math.round(shipmentAge / 60000)}min without on_hold — lifecycle evaluation queued`, withOrder(orderNumber, String(shipmentId)));
+      }
+      if (isOnHoldWithBypassTag) {
+        logger.info(`[ETL] ${ON_HOLD_BYPASS_TAG} tag detected on on_hold shipment ${orderNumber} (age: ${Math.round(shipmentAge / 60000)}min) — lifecycle evaluation queued`, withOrder(orderNumber, String(shipmentId)));
       }
     } else {
       logger.info(`[ETL] Skipping lifecycle evaluation for ${orderNumber} — shipment still in initial setup (status: ${newStatus}, previous: ${previousStatus || 'new'})`, withOrder(orderNumber, String(shipmentId)));

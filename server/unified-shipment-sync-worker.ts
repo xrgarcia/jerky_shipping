@@ -18,6 +18,7 @@ import logger, { withOrder } from './utils/logger';
 import { withSpan, tagCurrentSpan } from './utils/tracing';
 import { db } from './db';
 import { SHIPPABLE_TAGS } from './utils/shippable-tags';
+import { ON_HOLD_BYPASS_TAG } from '@shared/constants';
 import { syncCursors, shipments, shipmentSyncFailures } from '@shared/schema';
 import { eq, sql, and, isNull, lt, or, count, inArray } from 'drizzle-orm';
 import { shipStationShipmentETL } from './services/shipstation-shipment-etl-service';
@@ -581,6 +582,130 @@ async function refreshTagsForPreSessionShipments(): Promise<{ processed: number;
 }
 
 /**
+ * Refresh Tags for On-Hold Shipments Without a Lifecycle Phase
+ *
+ * Handles the case where READY FOR SHIPDOT is applied to an on_hold shipment that has
+ * never entered the lifecycle. ShipStation does not update modified_at on tag changes,
+ * so the main cursor-based poll misses these. This job compensates by:
+ *   1. Directly queuing lifecycle evaluation for any on_hold shipment already known to
+ *      have the bypass tag in our DB (covers stuck orders like JK3825370046).
+ *   2. Fetching fresh tags from ShipStation for on_hold shipments that don't yet have
+ *      the bypass tag locally, updating them if the tag has since been applied, then
+ *      queuing lifecycle evaluation.
+ *
+ * Runs as part of the post-poll maintenance cycle alongside refreshTagsForPreSessionShipments.
+ */
+async function refreshTagsForOnHoldShipments(): Promise<{ queued: number; fetched: number; errors: number }> {
+  const { shipmentTags } = await import('@shared/schema');
+  const { queueLifecycleEvaluation } = await import('./services/lifecycle-service');
+
+  const GRACE_PERIOD_MS = 10 * 60 * 1000; // 10 minutes — same as ETL gate
+  const graceCutoff = new Date(Date.now() - GRACE_PERIOD_MS).toISOString();
+
+  // All on_hold shipments with no lifecycle phase past the grace period
+  const candidates = await db
+    .select({
+      id: shipments.id,
+      shipmentId: shipments.shipmentId,
+      orderNumber: shipments.orderNumber,
+      createdAt: shipments.createdAt,
+    })
+    .from(shipments)
+    .where(
+      and(
+        eq(shipments.shipmentStatus, 'on_hold'),
+        isNull(shipments.lifecyclePhase),
+        sql`${shipments.shipmentId} IS NOT NULL`,
+        lt(shipments.createdAt, sql`${graceCutoff}::timestamptz`)
+      )
+    )
+    .limit(TAG_REFRESH_BATCH_SIZE);
+
+  if (candidates.length === 0) {
+    return { queued: 0, fetched: 0, errors: 0 };
+  }
+
+  let queued = 0;
+  let fetched = 0;
+  let errors = 0;
+
+  const apiKey = process.env.SHIPSTATION_API_KEY;
+
+  for (const shipment of candidates) {
+    try {
+      // Check if bypass tag already present locally
+      const localTags = await db
+        .select({ name: shipmentTags.name })
+        .from(shipmentTags)
+        .where(eq(shipmentTags.shipmentId, shipment.id));
+      const localTagNames = new Set(localTags.map(t => t.name));
+
+      if (localTagNames.has(ON_HOLD_BYPASS_TAG)) {
+        // Tag already in DB — just ensure lifecycle evaluation is queued
+        await queueLifecycleEvaluation(shipment.id, 'shipment_sync', shipment.orderNumber || undefined);
+        logger.info(`[UnifiedSync] Queuing lifecycle for on_hold ${shipment.orderNumber} — bypass tag already present locally`, withOrder(shipment.orderNumber, shipment.shipmentId));
+        queued++;
+        continue;
+      }
+
+      // Tag not in DB yet — fetch from ShipStation to check for new addition
+      if (!apiKey) continue;
+
+      const url = `${SHIPSTATION_API_BASE}/v2/shipments/${encodeURIComponent(shipment.shipmentId!)}`;
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: { 'api-key': apiKey, 'Content-Type': 'application/json' },
+      });
+
+      if (response.status === 429) {
+        logger.info('[UnifiedSync] Hit rate limit during on_hold tag refresh, stopping batch');
+        break;
+      }
+
+      if (!response.ok) {
+        errors++;
+        continue;
+      }
+
+      fetched++;
+      const shipmentData = await response.json();
+      const freshTags: any[] = shipmentData.tags || [];
+      const freshTagNames = new Set(freshTags.map((t: any) => t?.name?.trim()).filter(Boolean));
+
+      if (freshTagNames.has(ON_HOLD_BYPASS_TAG)) {
+        // Bypass tag was added in ShipStation — update local tags and queue evaluation
+        await db.delete(shipmentTags).where(eq(shipmentTags.shipmentId, shipment.id));
+        if (freshTags.length > 0) {
+          const tagsToInsert = freshTags
+            .filter((tag: any) => tag && (tag.name || tag.tag_id))
+            .map((tag: any) => ({
+              shipmentId: shipment.id,
+              name: tag.name?.trim() || `Tag ${tag.tag_id}`,
+              color: tag.color || null,
+              tagId: tag.tag_id?.toString() || null,
+            }));
+          if (tagsToInsert.length > 0) {
+            await db.insert(shipmentTags).values(tagsToInsert);
+          }
+        }
+        await queueLifecycleEvaluation(shipment.id, 'shipment_sync', shipment.orderNumber || undefined);
+        logger.info(`[UnifiedSync] ${ON_HOLD_BYPASS_TAG} tag found in ShipStation for on_hold ${shipment.orderNumber} — tags updated, lifecycle queued`, withOrder(shipment.orderNumber, shipment.shipmentId));
+        queued++;
+      }
+    } catch (err) {
+      console.error(`[UnifiedSync] Error in on_hold tag refresh for ${shipment.orderNumber}:`, err);
+      errors++;
+    }
+  }
+
+  if (queued > 0) {
+    logger.info(`[UnifiedSync] On-hold tag refresh: ${candidates.length} checked, ${queued} queued for lifecycle, ${fetched} fetched from API, ${errors} errors`);
+  }
+
+  return { queued, fetched, errors };
+}
+
+/**
  * Stale Shipment Audit
  * 
  * Detects shipments that no longer exist in ShipStation (merged, deleted, voided).
@@ -1084,6 +1209,12 @@ async function runPollLoop(): Promise<boolean> {
           await refreshTagsForPreSessionShipments();
         } catch (tagRefreshErr) {
           console.error('[UnifiedSync] Tag refresh error (non-fatal):', tagRefreshErr);
+        }
+
+        try {
+          await refreshTagsForOnHoldShipments();
+        } catch (onHoldTagRefreshErr) {
+          console.error('[UnifiedSync] On-hold tag refresh error (non-fatal):', onHoldTagRefreshErr);
         }
         
         try {
