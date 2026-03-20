@@ -874,6 +874,13 @@ export async function backfillFingerprints(limit: number = 100): Promise<{
             and(
               eq(shipments.fingerprintStatus, 'complete'),
               sql`${fingerprints.totalWeight} = 0`
+            ),
+            // Include shipments stuck with fingerprintStatus='complete' but no fingerprintId
+            // (the LEFT JOIN returns null for totalWeight when fingerprintId is null, so the
+            // condition above does not catch this case — it must be handled separately)
+            and(
+              eq(shipments.fingerprintStatus, 'complete'),
+              sql`${shipments.fingerprintId} IS NULL`
             )
           )
         )
