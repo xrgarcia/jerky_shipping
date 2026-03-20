@@ -14,6 +14,7 @@
     "@hookform/resolvers": "^3.10.0",
     "@jridgewell/trace-mapping": "^0.3.25",
     "@neondatabase/serverless": "^1.0.2",
+    "@octokit/rest": "^21.1.1",
     "@opentelemetry/api": "^1.9.0",
     "@opentelemetry/auto-instrumentations-node": "^0.69.0",
     "@opentelemetry/exporter-metrics-otlp-proto": "^0.211.0",

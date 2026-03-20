@@ -1,0 +1,210 @@
+2026-03-20 08:22:41.97
+749c4053
+User
+1:22:41 PM [info][ETL] Extracted shipmentStatus: pending for order JK3825366035 {"orderNumber":"JK3825366035","shipmentId":"se-958572567"}
+2026-03-20 08:22:41.97
+749c4053
+User
+1:22:41 PM [info][ETL] Updating existing shipment faa4f10c-b171-4184-a5e4-2306a0f8905f (ShipStation ID: se-958572567) {"orderNumber":"JK3825366035","shipmentId":"se-958572567"}
+2026-03-20 08:23:45.79
+749c4053
+User
+1:23:45 PM [info][ETL] Found existing shipment faa4f10c-b171-4184-a5e4-2306a0f8905f by ShipStation ID se-958572567 {"orderNumber":"JK3825366035","shipmentId":"se-958572567"}
+2026-03-20 08:23:45.88
+749c4053
+User
+1:23:45 PM [info][ETL] Updating existing shipment faa4f10c-b171-4184-a5e4-2306a0f8905f (ShipStation ID: se-958572567) {"orderNumber":"JK3825366035","shipmentId":"se-958572567"}
+2026-03-20 08:23:45.88
+749c4053
+User
+1:23:45 PM [info][ETL] Extracted shipmentStatus: pending for order JK3825366035 {"orderNumber":"JK3825366035","shipmentId":"se-958572567"}
+2026-03-20 08:24:50.48
+749c4053
+User
+1:24:50 PM [info][ETL] Found existing shipment faa4f10c-b171-4184-a5e4-2306a0f8905f by ShipStation ID se-958572567 {"orderNumber":"JK3825366035","shipmentId":"se-958572567"}
+2026-03-20 08:24:50.53
+749c4053
+User
+1:24:50 PM [info][ETL] Updating existing shipment faa4f10c-b171-4184-a5e4-2306a0f8905f (ShipStation ID: se-958572567) {"orderNumber":"JK3825366035","shipmentId":"se-958572567"}
+2026-03-20 08:24:50.53
+749c4053
+User
+1:24:50 PM [info][ETL] Extracted shipmentStatus: pending for order JK3825366035 {"orderNumber":"JK3825366035","shipmentId":"se-958572567"}
+2026-03-20 08:25:55.20
+749c4053
+User
+1:25:55 PM [info][ETL] Found existing shipment faa4f10c-b171-4184-a5e4-2306a0f8905f by ShipStation ID se-958572567 {"orderNumber":"JK3825366035","shipmentId":"se-958572567"}
+2026-03-20 08:25:55.29
+749c4053
+User
+1:25:55 PM [info][ETL] Updating existing shipment faa4f10c-b171-4184-a5e4-2306a0f8905f (ShipStation ID: se-958572567) {"orderNumber":"JK3825366035","shipmentId":"se-958572567"}
+2026-03-20 08:25:55.29
+749c4053
+User
+1:25:55 PM [info][ETL] Extracted shipmentStatus: pending for order JK3825366035 {"orderNumber":"JK3825366035","shipmentId":"se-958572567"}
+2026-03-20 08:26:15.24
+749c4053
+User
+1:26:15 PM [info][ETL] Found existing shipment faa4f10c-b171-4184-a5e4-2306a0f8905f by ShipStation ID se-958572567 {"orderNumber":"JK3825366035","shipmentId":"se-958572567"}
+2026-03-20 08:26:15.33
+749c4053
+User
+1:26:15 PM [info][ETL] Updating existing shipment faa4f10c-b171-4184-a5e4-2306a0f8905f (ShipStation ID: se-958572567) {"orderNumber":"JK3825366035","shipmentId":"se-958572567"}
+2026-03-20 08:26:15.33
+749c4053
+User
+1:26:15 PM [info][ETL] Extracted shipmentStatus: pending for order JK3825366035 {"orderNumber":"JK3825366035","shipmentId":"se-958572567"}
+2026-03-20 08:26:46.36
+749c4053
+User
+1:26:46 PM [info][ETL] Found existing shipment faa4f10c-b171-4184-a5e4-2306a0f8905f by ShipStation ID se-958572567 {"orderNumber":"JK3825366035","shipmentId":"se-958572567"}
+2026-03-20 08:26:46.45
+749c4053
+User
+1:26:46 PM [info][ETL] Extracted shipmentStatus: pending for order JK3825366035 {"orderNumber":"JK3825366035","shipmentId":"se-958572567"}
+2026-03-20 08:26:46.45
+749c4053
+User
+1:26:46 PM [info][ETL] Updating existing shipment faa4f10c-b171-4184-a5e4-2306a0f8905f (ShipStation ID: se-958572567) {"orderNumber":"JK3825366035","shipmentId":"se-958572567"}
+2026-03-20 08:27:51.39
+749c4053
+User
+1:27:51 PM [info][ETL] Found existing shipment faa4f10c-b171-4184-a5e4-2306a0f8905f by ShipStation ID se-958572567 {"orderNumber":"JK3825366035","shipmentId":"se-958572567"}
+2026-03-20 08:27:51.48
+749c4053
+User
+1:27:51 PM [info][ETL] Extracted shipmentStatus: pending for order JK3825366035 {"orderNumber":"JK3825366035","shipmentId":"se-958572567"}
+2026-03-20 08:27:51.48
+749c4053
+User
+1:27:51 PM [info][ETL] Updating existing shipment faa4f10c-b171-4184-a5e4-2306a0f8905f (ShipStation ID: se-958572567) {"orderNumber":"JK3825366035","shipmentId":"se-958572567"}
+2026-03-20 08:28:17.11
+749c4053
+User
+1:28:17 PM [info][ETL] Found existing shipment faa4f10c-b171-4184-a5e4-2306a0f8905f by ShipStation ID se-958572567 {"orderNumber":"JK3825366035","shipmentId":"se-958572567"}
+2026-03-20 08:28:17.24
+749c4053
+User
+1:28:17 PM [info][ETL] Extracted shipmentStatus: pending for order JK3825366035 {"orderNumber":"JK3825366035","shipmentId":"se-958572567"}
+2026-03-20 08:28:17.24
+749c4053
+User
+1:28:17 PM [info][ETL] Updating existing shipment faa4f10c-b171-4184-a5e4-2306a0f8905f (ShipStation ID: se-958572567) {"orderNumber":"JK3825366035","shipmentId":"se-958572567"}
+2026-03-20 08:28:37.87
+749c4053
+User
+1:28:37 PM [info][ETL] Found existing shipment faa4f10c-b171-4184-a5e4-2306a0f8905f by ShipStation ID se-958572567 {"orderNumber":"JK3825366035","shipmentId":"se-958572567"}
+2026-03-20 08:28:37.96
+749c4053
+User
+1:28:37 PM [info][ETL] Extracted shipmentStatus: pending for order JK3825366035 {"orderNumber":"JK3825366035","shipmentId":"se-958572567"}
+2026-03-20 08:28:37.96
+749c4053
+User
+1:28:37 PM [info][ETL] Updating existing shipment faa4f10c-b171-4184-a5e4-2306a0f8905f (ShipStation ID: se-958572567) {"orderNumber":"JK3825366035","shipmentId":"se-958572567"}
+2026-03-20 08:28:43.06
+749c4053
+User
+1:28:43 PM [info][ETL] Found existing shipment faa4f10c-b171-4184-a5e4-2306a0f8905f by ShipStation ID se-958572567 {"orderNumber":"JK3825366035","shipmentId":"se-958572567"}
+2026-03-20 08:28:43.10
+749c4053
+User
+1:28:43 PM [info][ETL] Updating existing shipment faa4f10c-b171-4184-a5e4-2306a0f8905f (ShipStation ID: se-958572567) {"orderNumber":"JK3825366035","shipmentId":"se-958572567"}
+2026-03-20 08:28:43.10
+749c4053
+User
+1:28:43 PM [info][ETL] Extracted shipmentStatus: pending for order JK3825366035 {"orderNumber":"JK3825366035","shipmentId":"se-958572567"}
+2026-03-20 08:28:48.88
+749c4053
+User
+1:28:48 PM [info][ETL] Found existing shipment faa4f10c-b171-4184-a5e4-2306a0f8905f by ShipStation ID se-958572567 {"orderNumber":"JK3825366035","shipmentId":"se-958572567"}
+2026-03-20 08:28:48.93
+749c4053
+User
+1:28:48 PM [info][ETL] Extracted shipmentStatus: pending for order JK3825366035 {"orderNumber":"JK3825366035","shipmentId":"se-958572567"}
+2026-03-20 08:28:48.93
+749c4053
+User
+1:28:48 PM [info][ETL] Updating existing shipment faa4f10c-b171-4184-a5e4-2306a0f8905f (ShipStation ID: se-958572567) {"orderNumber":"JK3825366035","shipmentId":"se-958572567"}
+2026-03-20 08:28:55.00
+749c4053
+User
+1:28:55 PM [info][ETL] Found existing shipment faa4f10c-b171-4184-a5e4-2306a0f8905f by ShipStation ID se-958572567 {"orderNumber":"JK3825366035","shipmentId":"se-958572567"}
+2026-03-20 08:28:55.09
+749c4053
+User
+1:28:55 PM [info][ETL] Extracted shipmentStatus: pending for order JK3825366035 {"orderNumber":"JK3825366035","shipmentId":"se-958572567"}
+2026-03-20 08:28:55.09
+749c4053
+User
+1:28:55 PM [info][ETL] Updating existing shipment faa4f10c-b171-4184-a5e4-2306a0f8905f (ShipStation ID: se-958572567) {"orderNumber":"JK3825366035","shipmentId":"se-958572567"}
+2026-03-20 08:29:07.31
+749c4053
+User
+1:29:07 PM [info][ETL] Found existing shipment faa4f10c-b171-4184-a5e4-2306a0f8905f by ShipStation ID se-958572567 {"orderNumber":"JK3825366035","shipmentId":"se-958572567"}
+2026-03-20 08:29:07.40
+749c4053
+User
+1:29:07 PM [info][ETL] Updating existing shipment faa4f10c-b171-4184-a5e4-2306a0f8905f (ShipStation ID: se-958572567) {"orderNumber":"JK3825366035","shipmentId":"se-958572567"}
+2026-03-20 08:29:07.40
+749c4053
+User
+1:29:07 PM [info][ETL] Extracted shipmentStatus: pending for order JK3825366035 {"orderNumber":"JK3825366035","shipmentId":"se-958572567"}
+2026-03-20 08:29:12.61
+749c4053
+User
+1:29:12 PM [info][ETL] Found existing shipment faa4f10c-b171-4184-a5e4-2306a0f8905f by ShipStation ID se-958572567 {"orderNumber":"JK3825366035","shipmentId":"se-958572567"}
+2026-03-20 08:29:12.66
+749c4053
+User
+1:29:12 PM [info][ETL] Extracted shipmentStatus: pending for order JK3825366035 {"orderNumber":"JK3825366035","shipmentId":"se-958572567"}
+2026-03-20 08:29:12.66
+749c4053
+User
+1:29:12 PM [info][ETL] Updating existing shipment faa4f10c-b171-4184-a5e4-2306a0f8905f (ShipStation ID: se-958572567) {"orderNumber":"JK3825366035","shipmentId":"se-958572567"}
+2026-03-20 08:29:24.24
+749c4053
+User
+1:29:24 PM [info][ETL] Found existing shipment faa4f10c-b171-4184-a5e4-2306a0f8905f by ShipStation ID se-958572567 {"orderNumber":"JK3825366035","shipmentId":"se-958572567"}
+2026-03-20 08:29:24.28
+749c4053
+User
+1:29:24 PM [info][ETL] Extracted shipmentStatus: pending for order JK3825366035 {"orderNumber":"JK3825366035","shipmentId":"se-958572567"}
+2026-03-20 08:29:24.28
+749c4053
+User
+1:29:24 PM [info][ETL] Updating existing shipment faa4f10c-b171-4184-a5e4-2306a0f8905f (ShipStation ID: se-958572567) {"orderNumber":"JK3825366035","shipmentId":"se-958572567"}
+2026-03-20 08:29:39.93
+749c4053
+User
+1:29:39 PM [info][ETL] Found existing shipment faa4f10c-b171-4184-a5e4-2306a0f8905f by ShipStation ID se-958572567 {"orderNumber":"JK3825366035","shipmentId":"se-958572567"}
+2026-03-20 08:29:40.02
+749c4053
+User
+1:29:40 PM [info][ETL] Updating existing shipment faa4f10c-b171-4184-a5e4-2306a0f8905f (ShipStation ID: se-958572567) {"orderNumber":"JK3825366035","shipmentId":"se-958572567"}
+2026-03-20 08:29:52.07
+749c4053
+User
+1:29:52 PM [info][ETL] Found existing shipment faa4f10c-b171-4184-a5e4-2306a0f8905f by ShipStation ID se-958572567 {"orderNumber":"JK3825366035","shipmentId":"se-958572567"}
+2026-03-20 08:29:52.16
+749c4053
+User
+1:29:52 PM [info][ETL] Extracted shipmentStatus: pending for order JK3825366035 {"orderNumber":"JK3825366035","shipmentId":"se-958572567"}
+2026-03-20 08:29:52.16
+749c4053
+User
+1:29:52 PM [info][ETL] Updating existing shipment faa4f10c-b171-4184-a5e4-2306a0f8905f (ShipStation ID: se-958572567) {"orderNumber":"JK3825366035","shipmentId":"se-958572567"}
+2026-03-20 08:30:24.91
+749c4053
+User
+1:30:24 PM [info][ETL] Found existing shipment faa4f10c-b171-4184-a5e4-2306a0f8905f by ShipStation ID se-958572567 {"orderNumber":"JK3825366035","shipmentId":"se-958572567"}
+2026-03-20 08:30:25.05
+749c4053
+User
+1:30:25 PM [info][ETL] Updating existing shipment faa4f10c-b171-4184-a5e4-2306a0f8905f (ShipStation ID: se-958572567) {"orderNumber":"JK3825366035","shipmentId":"se-958572567"}
+2026-03-20 08:30:25.05
+749c4053
+User
+1:30:25 PM [info][ETL] Extracted shipmentStatus: pending for order JK3825366035 {"orderNumber":"JK3825366035","shipmentId":"se-958572567"}
+Wrap
+Colors
