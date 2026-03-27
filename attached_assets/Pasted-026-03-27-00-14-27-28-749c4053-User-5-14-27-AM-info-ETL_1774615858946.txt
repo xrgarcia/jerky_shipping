@@ -1,0 +1,116 @@
+026-03-27 00:14:27.28
+749c4053
+User
+5:14:27 AM [info][ETL] Extracted shipmentStatus: on_hold for order JK3825372025 {"orderNumber":"JK3825372025","shipmentId":"se-970178144"}
+2026-03-27 00:14:34.08
+749c4053
+User
+5:14:34 AM [info][ETL] Skipping lifecycle evaluation for JK3825372025 — shipment still in initial setup (status: on_hold, previous: on_hold) {"orderNumber":"JK3825372025","shipmentId":"se-970178144"}
+2026-03-27 00:16:48.28
+749c4053
+User
+5:16:48 AM [info][ETL] Found existing shipment 2f931669-d6d1-4229-8fd8-257e805519ab by ShipStation ID se-970178144 {"orderNumber":"JK3825372025","shipmentId":"se-970178144"}
+2026-03-27 00:16:48.68
+749c4053
+User
+5:16:48 AM [info][ETL] Updating existing shipment 2f931669-d6d1-4229-8fd8-257e805519ab (ShipStation ID: se-970178144) {"orderNumber":"JK3825372025","shipmentId":"se-970178144"}
+2026-03-27 00:16:48.68
+749c4053
+User
+5:16:48 AM [info][ETL] Extracted shipmentStatus: on_hold for order JK3825372025 {"orderNumber":"JK3825372025","shipmentId":"se-970178144"}
+2026-03-27 00:17:05.48
+749c4053
+User
+5:17:05 AM [info][ETL] Skipping lifecycle evaluation for JK3825372025 — shipment still in initial setup (status: on_hold, previous: on_hold) {"orderNumber":"JK3825372025","shipmentId":"se-970178144"}
+2026-03-27 00:55:06.75
+749c4053
+User
+[Slashbin/Messages] Payload (1832 chars): {"tags":"","notes":null,"customer":{"id":10099670122810,"zip":"11373","city":"Elmhurst","name":"Hasbuns Business","note":null,"email":"freshboiiallday34@gmail.com","phone":"+13476158385","company":null,"country":"United States","default":true,"address1":"4165 Forley St Apt 2K","address2":null,"currency":"USD","province":"New York","last_name":"Business","created_at":"2026-03-26T23:53:50-05:00","first_name":"Hasbuns","tax_exempt":false,"updated_at":"2026-03-26T23:53:58-05:00","customer_id":10099670122810,"country_code":"US","country_name":"United States","province_code":"NY","verified_email":true},"shipping":{"zip":"11373","city":"Elmhurst","name":"Hasbuns Business","phone":"+13476158385","company":null,"country":"United States","address1":"4165 Forley St Apt 2K","address2":null,"province":"New York","last_name":"Business","first_name":"Hasbuns","country_code":"US","province_code":"NY"},"sub_total":0,"tax_total":0,"order_date":"2026-03-26T23:53:53-05:00","buyer_email":"freshboiiallday34@gmail.com","order_items":[{"qty":5,"sku":"BUILDJAS","tax":0,"price":0,"weight":0,"subtotal":0,"product_id":11860835343,"product_name":"Build Your Own Jerky Assortment","product_brand":"Jerky.com","fulfillment_status":null},{"qty":5,"sku":"BUILDBAG","tax":0,"price":0,"weight":0.5,"subtotal":0,"product_id":11860812623,"product_name":"Build Your Own Jerky Gift Bag","product_brand":"Jerky.com","fulfillment_status":null},{"qty":6,"sku":"BUILDBOX","tax":0,"price":0,"weight":0.5,"subtotal":0,"product_id":11846348239,"product_name":"Build Your Own Jerky Gift Box","product_brand":"Jerky.com","fulfillment_status":null}],"order_total":6.91,"order_number":"JK3825372025","order_status":"unshipped","refund_total":0,"sales_channel":"jerky.com","shipping_cost":6.91,"discount_total":0,"shipping_method":"Economy - 7 to 10 Business Days"}
+2026-03-27 01:29:36.18
+749c4053
+User
+6:29:36 AM [info][ETL] Found existing shipment 2f931669-d6d1-4229-8fd8-257e805519ab by ShipStation ID se-970178144 {"orderNumber":"JK3825372025","shipmentId":"se-970178144"}
+2026-03-27 01:29:36.68
+749c4053
+User
+6:29:36 AM [info][ETL] Updating existing shipment 2f931669-d6d1-4229-8fd8-257e805519ab (ShipStation ID: se-970178144) {"orderNumber":"JK3825372025","shipmentId":"se-970178144"}
+2026-03-27 01:29:36.68
+749c4053
+User
+6:29:36 AM [info][ETL] Extracted shipmentStatus: on_hold for order JK3825372025 {"orderNumber":"JK3825372025","shipmentId":"se-970178144"}
+2026-03-27 01:29:42.10
+749c4053
+User
+6:29:42 AM [info][ETL] Skipping lifecycle evaluation for JK3825372025 — shipment still in initial setup (status: on_hold, previous: on_hold) {"orderNumber":"JK3825372025","shipmentId":"se-970178144"}
+2026-03-27 01:31:07.28
+749c4053
+User
+6:31:07 AM [info][ETL] Found existing shipment 2f931669-d6d1-4229-8fd8-257e805519ab by ShipStation ID se-970178144 {"orderNumber":"JK3825372025","shipmentId":"se-970178144"}
+2026-03-27 01:31:07.43
+749c4053
+User
+6:31:07 AM [info][ETL] Updating existing shipment 2f931669-d6d1-4229-8fd8-257e805519ab (ShipStation ID: se-970178144) {"orderNumber":"JK3825372025","shipmentId":"se-970178144"}
+2026-03-27 01:31:07.43
+749c4053
+User
+6:31:07 AM [info][ETL] Extracted shipmentStatus: on_hold for order JK3825372025 {"orderNumber":"JK3825372025","shipmentId":"se-970178144"}
+2026-03-27 01:31:09.78
+749c4053
+User
+6:31:09 AM [info][ETL] Skipping lifecycle evaluation for JK3825372025 — shipment still in initial setup (status: on_hold, previous: on_hold) {"orderNumber":"JK3825372025","shipmentId":"se-970178144"}
+2026-03-27 07:30:19.13
+749c4053
+User
+12:30:19 PM [info][ETL] Found existing shipment 2f931669-d6d1-4229-8fd8-257e805519ab by ShipStation ID se-970178144 {"orderNumber":"JK3825372025","shipmentId":"se-970178144"}
+2026-03-27 07:30:19.18
+749c4053
+User
+12:30:19 PM [info][ETL] Updating existing shipment 2f931669-d6d1-4229-8fd8-257e805519ab (ShipStation ID: se-970178144) {"orderNumber":"JK3825372025","shipmentId":"se-970178144"}
+2026-03-27 07:30:19.18
+749c4053
+User
+12:30:19 PM [info][ETL] Extracted shipmentStatus: pending for order JK3825372025 {"orderNumber":"JK3825372025","shipmentId":"se-970178144"}
+2026-03-27 07:30:19.61
+749c4053
+User
+12:30:19 PM [info][ETL] Hold released for JK3825372025 (on_hold → pending) — lifecycle evaluation queued {"orderNumber":"JK3825372025","shipmentId":"se-970178144"}
+2026-03-27 07:33:30.45
+749c4053
+User
+12:33:30 PM [info][QcExplosionQueue] Processing job #6953 for JK3825372025 (attempt 2/8) {"orderNumber":"JK3825372025","shipmentId":"2f931669-d6d1-4229-8fd8-257e805519ab","queueItemId":"6953"}
+2026-03-27 07:33:30.64
+749c4053
+User
+12:33:30 PM [info][qc-item-hydrator] Skipping excluded top-level SKU: BUILDBAG from order JK3825372025 {"orderNumber":"JK3825372025","shipmentId":"2f931669-d6d1-4229-8fd8-257e805519ab"}
+2026-03-27 07:33:30.64
+749c4053
+User
+12:33:30 PM [warn][qc-item-hydrator] No items to insert after processing (3 items, 0 null SKUs, rest excluded) {"orderNumber":"JK3825372025","shipmentId":"2f931669-d6d1-4229-8fd8-257e805519ab"}
+2026-03-27 07:33:30.64
+749c4053
+User
+12:33:30 PM [info][qc-item-hydrator] Skipping excluded top-level SKU: BUILDJAS from order JK3825372025 {"orderNumber":"JK3825372025","shipmentId":"2f931669-d6d1-4229-8fd8-257e805519ab"}
+2026-03-27 07:47:40.54
+749c4053
+User
+12:47:40 PM [info][QcExplosionQueue] Processing job #6953 for JK3825372025 (attempt 5/8) {"orderNumber":"JK3825372025","shipmentId":"2f931669-d6d1-4229-8fd8-257e805519ab","queueItemId":"6953"}
+2026-03-27 07:47:40.73
+749c4053
+User
+12:47:40 PM [info][qc-item-hydrator] Skipping excluded top-level SKU: BUILDBAG from order JK3825372025 {"orderNumber":"JK3825372025","shipmentId":"2f931669-d6d1-4229-8fd8-257e805519ab"}
+2026-03-27 07:47:40.73
+749c4053
+User
+12:47:40 PM [warn][QcExplosionQueue] Job #6953 failed (attempt 5/8), retrying at 2026-03-27T13:03:40.739Z: No items to insert after processing (3 items, 0 null SKUs, rest excluded) {"orderNumber":"JK3825372025","shipmentId":"2f931669-d6d1-4229-8fd8-257e805519ab","queueItemId":"6953"}
+2026-03-27 07:47:40.73
+749c4053
+User
+12:47:40 PM [info][qc-item-hydrator] Skipping excluded top-level SKU: BUILDBOX from order JK3825372025 {"orderNumber":"JK3825372025","shipmentId":"2f931669-d6d1-4229-8fd8-257e805519ab"}
+2026-03-27 07:47:40.73
+749c4053
+User
+12:47:40 PM [warn][qc-item-hydrator] No items to insert after processing (3 items, 0 null SKUs, rest excluded) {"orderNumber":"JK3825372025","shipmentId":"2f931669-d6d1-4229-8fd8-257e805519ab"}
+2026-03-27 07:47:40.73
+749c4053
+User
+12:47:40 PM [info][qc-item-hydrator] Skipping excluded top-level SKU: BUILDJAS from order JK3825372025 {"orderNumber":"JK3825372025","shipmentId":"2f931669-d6d1-4229-8fd8-257e805519ab"}

@@ -149,6 +149,19 @@ async function processNextJob(): Promise<boolean> {
     const result = await hydrateShipment(job.shipmentId, shipment.orderNumber || 'unknown');
 
     if (result.error) {
+      if (result.terminal) {
+        // Terminal errors won't resolve on retry (e.g. all SKUs excluded). Dead-letter immediately.
+        log(`Job #${job.id} terminal error — skipping retries: ${result.error}`, 'error', jobCtx);
+        await db.update(qcExplosionQueue)
+          .set({
+            status: 'dead_letter',
+            lastError: result.error,
+            retryCount: job.retryCount + 1,
+            completedAt: new Date(),
+          })
+          .where(eq(qcExplosionQueue.id, job.id));
+        return true;
+      }
       throw new Error(result.error);
     }
 

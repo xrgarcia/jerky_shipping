@@ -582,11 +582,14 @@ export async function hydrateShipment(shipmentId: string, orderNumber: string): 
       const totalItems = items.length;
       const nullSkuCount = items.filter(i => !i.sku || i.sku.trim() === '').length;
       const allSkusNull = nullSkuCount === totalItems;
+      // All items were present but every one is explicitly in the excluded SKU list.
+      // Retrying won't help — the exclusion list won't change between attempts.
+      const allExcluded = !allSkusNull && nullSkuCount === 0;
       const errorMsg = allSkusNull
         ? `All ${totalItems} line item(s) have null/empty SKUs - cannot hydrate`
         : `No items to insert after processing (${totalItems} items, ${nullSkuCount} null SKUs, rest excluded)`;
       logger.warn(`[qc-item-hydrator] ${errorMsg}`, withOrder(orderNumber, shipmentId));
-      return { shipmentId, orderNumber, itemsCreated: 0, error: errorMsg, terminal: allSkusNull };
+      return { shipmentId, orderNumber, itemsCreated: 0, error: errorMsg, terminal: allSkusNull || allExcluded };
     }
     
     // Phase 2.5: Aggregate items by SKU to sum quantities
