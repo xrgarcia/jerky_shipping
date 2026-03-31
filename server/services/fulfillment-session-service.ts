@@ -250,7 +250,7 @@ export class FulfillmentSessionService {
    * Ready = in 'needs_session' subphase (has packaging, station, and no existing session)
    * AND meets lifecycle state machine criteria for READY_TO_SESSION:
    * - shipmentStatus = 'pending' (ready for fulfillment processing)
-   * - has a shippable tag ('MOVE OVER' or 'READY FOR SHIPDOT')
+   * - has a shippable tag ('MOVE OVER')
    * - status != 'cancelled' (not cancelled in ShipStation)
    * 
    * Note: on_hold is BEFORE fulfillment starts, pending is when orders are ready to be sessioned

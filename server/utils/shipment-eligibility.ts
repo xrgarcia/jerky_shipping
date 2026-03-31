@@ -109,7 +109,6 @@ export function isShipmentShippable(
   tags: Pick<ShipmentTag, 'shipmentId' | 'name'>[],
   packages: PackageForEligibility[] = []
 ): boolean {
-  // Pass tags into passesHardFilters so 'READY FOR SHIPDOT' can bypass on_hold.
   if (!passesHardFilters(shipment, packages, tags)) {
     return false;
   }
@@ -118,11 +117,10 @@ export function isShipmentShippable(
 
 /**
  * Filter an array of shipments to only those that pass hard filters.
- * When tags are provided, 'READY FOR SHIPDOT' bypasses the on_hold check.
  *
  * @param shipments - Array of shipment records
  * @param packages  - Optional array of all packages for these shipments
- * @param tags      - Optional array of all tags; enables READY FOR SHIPDOT bypass
+ * @param tags      - Optional array of all tags (kept for API compatibility)
  * @returns Array of shipments that pass hard filters
  */
 export function filterEligibleShipments<T extends ShipmentForEligibility>(
@@ -135,8 +133,7 @@ export function filterEligibleShipments<T extends ShipmentForEligibility>(
 
 /**
  * Filter an array of shipments to only those that are shippable (primary criteria).
- * This applies hard filters first (with READY FOR SHIPDOT bypass), then checks for
- * any shippable tag.
+ * This applies hard filters first, then checks for any shippable tag ("MOVE OVER").
  * 
  * @param shipments - Array of shipment records
  * @param allTags - Array of all tags for these shipments
@@ -248,7 +245,7 @@ export interface ShippableShipmentsResult<T> {
  * 
  * HARD FILTERS (always applied):
  * - Exclude shipments with tracking numbers (already shipped)
- * - Exclude shipments that are on_hold  (bypassed for 'READY FOR SHIPDOT')
+ * - Exclude shipments that are on_hold
  * - Exclude shipments with "DO NOT SHIP (ALERT MGR)" package
  * - Exclude shipments with missing serviceCode
  * 

@@ -7,7 +7,7 @@
  * - Maps SKUs to collections for fingerprint calculation
  * - Calculates fingerprint signature and creates/matches fingerprints
  * 
- * Trigger: READY_TO_FULFILL phase = 'READY FOR SHIPDOT' tag + no session + no QC items
+ * Trigger: READY_TO_SESSION phase = 'READY FOR SHIPDOT' tag + no session + no QC items
  * 
  * This must run BEFORE SkuVault picks up orders for sessioning to ensure:
  * 1. QC items are exploded and barcodes are available for scanning
@@ -72,7 +72,7 @@ interface HydrationStats {
  * Find shipments that need QC items hydrated
  * Criteria: has 'READY FOR SHIPDOT' tag + no session yet + no existing shipment_qc_items
  * 
- * This targets the READY_TO_FULFILL lifecycle phase — shipments entering the prep pipeline.
+ * This targets the READY_TO_SESSION lifecycle phase — shipments entering the prep pipeline.
  * The 'READY FOR SHIPDOT' tag is the sole entry condition, replacing the old pending+shippable
  * tag filter. These orders may be on_hold in ShipStation while prep workers run.
  */
@@ -96,7 +96,7 @@ async function findShipmentsNeedingHydration(limit: number = 50): Promise<{ id: 
               )
             )
         ),
-        // Not yet picked up by SkuVault (READY_TO_FULFILL prep pipeline entry check)
+        // Not yet picked up by SkuVault (READY_TO_SESSION prep pipeline entry check)
         sql`${shipments.sessionStatus} IS NULL`,
         // Does NOT have any shipment_qc_items yet
         notExists(

@@ -1217,7 +1217,7 @@ function LifecycleBackfillButton() {
           <AlertDialogHeader>
             <AlertDialogTitle>Backfill Lifecycle Phases?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will enqueue shipments with a shippable tag ("MOVE OVER" or "READY FOR SHIPDOT") for lifecycle evaluation by the worker. 
+              This will enqueue shipments with a shippable tag ("MOVE OVER") or lifecycle entry tag ("READY FOR SHIPDOT") for lifecycle evaluation by the worker. 
               The worker will recalculate phases and trigger any needed side effects. Select a time range to limit scope.
             </AlertDialogDescription>
           </AlertDialogHeader>

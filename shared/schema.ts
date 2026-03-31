@@ -12,14 +12,14 @@ import { z } from "zod";
  * 
  * The complete journey of a shipment from order receipt to carrier pickup:
  * 
- * ready_to_fulfill → ready_to_session → fulfillment_prep → ready_to_pick → picking → packing_ready → on_dock
+ * ready_to_session → fulfillment_prep → ready_to_pick → picking → packing_ready → on_dock
  *                                                                        ↘ picking_issues (exception path)
  * 
- * ready_to_fulfill: On hold + shippable tag (waiting to be released from ShipStation hold)
+ * ready_to_fulfill: Legacy phase (no longer derived by state machine; kept for historical data)
  * ready_to_session: Pending + shippable tag (released, ready for fingerprinting & sessioning)
  */
 export const LIFECYCLE_PHASES = {
-  READY_TO_FULFILL: 'ready_to_fulfill',      // On hold + shippable tag - waiting to be released from hold
+  READY_TO_FULFILL: 'ready_to_fulfill',      // Legacy phase - kept for historical data compatibility
   READY_TO_SESSION: 'ready_to_session',      // Pending + shippable tag + no session - fingerprinting & QC explosion happens here
   READY_FOR_SKUVAULT: 'ready_for_skuvault',  // Local fulfillment session built, waiting for SkuVault wave picking
   FULFILLMENT_PREP: 'fulfillment_prep',      // Hydration, fingerprinting, packaging, rate check, sessioning
@@ -67,7 +67,7 @@ export type DecisionSubphase = typeof DECISION_SUBPHASES[keyof typeof DECISION_S
  * Valid state transitions for lifecycle phases
  */
 export const LIFECYCLE_TRANSITIONS: Record<LifecyclePhase, LifecyclePhase[]> = {
-  [LIFECYCLE_PHASES.READY_TO_FULFILL]: [LIFECYCLE_PHASES.READY_TO_SESSION], // When released from hold
+  [LIFECYCLE_PHASES.READY_TO_FULFILL]: [LIFECYCLE_PHASES.READY_TO_SESSION], // Legacy transition (kept for historical data)
   [LIFECYCLE_PHASES.READY_TO_SESSION]: [LIFECYCLE_PHASES.READY_FOR_SKUVAULT, LIFECYCLE_PHASES.FULFILLMENT_PREP], // After session built or fingerprinting
   [LIFECYCLE_PHASES.READY_FOR_SKUVAULT]: [LIFECYCLE_PHASES.READY_TO_PICK, LIFECYCLE_PHASES.READY_TO_SESSION], // SkuVault detects session, or session cancelled
   [LIFECYCLE_PHASES.FULFILLMENT_PREP]: [LIFECYCLE_PHASES.READY_TO_PICK],

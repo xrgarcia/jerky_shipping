@@ -13,10 +13,10 @@ export type ShippableTag = (typeof SHIPPABLE_TAGS)[number];
 
 /**
  * The tag applied by Marc's automation that signals an order should enter
- * the lifecycle state machine at READY_TO_FULFILL for prep pipeline processing.
+ * the lifecycle state machine at READY_TO_SESSION for prep pipeline processing.
  *
  * This is NOT a shippable condition — it is a lifecycle entry path.
- * Orders with this tag enter at READY_TO_FULFILL and flow through the full
+ * Orders with this tag enter at READY_TO_SESSION and flow through the full
  * prep pipeline (hydration → categorization → fingerprint → packaging →
  * rate check → session) regardless of on_hold status.
  *

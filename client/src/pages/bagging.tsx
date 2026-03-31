@@ -677,7 +677,7 @@ export default function Bagging() {
   const hasGiftTag = shipmentTags.some(tag => tag.name === 'Gift');
   const isGift = hasGiftTag || Boolean(currentShipment?.isGift);
   
-  // Check if shipment has any shippable tag ('MOVE OVER' or 'READY FOR SHIPDOT')
+  // Check if shipment has any shippable tag ('MOVE OVER')
   const hasShippableTag = shipmentTags.some(tag => (SHIPPABLE_TAGS as readonly string[]).includes(tag.name));
   
   // Helper to normalize SKUs for comparison (uppercase, trimmed)
@@ -2648,7 +2648,7 @@ export default function Bagging() {
                       {labelError.code === 'NOT_SHIPPABLE' && (
                         <div className="bg-amber-100 dark:bg-amber-900 border border-amber-300 dark:border-amber-700 rounded p-3 space-y-2">
                           <p className="text-sm text-amber-800 dark:text-amber-200 font-medium">
-                            This order is missing a shippable tag ("MOVE OVER" or "READY FOR SHIPDOT").
+                            This order is missing the "MOVE OVER" shippable tag.
                           </p>
                           <p className="text-sm text-amber-700 dark:text-amber-300">
                             {labelError.shipStationError || 'The order may still be in picking, or it hasn\'t been released from SkuVault yet.'}

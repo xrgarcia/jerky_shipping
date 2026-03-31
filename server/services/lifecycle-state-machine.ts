@@ -5,8 +5,7 @@
  * ready_to_fulfill → ready_to_session → fulfillment_prep → ready_to_pick → picking → packing_ready → on_dock
  *                                                                        ↘ picking_issues (exception path)
  * 
- * READY_TO_FULFILL: Has 'READY FOR SHIPDOT' tag - entering prep pipeline (regardless of on_hold)
- * READY_TO_SESSION: Pending + 'MOVE OVER' tag + no session - ready to be picked up for sessioning
+ * READY_TO_SESSION: Has 'READY FOR SHIPDOT' tag OR (Pending + 'MOVE OVER' tag + no session) - entering prep pipeline
  * ON_DOCK: Order has been packaged and is on the dock awaiting pickup from carrier
  *          Requires: shipmentStatus='label_purchased' AND status IN ('NY', 'AC')
  * IN_TRANSIT: Package is on its way to customer
@@ -113,7 +112,7 @@ const PROBLEM_STATUSES = ['UN', 'EX'];
  * 3. IN_TRANSIT - status IN ('IT', 'shipped') (regardless of shipmentStatus)
  * 4. PROBLEM - status IN ('SP', 'UN', 'EX') (terminal, regardless of shipmentStatus)
  * 5. ON_DOCK - status IN ('NY', 'AC', 'new') AND shipmentStatus='label_purchased'
- * 6. READY_TO_FULFILL - hasReadyForShipdotTag (regardless of shipmentStatus)
+ * 6. READY_TO_SESSION - hasReadyForShipdotTag (regardless of shipmentStatus)
  * 7. PICKING_ISSUES - sessionStatus='inactive'
  * 8. PACKING_READY - sessionStatus='closed' AND no tracking AND shipmentStatus='pending'
  * 9. PICKING - sessionStatus='active'
@@ -166,11 +165,11 @@ export function deriveLifecyclePhase(shipment: ShipmentLifecycleData): Lifecycle
   // OPERATIONAL PHASES (based on shipmentStatus and session state)
   // ========================================================================
 
-  // READY_TO_FULFILL: Has 'READY FOR SHIPDOT' tag (regardless of session state or on_hold status)
-  // This MUST be checked BEFORE session-based phases as it is the sole lifecycle entry condition
+  // READY_TO_SESSION: Has 'READY FOR SHIPDOT' tag (regardless of session state or on_hold status)
+  // This MUST be checked BEFORE other session-based phases as it is the lifecycle entry condition
   if (shipment.hasReadyForShipdotTag === true) {
     const subphase = deriveDecisionSubphase(shipment);
-    return { phase: LIFECYCLE_PHASES.READY_TO_FULFILL, subphase };
+    return { phase: LIFECYCLE_PHASES.READY_TO_SESSION, subphase };
   }
 
   // PICKING_ISSUES: Session status is 'inactive' (supervisor attention needed)

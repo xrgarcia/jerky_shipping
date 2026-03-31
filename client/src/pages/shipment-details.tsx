@@ -210,7 +210,7 @@ export default function ShipmentDetails() {
     },
     ready_to_fulfill: {
       phase: 'ready_to_fulfill', label: 'Ready to Fulfill', description: 'On hold in ShipStation, waiting to be released',
-      whyThisStatus: 'Order is on hold with a shippable tag ("MOVE OVER" or "READY FOR SHIPDOT").', whatHappensNext: 'Will be released when the hold date passes.',
+      whyThisStatus: 'Order has been tagged for fulfillment but hasn\'t completed prep yet.', whatHappensNext: 'Prep pipeline will hydrate items, calculate fingerprints, and assign packaging.',
       colorClass: 'bg-amber-600', badgeClass: 'bg-amber-600 text-white',
     },
     picking_issues: {
@@ -830,7 +830,7 @@ export default function ShipmentDetails() {
                       <li>IN_TRANSIT: status='IT' or 'SHIPPED'</li>
                       <li>PROBLEM: status IN ('UN', 'EX')</li>
                       <li>ON_DOCK: shipmentStatus='label_purchased' AND status IN ('NY', 'AC', 'NEW')</li>
-                      <li>READY_TO_FULFILL: hasReadyForShipdotTag (regardless of on_hold status)</li>
+                      <li>READY_TO_SESSION: hasReadyForShipdotTag (lifecycle entry, regardless of on_hold status)</li>
                       <li>PICKING_ISSUES: sessionStatus='inactive'</li>
                       <li>PACKING_READY: sessionStatus='closed' AND !trackingNumber AND shipmentStatus='pending'</li>
                       <li>PICKING: sessionStatus='active'</li>

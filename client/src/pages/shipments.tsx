@@ -91,8 +91,8 @@ const LIFECYCLE_PHASE_INFO: Record<string, { title: string; description: string;
   },
   ready_to_fulfill: {
     title: "Ready to Fulfill",
-    description: "This order has a shippable tag (\"MOVE OVER\" or \"READY FOR SHIPDOT\") but is still on hold in ShipStation. It's waiting to be released before fulfillment can begin.",
-    nextSteps: "Wait for the order to be released from hold in ShipStation. Once released, it will move to Ready to Session."
+    description: "This order has been tagged for fulfillment but hasn't completed the prep pipeline yet.",
+    nextSteps: "The system will hydrate QC items, calculate fingerprints, and assign packaging automatically."
   },
   ready_to_session: {
     title: "Ready to Session",
@@ -1539,7 +1539,7 @@ export default function Shipments() {
     if (viewMode === 'workflow') {
       switch (activeTab) {
         case 'ready_to_fulfill':
-          return 'Orders on hold with shippable tag ("MOVE OVER" or "READY FOR SHIPDOT") - waiting to be released from ShipStation';
+          return 'Orders entering the prep pipeline - tagged for fulfillment, awaiting hydration and packaging';
         case 'in_progress':
           return 'Orders truly in progress - Ready to Pick + Picking + Packing Ready';
         case 'shipped':

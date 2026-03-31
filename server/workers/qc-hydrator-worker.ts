@@ -2,9 +2,9 @@
  * QC Item Hydrator Worker
  * 
  * Scheduled worker that runs every 1 minute to populate shipment_qc_items
- * for "Ready to Fulfill" shipments (pending + shippable tag).
+ * for shipments tagged 'READY FOR SHIPDOT' (lifecycle entry trigger).
  * 
- * Note: on_hold is BEFORE fulfillment starts, pending is when orders are ready to be sessioned
+ * Note: These shipments may be on_hold during prep; they transition to pending later
  * One-time hydration per shipment - once QC items exist, the shipment is skipped.
  */
 
