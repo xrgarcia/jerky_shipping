@@ -1,0 +1,208 @@
+2026-03-30 03:26:44.32
+749c4053
+User
+at runPollLoop (file:///home/runner/workspace/dist/index.js:12610:13)
+2026-03-30 03:26:44.32
+749c4053
+User
+[UnifiedSync] Poll error (consecutive: 1): Error: DB health check failed - skipping poll cycle
+2026-03-30 03:26:44.32
+749c4053
+User
+at async Timeout._onTimeout (file:///home/runner/workspace/dist/index.js:12691:27)
+2026-03-30 03:45:32.52
+749c4053
+User
+[UnifiedSync] DB health check failed: DB health check timed out (5s)
+2026-03-30 03:45:32.73
+749c4053
+User
+[UnifiedSync] Poll error (consecutive: 1): Error: DB health check failed - skipping poll cycle
+2026-03-30 03:45:32.73
+749c4053
+User
+at async Timeout._onTimeout (file:///home/runner/workspace/dist/index.js:12691:27)
+2026-03-30 03:45:32.73
+749c4053
+User
+at runPollLoop (file:///home/runner/workspace/dist/index.js:12610:13)
+2026-03-30 04:06:38.42
+749c4053
+User
+[UnifiedSync] DB health check failed: DB health check timed out (5s)
+2026-03-30 04:06:38.63
+749c4053
+User
+at process.processTimers (node:internal/timers:519:7)
+2026-03-30 04:06:38.63
+749c4053
+User
+[UnifiedSync] Poll error (consecutive: 1): Error: DB health check failed - skipping poll cycle
+2026-03-30 04:06:38.63
+749c4053
+User
+at runNextTicks (node:internal/process/task_queues:60:5)
+2026-03-30 04:06:38.63
+749c4053
+User
+at async Timeout._onTimeout (file:///home/runner/workspace/dist/index.js:12691:27)
+2026-03-30 04:06:38.63
+749c4053
+User
+at runPollLoop (file:///home/runner/workspace/dist/index.js:12610:13)
+2026-03-30 04:06:38.63
+749c4053
+User
+at listOnTimeout (node:internal/timers:545:9)
+2026-03-30 04:15:13.02
+749c4053
+User
+[UnifiedSync] DB health check failed: DB health check timed out (5s)
+2026-03-30 04:15:13.62
+749c4053
+User
+at runNextTicks (node:internal/process/task_queues:60:5)
+2026-03-30 04:15:13.62
+749c4053
+User
+at runPollLoop (file:///home/runner/workspace/dist/index.js:12610:13)
+2026-03-30 04:15:13.62
+749c4053
+User
+at process.processTimers (node:internal/timers:516:9)
+2026-03-30 04:15:13.62
+749c4053
+User
+[UnifiedSync] Poll error (consecutive: 1): Error: DB health check failed - skipping poll cycle
+2026-03-30 04:15:13.62
+749c4053
+User
+at async Timeout._onTimeout (file:///home/runner/workspace/dist/index.js:12691:27)
+2026-03-30 05:04:21.72
+749c4053
+User
+[UnifiedSync] DB health check failed: DB health check timed out (5s)
+2026-03-30 05:04:22.12
+749c4053
+User
+at async Timeout._onTimeout (file:///home/runner/workspace/dist/index.js:12691:27)
+2026-03-30 05:04:22.12
+749c4053
+User
+at runPollLoop (file:///home/runner/workspace/dist/index.js:12610:13)
+2026-03-30 05:04:22.12
+749c4053
+User
+[UnifiedSync] Poll error (consecutive: 1): Error: DB health check failed - skipping poll cycle
+2026-03-30 06:30:56.63
+749c4053
+User
+[Heartbeat] Container ping FAILED in production via https://ship.jerky.com: The operation was aborted due to timeout
+2026-03-30 06:37:02.33
+749c4053
+User
+[Heartbeat] Container ping FAILED in production via https://ship.jerky.com: The operation was aborted due to timeout
+2026-03-30 06:38:30.72
+749c4053
+User
+[SkuVault QC] Request error: timeout of 30000ms exceeded
+2026-03-30 06:38:31.22
+749c4053
+User
+at process.processTimers (node:internal/timers:516:9)
+2026-03-30 06:38:31.22
+749c4053
+User
+statusCode: 500,
+2026-03-30 06:38:31.22
+749c4053
+User
+}
+2026-03-30 06:38:31.22
+749c4053
+User
+at async runSyncCheck (file:///home/runner/workspace/dist/index.js:22020:28) {
+2026-03-30 06:38:31.22
+749c4053
+User
+details: undefined
+2026-03-30 06:38:31.22
+749c4053
+User
+at async SkuVaultService.getInventoryByBrandAndWarehouse (file:///home/runner/workspace/dist/index.js:9673:28)
+2026-03-30 06:38:31.22
+749c4053
+User
+at SkuVaultService.makeQCRequest (file:///home/runner/workspace/dist/index.js:9112:17)
+2026-03-30 06:38:31.22
+749c4053
+User
+at processTicksAndRejections (node:internal/process/task_queues:95:5)
+2026-03-30 06:38:31.22
+749c4053
+User
+at runNextTicks (node:internal/process/task_queues:64:3)
+2026-03-30 06:38:31.22
+749c4053
+User
+[SkuVault Inventory] Error fetching inventory for brand Reeds: SkuVaultError: QC request failed: timeout of 30000ms exceeded
+2026-03-30 06:38:31.22
+749c4053
+User
+at async syncPhysicalLocations (file:///home/runner/workspace/dist/index.js:17458:26)
+2026-03-30 06:46:00.32
+749c4053
+User
+[Heartbeat] Container ping FAILED in production via https://ship.jerky.com: The operation was aborted due to timeout
+2026-03-30 06:46:07.32
+749c4053
+User
+[Heartbeat] Container ping FAILED in production via http://localhost:5000: The operation was aborted due to timeout
+2026-03-30 07:13:05.58
+749c4053
+User
+[Heartbeat] Container ping FAILED in production via https://ship.jerky.com: The operation was aborted due to timeout
+2026-03-30 08:10:34.22
+749c4053
+User
+[lifecycle-worker] Package sync: No packagingTypeId set for JK3825372079 — event reason 'unknown' expected packaging to exist
+2026-03-30 08:16:42.62
+749c4053
+User
+[lifecycle-worker] Package sync: No packagingTypeId set for JK3825372087 — event reason 'unknown' expected packaging to exist
+2026-03-30 08:18:31.72
+749c4053
+User
+[lifecycle-worker] Package sync: No packagingTypeId set for JK3825372094 — event reason 'unknown' expected packaging to exist
+2026-03-30 08:19:52.16
+749c4053
+User
+[lifecycle-worker] Package sync: No packagingTypeId set for JK3825372100 — event reason 'unknown' expected packaging to exist
+2026-03-30 08:20:31.92
+749c4053
+User
+[lifecycle-worker] Package sync: No packagingTypeId set for JK3825372086 — event reason 'unknown' expected packaging to exist
+2026-03-30 08:22:28.53
+749c4053
+User
+at listOnTimeout (node:internal/timers:581:17)
+2026-03-30 08:22:28.53
+749c4053
+User
+at process.processTimers (node:internal/timers:519:7)
+2026-03-30 08:22:28.53
+749c4053
+User
+[UnifiedSync] Poll error (consecutive: 1): Error: Poll timeout exceeded (900s) - aborting to allow recovery
+2026-03-30 08:22:28.53
+749c4053
+User
+at Timeout._onTimeout (file:///home/runner/workspace/dist/index.js:12615:16)
+2026-03-30 08:29:00.94
+749c4053
+User
+[lifecycle-worker] Package sync: No packagingTypeId set for JK3825372143 — event reason 'unknown' expected packaging to exist
+2026-03-30 08:30:51.90
+749c4053
+User
+[lifecycle-worker] Package sync: No packagingTypeId set for JK3825372140 — event reason 'unknown' expected packaging to exist
