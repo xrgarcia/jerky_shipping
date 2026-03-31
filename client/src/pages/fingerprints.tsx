@@ -2255,12 +2255,12 @@ export default function Fingerprints() {
                   <table className="w-full table-fixed">
                     <colgroup>
                       <col className="w-10" />
-                      <col className="w-[200px]" />
-                      <col className="w-[120px]" />
-                      <col className="w-[140px]" />
-                      <col className="w-[110px]" />
+                      <col className="w-[180px]" />
+                      <col className="w-[100px]" />
+                      <col className="w-[180px]" />
+                      <col className="w-[100px]" />
                       <col />
-                      <col className="w-[80px]" />
+                      <col className="w-[70px]" />
                     </colgroup>
                     <thead className="sticky top-0 z-10 bg-card border-b shadow-sm">
                       <tr>
@@ -2551,14 +2551,14 @@ export default function Fingerprints() {
                               <span className="text-muted-foreground/50">-</span>
                             )}
                           </td>
-                          <td className="py-2 px-3 text-sm overflow-hidden">
+                          <td className="py-2 px-3 text-sm">
                             {(() => {
                               const optionalTags = order.tags || [];
                               if (optionalTags.length === 0) {
                                 return <span className="text-muted-foreground/50">-</span>;
                               }
                               return (
-                                <div className="flex flex-nowrap gap-1 overflow-hidden">
+                                <div className="flex flex-wrap gap-1">
                                   {optionalTags.slice(0, 2).map((tag, idx) => (
                                     <Badge 
                                       key={idx} 
@@ -2585,20 +2585,19 @@ export default function Fingerprints() {
                               <AlertCircle className="h-5 w-5 text-amber-500 mx-auto" />
                             )}
                           </td>
-                          <td className="py-2 px-3 text-sm overflow-hidden">
+                          <td className="py-2 px-3 text-sm">
                             {order.actionUrl ? (
                               <button
                                 onClick={() => {
                                   navigate(order.actionUrl!);
                                 }}
-                                className="text-left text-amber-600 dark:text-amber-400 hover:underline cursor-pointer truncate block w-full"
-                                title={order.reason}
+                                className="text-left text-amber-600 dark:text-amber-400 hover:underline cursor-pointer break-words"
                                 data-testid={`button-action-${order.orderNumber}`}
                               >
                                 {order.reason}
                               </button>
                             ) : (
-                              <span className={`truncate block ${order.readyToSession ? "text-green-600 dark:text-green-400" : "text-amber-600 dark:text-amber-400"}`} title={order.reason}>
+                              <span className={`break-words ${order.readyToSession ? "text-green-600 dark:text-green-400" : "text-amber-600 dark:text-amber-400"}`}>
                                 {order.reason}
                               </span>
                             )}
