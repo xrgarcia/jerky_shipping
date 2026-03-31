@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { SHIPPABLE_TAGS, BUILD_DEFAULT_EXCLUDED_TAGS } from "@shared/constants";
+import { BUILD_DEFAULT_EXCLUDED_TAGS } from "@shared/constants";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
@@ -593,7 +593,6 @@ export default function Fingerprints() {
       readyToSessionOrdersData.orders.forEach(order => {
         order.tags?.forEach(tag => allTagNames.add(tag.name));
       });
-      SHIPPABLE_TAGS.forEach(tag => allTagNames.add(tag));
       BUILD_DEFAULT_EXCLUDED_TAGS.forEach(tag => allTagNames.delete(tag));
       setSelectedBuildTags(allTagNames);
       setBuildTagsInitialized(true);
@@ -608,12 +607,8 @@ export default function Fingerprints() {
         if (!selectedBuildStationTypes.has(stationTypeKey)) return false;
       }
       const orderTagNames = order.tags?.map(t => t.name) || [];
-      const hasShippableTag = (SHIPPABLE_TAGS as readonly string[]).some(tag => orderTagNames.includes(tag));
-      if (!hasShippableTag) return false;
-      const uncheckedOptionalTags = orderTagNames.filter(tag => 
-        !selectedBuildTags.has(tag) && !SHIPPABLE_TAGS.includes(tag)
-      );
-      if (uncheckedOptionalTags.length > 0) return false;
+      const uncheckedTags = orderTagNames.filter(tag => !selectedBuildTags.has(tag));
+      if (uncheckedTags.length > 0) return false;
       return true;
     });
     if (buildOrderSearch.trim()) {
@@ -971,30 +966,17 @@ export default function Fingerprints() {
   const sessionPreview = sessionPreviewData?.preview || [];
   const totalSessionableOrders = sessionPreviewData?.totalOrders || 0;
   
-  // Base metric for header card: orders with required tags (no user filters applied, matches table base query)
   const baseReadyToSessionCount = useMemo(() => {
     if (!readyToSessionOrdersData?.orders) return 0;
-    return readyToSessionOrdersData.orders.filter(order => {
-      const orderTagNames = order.tags?.map(t => t.name) || [];
-      // Must have ALL required tags
-      const hasShippableTag = (SHIPPABLE_TAGS as readonly string[]).some(tag => orderTagNames.includes(tag));
-      return hasShippableTag;
-    }).length;
+    return readyToSessionOrdersData.orders.length;
   }, [readyToSessionOrdersData]);
   
-  // Compute filtered sessionable orders count (applies user filters for table display)
   const filteredSessionableOrders = useMemo(() => {
     if (!readyToSessionOrdersData?.orders) return [];
     return readyToSessionOrdersData.orders.filter(order => {
       const orderTagNames = order.tags?.map(t => t.name) || [];
-      // Must have ALL required tags
-      const hasShippableTag = (SHIPPABLE_TAGS as readonly string[]).some(tag => orderTagNames.includes(tag));
-      if (!hasShippableTag) return false;
-      // Compute unchecked optional tags
-      const uncheckedOptionalTags = orderTagNames.filter(tag => 
-        !selectedBuildTags.has(tag) && !SHIPPABLE_TAGS.includes(tag)
-      );
-      if (uncheckedOptionalTags.length > 0) return false;
+      const uncheckedTags = orderTagNames.filter(tag => !selectedBuildTags.has(tag));
+      if (uncheckedTags.length > 0) return false;
       return true;
     });
   }, [readyToSessionOrdersData, selectedBuildTags]);
@@ -2436,7 +2418,6 @@ export default function Fingerprints() {
                                         readyToSessionOrdersData.orders.forEach(order => {
                                           order.tags?.forEach(tag => allTagNames.add(tag.name));
                                         });
-                                        SHIPPABLE_TAGS.forEach(tag => allTagNames.add(tag));
                                         setSelectedBuildTags(allTagNames);
                                       }}
                                       data-testid="button-check-all-tags"
@@ -2448,8 +2429,7 @@ export default function Fingerprints() {
                                       size="sm"
                                       className="h-6 px-2 text-xs"
                                       onClick={() => {
-                                        // Keep only required tags
-                                        setSelectedBuildTags(new Set(SHIPPABLE_TAGS));
+                                        setSelectedBuildTags(new Set());
                                       }}
                                       data-testid="button-uncheck-all-tags"
                                     >
@@ -2468,17 +2448,7 @@ export default function Fingerprints() {
                                         }
                                       });
                                     });
-                                    // Sort: required tags first (in order), then optional tags alphabetically
                                     const sortedTags = [...allTags.entries()].sort((a, b) => {
-                                      const aRequired = SHIPPABLE_TAGS.indexOf(a[0]);
-                                      const bRequired = SHIPPABLE_TAGS.indexOf(b[0]);
-                                      // Both shippable: sort by their order in SHIPPABLE_TAGS
-                                      if (aRequired !== -1 && bRequired !== -1) return aRequired - bRequired;
-                                      // Only a is required: a comes first
-                                      if (aRequired !== -1) return -1;
-                                      // Only b is required: b comes first
-                                      if (bRequired !== -1) return 1;
-                                      // Neither required: sort alphabetically
                                       return a[0].localeCompare(b[0]);
                                     });
                                     
@@ -2487,15 +2457,12 @@ export default function Fingerprints() {
                                     }
                                     
                                     return sortedTags.map(([tagName, tagColor]) => {
-                                      const isRequired = SHIPPABLE_TAGS.includes(tagName);
                                       return (
                                       <div key={tagName} className="flex items-center space-x-2 py-1">
                                         <Checkbox
                                           id={`tag-filter-${tagName}`}
-                                          checked={isRequired || selectedBuildTags.has(tagName)}
-                                          disabled={isRequired}
+                                          checked={selectedBuildTags.has(tagName)}
                                           onCheckedChange={(checked) => {
-                                            if (isRequired) return; // Cannot uncheck required tags
                                             setSelectedBuildTags(prev => {
                                               const next = new Set(prev);
                                               if (checked) {
@@ -2510,11 +2477,10 @@ export default function Fingerprints() {
                                         />
                                         <label
                                           htmlFor={`tag-filter-${tagName}`}
-                                          className={`text-sm flex-1 flex items-center gap-2 ${isRequired ? 'text-muted-foreground' : 'cursor-pointer'}`}
+                                          className="text-sm flex-1 flex items-center gap-2 cursor-pointer"
                                         >
                                           <Tag className="h-3 w-3" style={{ color: tagColor || undefined }} />
                                           {tagName}
-                                          {isRequired && <span className="text-xs text-muted-foreground">(required)</span>}
                                         </label>
                                       </div>
                                     );});
@@ -2578,7 +2544,7 @@ export default function Fingerprints() {
                           </td>
                           <td className="py-2 px-3 text-sm">
                             {(() => {
-                              const optionalTags = order.tags?.filter(t => !SHIPPABLE_TAGS.includes(t.name)) || [];
+                              const optionalTags = order.tags || [];
                               if (optionalTags.length === 0) {
                                 return <span className="text-muted-foreground/50">-</span>;
                               }
