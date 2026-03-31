@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { SHIPPABLE_TAGS } from "@shared/constants";
+import { SHIPPABLE_TAGS, BUILD_DEFAULT_EXCLUDED_TAGS } from "@shared/constants";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
@@ -77,6 +77,9 @@ import {
   Copy,
   Search,
   AlertTriangle,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -443,6 +446,10 @@ export default function Fingerprints() {
   // Tag filter state for Build tab
   const [selectedBuildTags, setSelectedBuildTags] = useState<Set<string>>(new Set());
   const [buildTagsInitialized, setBuildTagsInitialized] = useState(false);
+
+  // Order search and sort state for Build tab
+  const [buildOrderSearch, setBuildOrderSearch] = useState('');
+  const [buildOrderSortDir, setBuildOrderSortDir] = useState<'asc' | 'desc' | null>(null);
   
   useEffect(() => {
     const timeouts: NodeJS.Timeout[] = [];
@@ -579,19 +586,48 @@ export default function Fingerprints() {
     enabled: activeTab === 'sessions',
   });
 
-  // Initialize tag filter with all tags checked when data first loads
+  // Initialize tag filter with all tags checked EXCEPT default excluded tags
   useEffect(() => {
     if (readyToSessionOrdersData?.orders && !buildTagsInitialized) {
       const allTagNames = new Set<string>();
       readyToSessionOrdersData.orders.forEach(order => {
         order.tags?.forEach(tag => allTagNames.add(tag.name));
       });
-      // Always include required tags even if not in data
       SHIPPABLE_TAGS.forEach(tag => allTagNames.add(tag));
+      BUILD_DEFAULT_EXCLUDED_TAGS.forEach(tag => allTagNames.delete(tag));
       setSelectedBuildTags(allTagNames);
       setBuildTagsInitialized(true);
     }
   }, [readyToSessionOrdersData, buildTagsInitialized]);
+
+  const filteredBuildOrders = useMemo(() => {
+    if (!readyToSessionOrdersData?.orders) return [];
+    let orders = readyToSessionOrdersData.orders.filter(order => {
+      if (selectedBuildStationTypes.size > 0) {
+        const stationTypeKey = order.stationType || '__none__';
+        if (!selectedBuildStationTypes.has(stationTypeKey)) return false;
+      }
+      const orderTagNames = order.tags?.map(t => t.name) || [];
+      const hasShippableTag = (SHIPPABLE_TAGS as readonly string[]).some(tag => orderTagNames.includes(tag));
+      if (!hasShippableTag) return false;
+      const uncheckedOptionalTags = orderTagNames.filter(tag => 
+        !selectedBuildTags.has(tag) && !SHIPPABLE_TAGS.includes(tag)
+      );
+      if (uncheckedOptionalTags.length > 0) return false;
+      return true;
+    });
+    if (buildOrderSearch.trim()) {
+      const searchLower = buildOrderSearch.trim().toLowerCase();
+      orders = orders.filter(o => o.orderNumber.toLowerCase().includes(searchLower));
+    }
+    if (buildOrderSortDir) {
+      orders = [...orders].sort((a, b) => {
+        const cmp = a.orderNumber.localeCompare(b.orderNumber);
+        return buildOrderSortDir === 'asc' ? cmp : -cmp;
+      });
+    }
+    return orders;
+  }, [readyToSessionOrdersData, selectedBuildStationTypes, selectedBuildTags, buildOrderSearch, buildOrderSortDir]);
 
   // Mutations
   const assignMutation = useMutation({
@@ -2209,28 +2245,9 @@ export default function Fingerprints() {
                   {/* Filtered count display */}
                   {(() => {
                     const totalOrders = readyToSessionOrdersData.orders.length;
-                    const filteredOrders = readyToSessionOrdersData.orders.filter(order => {
-                      // Station type filter
-                      if (selectedBuildStationTypes.size > 0) {
-                        const stationTypeKey = order.stationType || '__none__';
-                        if (!selectedBuildStationTypes.has(stationTypeKey)) return false;
-                      }
-                      // Tag filter - order must have required tags AND NOT have any unchecked optional tags
-                      const orderTagNames = order.tags?.map(t => t.name) || [];
-                      // Must have ALL required tags
-                      const hasShippableTag = (SHIPPABLE_TAGS as readonly string[]).some(tag => orderTagNames.includes(tag));
-                      if (!hasShippableTag) return false;
-                      // Compute unchecked optional tags (all tags in order that are NOT selected, excluding required tags)
-                      const uncheckedOptionalTags = orderTagNames.filter(tag => 
-                        !selectedBuildTags.has(tag) && !SHIPPABLE_TAGS.includes(tag)
-                      );
-                      // If order has any unchecked optional tag, exclude it
-                      if (uncheckedOptionalTags.length > 0) return false;
-                      return true;
-                    });
-                    const filteredCount = filteredOrders.length;
-                    const readyInFiltered = filteredOrders.filter(o => o.readyToSession).length;
-                    const hasFilters = selectedBuildStationTypes.size > 0 || selectedBuildTags.size > 0;
+                    const filteredCount = filteredBuildOrders.length;
+                    const readyInFiltered = filteredBuildOrders.filter(o => o.readyToSession).length;
+                    const hasFilters = selectedBuildStationTypes.size > 0 || selectedBuildTags.size > 0 || buildOrderSearch.trim() !== '';
                     
                     return (
                       <div className="flex items-center justify-between mb-3 text-sm text-muted-foreground" data-testid="text-filtered-count">
@@ -2258,25 +2275,7 @@ export default function Fingerprints() {
                       <tr>
                         <th className="py-3 px-3 font-medium text-sm bg-card w-10">
                           {(() => {
-                            const filteredOrders = readyToSessionOrdersData.orders.filter(order => {
-                              // Station type filter
-                              if (selectedBuildStationTypes.size > 0) {
-                                const stationTypeKey = order.stationType || '__none__';
-                                if (!selectedBuildStationTypes.has(stationTypeKey)) return false;
-                              }
-                              // Tag filter - order must have required tags AND NOT have any unchecked optional tags
-                              const orderTagNames = order.tags?.map(t => t.name) || [];
-                              // Must have ALL required tags
-                              const hasShippableTag = (SHIPPABLE_TAGS as readonly string[]).some(tag => orderTagNames.includes(tag));
-                              if (!hasShippableTag) return false;
-                              // Compute unchecked optional tags
-                              const uncheckedOptionalTags = orderTagNames.filter(tag => 
-                                !selectedBuildTags.has(tag) && !SHIPPABLE_TAGS.includes(tag)
-                              );
-                              if (uncheckedOptionalTags.length > 0) return false;
-                              return true;
-                            });
-                            const readyFilteredOrders = filteredOrders.filter(o => o.readyToSession);
+                            const readyFilteredOrders = filteredBuildOrders.filter(o => o.readyToSession);
                             return (
                               <Checkbox
                                 checked={
@@ -2297,7 +2296,44 @@ export default function Fingerprints() {
                             );
                           })()}
                         </th>
-                        <th className="text-left py-3 px-3 font-medium text-sm bg-card">Order Number</th>
+                        <th className="text-left py-3 px-3 font-medium text-sm bg-card">
+                          <div className="flex items-center gap-2">
+                            <div className="relative flex-1 max-w-[200px]">
+                              <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+                              <Input
+                                placeholder="Search orders..."
+                                value={buildOrderSearch}
+                                onChange={(e) => setBuildOrderSearch(e.target.value)}
+                                className="h-7 pl-7 pr-7 text-xs font-normal"
+                                data-testid="input-build-order-search"
+                              />
+                              {buildOrderSearch && (
+                                <button
+                                  onClick={() => setBuildOrderSearch('')}
+                                  className="absolute right-2 top-1/2 -translate-y-1/2"
+                                  data-testid="button-clear-build-order-search"
+                                >
+                                  <X className="h-3 w-3 text-muted-foreground" />
+                                </button>
+                              )}
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={() => setBuildOrderSortDir(prev => prev === 'asc' ? 'desc' : prev === 'desc' ? null : 'asc')}
+                              data-testid="button-sort-order-number"
+                            >
+                              {buildOrderSortDir === 'asc' ? (
+                                <ArrowUp className="h-3.5 w-3.5" />
+                              ) : buildOrderSortDir === 'desc' ? (
+                                <ArrowDown className="h-3.5 w-3.5" />
+                              ) : (
+                                <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground" />
+                              )}
+                            </Button>
+                          </div>
+                        </th>
                         <th className="text-left py-3 px-3 font-medium text-sm bg-card">
                           <Popover>
                             <PopoverTrigger asChild>
@@ -2494,25 +2530,7 @@ export default function Fingerprints() {
                       </tr>
                     </thead>
                     <tbody>
-                      {readyToSessionOrdersData.orders
-                        .filter(order => {
-                          // Station type filter
-                          if (selectedBuildStationTypes.size > 0) {
-                            const stationTypeKey = order.stationType || '__none__';
-                            if (!selectedBuildStationTypes.has(stationTypeKey)) return false;
-                          }
-                          // Tag filter - order must have required tags AND NOT have any unchecked optional tags
-                          const orderTagNames = order.tags?.map(t => t.name) || [];
-                          // Must have ALL required tags
-                          const hasShippableTag = (SHIPPABLE_TAGS as readonly string[]).some(tag => orderTagNames.includes(tag));
-                          if (!hasShippableTag) return false;
-                          // Compute unchecked optional tags
-                          const uncheckedOptionalTags = orderTagNames.filter(tag => 
-                            !selectedBuildTags.has(tag) && !SHIPPABLE_TAGS.includes(tag)
-                          );
-                          if (uncheckedOptionalTags.length > 0) return false;
-                          return true;
-                        })
+                      {filteredBuildOrders
                         .map((order) => (
                         <tr 
                           key={order.orderNumber} 
@@ -2651,28 +2669,10 @@ export default function Fingerprints() {
                   </CardDescription>
                 </div>
                 {(() => {
-                  const visibleSelectedOrders = readyToSessionOrdersData?.orders
-                    .filter(order => {
-                      // Station type filter
-                      if (selectedBuildStationTypes.size > 0) {
-                        const stationTypeKey = order.stationType || '__none__';
-                        if (!selectedBuildStationTypes.has(stationTypeKey)) return false;
-                      }
-                      // Tag filter - order must have required tags AND NOT have any unchecked optional tags
-                      const orderTagNames = order.tags?.map(t => t.name) || [];
-                      // Must have ALL required tags
-                      const hasShippableTag = (SHIPPABLE_TAGS as readonly string[]).some(tag => orderTagNames.includes(tag));
-                      if (!hasShippableTag) return false;
-                      // Compute unchecked optional tags
-                      const uncheckedOptionalTags = orderTagNames.filter(tag => 
-                        !selectedBuildTags.has(tag) && !SHIPPABLE_TAGS.includes(tag)
-                      );
-                      if (uncheckedOptionalTags.length > 0) return false;
-                      return true;
-                    })
+                  const visibleSelectedOrders = filteredBuildOrders
                     .filter(order => selectedBuildOrderNumbers.has(order.orderNumber))
                     .filter(order => order.readyToSession)
-                    .map(order => order.orderNumber) || [];
+                    .map(order => order.orderNumber);
                   
                   return (
                     <Button
