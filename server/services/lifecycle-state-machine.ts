@@ -5,7 +5,8 @@
  * ready_to_fulfill → ready_to_session → fulfillment_prep → ready_to_pick → picking → packing_ready → on_dock
  *                                                                        ↘ picking_issues (exception path)
  * 
- * READY_TO_SESSION: Has 'READY FOR SHIPDOT' tag OR (Pending + 'MOVE OVER' tag + no session) - entering prep pipeline
+ * READY_TO_SESSION: Has 'READY FOR SHIPDOT' tag (never removed) OR (Pending + 'MOVE OVER' tag + no session)
+ *                   Only fires AFTER session-based phases so progressed orders aren't pinned back
  * ON_DOCK: Order has been packaged and is on the dock awaiting pickup from carrier
  *          Requires: shipmentStatus='label_purchased' AND status IN ('NY', 'AC')
  * IN_TRANSIT: Package is on its way to customer
@@ -112,12 +113,12 @@ const PROBLEM_STATUSES = ['UN', 'EX'];
  * 3. IN_TRANSIT - status IN ('IT', 'shipped') (regardless of shipmentStatus)
  * 4. PROBLEM - status IN ('SP', 'UN', 'EX') (terminal, regardless of shipmentStatus)
  * 5. ON_DOCK - status IN ('NY', 'AC', 'new') AND shipmentStatus='label_purchased'
- * 6. READY_TO_SESSION - hasReadyForShipdotTag (regardless of shipmentStatus)
- * 7. PICKING_ISSUES - sessionStatus='inactive'
- * 8. PACKING_READY - sessionStatus='closed' AND no tracking AND shipmentStatus='pending'
- * 9. PICKING - sessionStatus='active'
- * 10. READY_TO_PICK - sessionStatus='new'
- * 11. READY_FOR_SKUVAULT - has fulfillmentSessionId, no sessionStatus, shipmentStatus='pending'
+ * 6. PICKING_ISSUES - sessionStatus='inactive'
+ * 7. PACKING_READY - sessionStatus='closed' AND !trackingNumber AND shipmentStatus='pending'
+ * 8. PICKING - sessionStatus='active'
+ * 9. READY_TO_PICK - sessionStatus='new'
+ * 10. READY_FOR_SKUVAULT - has fulfillmentSessionId, no sessionStatus, shipmentStatus='pending'
+ * 11. READY_TO_SESSION - hasReadyForShipdotTag (tag is never removed; only fires when no session phases matched)
  * 12. READY_TO_SESSION - shipmentStatus='pending' AND hasShippableTag AND no session
  * 13. FULFILLMENT_PREP - Default fallback
  */
@@ -165,12 +166,8 @@ export function deriveLifecyclePhase(shipment: ShipmentLifecycleData): Lifecycle
   // OPERATIONAL PHASES (based on shipmentStatus and session state)
   // ========================================================================
 
-  // READY_TO_SESSION: Has 'READY FOR SHIPDOT' tag (regardless of session state or on_hold status)
-  // This MUST be checked BEFORE other session-based phases as it is the lifecycle entry condition
-  if (shipment.hasReadyForShipdotTag === true) {
-    const subphase = deriveDecisionSubphase(shipment);
-    return { phase: LIFECYCLE_PHASES.READY_TO_SESSION, subphase };
-  }
+  // Session-based phases checked FIRST — these take priority over tag-based entry
+  // because the 'READY FOR SHIPDOT' tag is never removed from orders.
 
   // PICKING_ISSUES: Session status is 'inactive' (supervisor attention needed)
   if (shipment.sessionStatus === 'inactive') {
@@ -201,7 +198,14 @@ export function deriveLifecyclePhase(shipment: ShipmentLifecycleData): Lifecycle
     return { phase: LIFECYCLE_PHASES.READY_FOR_SKUVAULT, subphase: null };
   }
 
-  // READY_TO_SESSION: Pending + any shippable tag + no session
+  // READY_TO_SESSION: Has 'READY FOR SHIPDOT' tag + no session activity yet
+  // Tag is never removed, so this only fires when no session phases matched above
+  if (shipment.hasReadyForShipdotTag === true) {
+    const subphase = deriveDecisionSubphase(shipment);
+    return { phase: LIFECYCLE_PHASES.READY_TO_SESSION, subphase };
+  }
+
+  // READY_TO_SESSION: Pending + any shippable tag ('MOVE OVER') + no session
   if (shipment.shipmentStatus === 'pending' && 
       shipment.hasShippableTag === true && 
       !shipment.sessionStatus &&
