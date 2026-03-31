@@ -11,3 +11,4 @@ desktop/dist
 
 # Desktop OAuth credentials (generated at build time, contains secrets)
 desktop/src/shared/oauth-credentials.json
+.env
