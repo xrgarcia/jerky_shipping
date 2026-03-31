@@ -2254,13 +2254,13 @@ export default function Fingerprints() {
                 <ScrollArea className="h-[400px]">
                   <table className="w-full table-fixed">
                     <colgroup>
-                      <col className="w-10" />
-                      <col className="w-[180px]" />
-                      <col className="w-[100px]" />
-                      <col className="w-[180px]" />
-                      <col className="w-[100px]" />
-                      <col />
-                      <col className="w-[70px]" />
+                      <col style={{ width: '3%' }} />
+                      <col style={{ width: '16%' }} />
+                      <col style={{ width: '10%' }} />
+                      <col style={{ width: '16%' }} />
+                      <col style={{ width: '9%' }} />
+                      <col style={{ width: '40%' }} />
+                      <col style={{ width: '6%' }} />
                     </colgroup>
                     <thead className="sticky top-0 z-10 bg-card border-b shadow-sm">
                       <tr>
