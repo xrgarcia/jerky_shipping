@@ -7,16 +7,19 @@
  * An order with ANY of these tags is considered "shippable".
  *
  * - 'MOVE OVER': Set by SkuVault after wave picking is complete.
- * - 'READY FOR SHIPDOT': Set by Marc's automation to pre-tag orders
- *   throughout the day, reducing peak-time ShipStation API rate-limit pressure.
- *   Unlike 'MOVE OVER', this tag bypasses the on_hold hard filter so orders
- *   can be packed while still technically on hold in ShipStation.
  */
-export const SHIPPABLE_TAGS = ['MOVE OVER', 'READY FOR SHIPDOT'] as const;
+export const SHIPPABLE_TAGS = ['MOVE OVER'] as const;
 export type ShippableTag = (typeof SHIPPABLE_TAGS)[number];
 
 /**
- * The shippable tag that bypasses the on_hold hard filter.
- * Orders tagged with this can be packed while still on hold in ShipStation.
+ * The tag applied by Marc's automation that signals an order should enter
+ * the lifecycle state machine at READY_TO_FULFILL for prep pipeline processing.
+ *
+ * This is NOT a shippable condition — it is a lifecycle entry path.
+ * Orders with this tag enter at READY_TO_FULFILL and flow through the full
+ * prep pipeline (hydration → categorization → fingerprint → packaging →
+ * rate check → session) regardless of on_hold status.
+ *
+ * Shippability still requires 'MOVE OVER' + pending status.
  */
-export const ON_HOLD_BYPASS_TAG = 'READY FOR SHIPDOT' as const satisfies ShippableTag;
+export const READY_FOR_SHIPDOT_TAG = 'READY FOR SHIPDOT' as const;

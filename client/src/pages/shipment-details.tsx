@@ -164,7 +164,7 @@ export default function ShipmentDetails() {
     }
   };
 
-  // Derive hasShippableTag from tags array ('MOVE OVER' or 'READY FOR SHIPDOT')
+  // Derive hasShippableTag from tags array ('MOVE OVER')
   const hasShippableTag = tags?.some(tag => (SHIPPABLE_TAGS as readonly string[]).includes(tag.name)) ?? false;
 
   type LifecyclePhase = 'delivered' | 'in_transit' | 'on_dock' | 'ready_to_fulfill' | 'picking_issues' | 'packing_ready' | 'picking' | 'ready_to_pick' | 'ready_to_session' | 'ready_for_skuvault' | 'fulfillment_prep' | 'cancelled' | 'problem';
@@ -830,13 +830,13 @@ export default function ShipmentDetails() {
                       <li>IN_TRANSIT: status='IT' or 'SHIPPED'</li>
                       <li>PROBLEM: status IN ('UN', 'EX')</li>
                       <li>ON_DOCK: shipmentStatus='label_purchased' AND status IN ('NY', 'AC', 'NEW')</li>
-                      <li>READY_TO_FULFILL: shipmentStatus='on_hold' AND hasShippableTag</li>
+                      <li>READY_TO_FULFILL: hasReadyForShipdotTag (regardless of on_hold status)</li>
                       <li>PICKING_ISSUES: sessionStatus='inactive'</li>
                       <li>PACKING_READY: sessionStatus='closed' AND !trackingNumber AND shipmentStatus='pending'</li>
                       <li>PICKING: sessionStatus='active'</li>
                       <li>READY_TO_PICK: sessionStatus='new'</li>
                       <li>READY_FOR_SKUVAULT: has fulfillmentSessionId AND !sessionStatus AND shipmentStatus='pending'</li>
-                      <li>READY_TO_SESSION: shipmentStatus='pending' AND hasShippableTag AND !sessionStatus AND !fulfillmentSessionId</li>
+                      <li>READY_TO_SESSION: shipmentStatus='pending' AND hasMoveOverTag AND !sessionStatus AND !fulfillmentSessionId</li>
                       <li>FULFILLMENT_PREP: fallback</li>
                     </ol>
                   </div>

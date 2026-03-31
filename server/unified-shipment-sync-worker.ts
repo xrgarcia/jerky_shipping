@@ -18,7 +18,7 @@ import logger, { withOrder } from './utils/logger';
 import { withSpan, tagCurrentSpan } from './utils/tracing';
 import { db } from './db';
 import { SHIPPABLE_TAGS } from './utils/shippable-tags';
-import { ON_HOLD_BYPASS_TAG } from '@shared/constants';
+import { READY_FOR_SHIPDOT_TAG } from '@shared/constants';
 import { syncCursors, shipments, shipmentSyncFailures } from '@shared/schema';
 import { eq, sql, and, isNull, lt, or, count, inArray } from 'drizzle-orm';
 import { shipStationShipmentETL } from './services/shipstation-shipment-etl-service';
@@ -599,7 +599,7 @@ async function refreshTagsForOnHoldShipments(): Promise<{ queued: number; fetche
   const { shipmentTags } = await import('@shared/schema');
   const { queueLifecycleEvaluation } = await import('./services/lifecycle-service');
 
-  const GRACE_PERIOD_MS = 10 * 60 * 1000; // 10 minutes — same as ETL gate
+  const GRACE_PERIOD_MS = 15 * 60 * 1000; // 15 minutes — automation fires ~12 steps over ~10 minutes
   const graceCutoff = new Date(Date.now() - GRACE_PERIOD_MS).toISOString();
 
   // All on_hold shipments with no lifecycle phase past the grace period
@@ -640,10 +640,10 @@ async function refreshTagsForOnHoldShipments(): Promise<{ queued: number; fetche
         .where(eq(shipmentTags.shipmentId, shipment.id));
       const localTagNames = new Set(localTags.map(t => t.name));
 
-      if (localTagNames.has(ON_HOLD_BYPASS_TAG)) {
+      if (localTagNames.has(READY_FOR_SHIPDOT_TAG)) {
         // Tag already in DB — just ensure lifecycle evaluation is queued
         await queueLifecycleEvaluation(shipment.id, 'shipment_sync', shipment.orderNumber || undefined);
-        logger.info(`[UnifiedSync] Queuing lifecycle for on_hold ${shipment.orderNumber} — bypass tag already present locally`, withOrder(shipment.orderNumber, shipment.shipmentId));
+        logger.info(`[UnifiedSync] Queuing lifecycle for on_hold ${shipment.orderNumber} — ${READY_FOR_SHIPDOT_TAG} tag already present locally`, withOrder(shipment.orderNumber, shipment.shipmentId));
         queued++;
         continue;
       }
@@ -672,8 +672,8 @@ async function refreshTagsForOnHoldShipments(): Promise<{ queued: number; fetche
       const freshTags: any[] = shipmentData.tags || [];
       const freshTagNames = new Set(freshTags.map((t: any) => t?.name?.trim()).filter(Boolean));
 
-      if (freshTagNames.has(ON_HOLD_BYPASS_TAG)) {
-        // Bypass tag was added in ShipStation — update local tags and queue evaluation
+      if (freshTagNames.has(READY_FOR_SHIPDOT_TAG)) {
+        // Lifecycle entry tag was added in ShipStation — update local tags and queue evaluation
         await db.delete(shipmentTags).where(eq(shipmentTags.shipmentId, shipment.id));
         if (freshTags.length > 0) {
           const tagsToInsert = freshTags
@@ -689,7 +689,7 @@ async function refreshTagsForOnHoldShipments(): Promise<{ queued: number; fetche
           }
         }
         await queueLifecycleEvaluation(shipment.id, 'shipment_sync', shipment.orderNumber || undefined);
-        logger.info(`[UnifiedSync] ${ON_HOLD_BYPASS_TAG} tag found in ShipStation for on_hold ${shipment.orderNumber} — tags updated, lifecycle queued`, withOrder(shipment.orderNumber, shipment.shipmentId));
+        logger.info(`[UnifiedSync] ${READY_FOR_SHIPDOT_TAG} tag found in ShipStation for on_hold ${shipment.orderNumber} — tags updated, lifecycle queued`, withOrder(shipment.orderNumber, shipment.shipmentId));
         queued++;
       }
     } catch (err) {

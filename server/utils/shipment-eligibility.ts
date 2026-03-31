@@ -14,12 +14,12 @@
  * 
  * ALWAYS EXCLUDED (hard filters applied first):
  * - Shipments that are already shipped (have a tracking number)
- * - Shipments that are on_hold  (EXCEPTION: 'READY FOR SHIPDOT' tag bypasses this)
+ * - Shipments that are on_hold
  * - Shipments with package type "**DO NOT SHIP (ALERT MGR)**"
  * - Shipments with missing serviceCode (no carrier/service selected)
  * 
  * PRIMARY: A shipment is fully shippable if (after hard filters):
- * 1. It has any tag in SHIPPABLE_TAGS ('MOVE OVER' or 'READY FOR SHIPDOT')
+ * 1. It has any tag in SHIPPABLE_TAGS ('MOVE OVER')
  * 
  * FALLBACK: When NO shipments pass the primary criteria, we fall back to:
  * - All shipments that pass the hard filters (not shipped, not on_hold)
@@ -29,8 +29,7 @@
  */
 
 import type { Shipment, ShipmentTag, ShipmentPackage } from '@shared/schema';
-import { SHIPPABLE_TAGS, hasShippableTag as checkShippableTag, hasSpecificShippableTag } from './shippable-tags';
-import { ON_HOLD_BYPASS_TAG } from '@shared/constants';
+import { SHIPPABLE_TAGS, hasShippableTag as checkShippableTag } from './shippable-tags';
 
 /**
  * Package name that indicates a shipment should NOT be shipped.
@@ -71,13 +70,13 @@ export function hasDoNotShipPackage(
  * Check if a shipment passes the hard filters (excluded from ALL eligibility).
  * A shipment is excluded if:
  * - It already has a tracking number (already shipped)
- * - Its status is 'on_hold' (bypassed when shipment has 'READY FOR SHIPDOT' tag)
+ * - Its status is 'on_hold'
  * - It has a "DO NOT SHIP (ALERT MGR)" package (when packages are provided)
  * - It is missing a serviceCode (carrier/service not selected)
  *
  * @param shipment - The shipment record
  * @param packages - Optional array of packages for this shipment (for DO NOT SHIP check)
- * @param tags     - Optional array of tags; when provided, 'READY FOR SHIPDOT' bypasses the on_hold check
+ * @param tags     - Optional array of tags (unused, kept for API compatibility)
  * @returns true if shipment is NOT excluded (passes hard filters)
  */
 export function passesHardFilters(
@@ -88,10 +87,7 @@ export function passesHardFilters(
   const notShipped = !shipment.trackingNumber;
   const notDoNotShip = !hasDoNotShipPackage(shipment.id, packages);
   const hasServiceCode = !!shipment.serviceCode;
-
-  // ON_HOLD_BYPASS_TAG ('READY FOR SHIPDOT') bypasses the on_hold hard filter
-  const hasReadyForShipDot = hasSpecificShippableTag(tags, ON_HOLD_BYPASS_TAG, shipment.id);
-  const notOnHold = hasReadyForShipDot || shipment.shipmentStatus !== 'on_hold';
+  const notOnHold = shipment.shipmentStatus !== 'on_hold';
 
   return notShipped && notOnHold && notDoNotShip && hasServiceCode;
 }
@@ -100,9 +96,8 @@ export function passesHardFilters(
  * Check if a shipment is shippable based on its status, tags, and packages.
  * This is the main function for determining if a shipment can be shipped today.
  * 
- * A shipment is shippable if it has any tag in SHIPPABLE_TAGS AND meets the
- * relevant hard filters. The 'READY FOR SHIPDOT' tag bypasses the on_hold check
- * (allowing packing even while the shipment is technically on hold in ShipStation).
+ * A shipment is shippable if it has any tag in SHIPPABLE_TAGS ('MOVE OVER') AND meets
+ * all hard filters (not shipped, not on_hold, no DO NOT SHIP package, has service code).
  * 
  * @param shipment - The shipment record
  * @param tags - Array of tags associated with this shipment
@@ -190,12 +185,10 @@ export interface ShipmentStatus {
 
 /**
  * Get the exclusion reason for a shipment.
- * When tags are provided, ON_HOLD_BYPASS_TAG ('READY FOR SHIPDOT') makes
- * an on_hold shipment report as 'eligible' rather than 'on_hold'.
  *
  * @param shipment - The shipment to check
  * @param packages - Optional array of packages for DO NOT SHIP check
- * @param tags     - Optional array of tags; enables ON_HOLD_BYPASS_TAG bypass
+ * @param tags     - Optional array of tags (unused, kept for API compatibility)
  * @returns The reason why it's excluded, or 'eligible' if it passes hard filters
  */
 export function getShipmentExclusionReason(
@@ -206,8 +199,7 @@ export function getShipmentExclusionReason(
   if (shipment.trackingNumber) {
     return 'already_shipped';
   }
-  const hasBypassTag = hasSpecificShippableTag(tags, ON_HOLD_BYPASS_TAG, shipment.id);
-  if (shipment.shipmentStatus === 'on_hold' && !hasBypassTag) {
+  if (shipment.shipmentStatus === 'on_hold') {
     return 'on_hold';
   }
   if (hasDoNotShipPackage(shipment.id, packages)) {
@@ -221,12 +213,10 @@ export function getShipmentExclusionReason(
 
 /**
  * Get exclusion reasons for all shipments in an order.
- * When tags are provided, ON_HOLD_BYPASS_TAG ('READY FOR SHIPDOT') shipments
- * report as 'eligible' rather than 'on_hold'.
  *
  * @param shipments - All shipments for an order
  * @param packages - Optional array of all packages for these shipments
- * @param tags     - Optional array of all tags; enables ON_HOLD_BYPASS_TAG bypass
+ * @param tags     - Optional array of all tags (unused, kept for API compatibility)
  * @returns Array of shipment statuses with their exclusion reasons
  */
 export function getShipmentStatuses<T extends ShipmentForEligibility>(
@@ -275,13 +265,11 @@ export function analyzeShippableShipments<T extends ShipmentForEligibility>(
   allTags: Pick<ShipmentTag, 'shipmentId' | 'name'>[],
   packages: PackageForEligibility[] = []
 ): ShippableShipmentsResult<T> {
-  // Get per-shipment exclusion reasons (with ON_HOLD_BYPASS_TAG awareness)
   const shipmentStatuses = getShipmentStatuses(shipments, packages, allTags);
   
-  // First apply hard filters (with ON_HOLD_BYPASS_TAG bypass for on_hold check)
   const eligibleShipments = filterEligibleShipments(shipments, packages, allTags);
   
-  // Try primary criteria: eligible (or READY FOR SHIPDOT bypass) + any shippable tag
+  // Try primary criteria: eligible + any shippable tag ('MOVE OVER')
   let shippableShipments = shipments.filter(shipment =>
     isShipmentShippable(shipment, allTags, packages)
   );

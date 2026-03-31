@@ -17,6 +17,7 @@ import logger, { withOrder } from '../utils/logger';
 import { shipments, shipmentTags, LIFECYCLE_PHASES, type Shipment, type LifecyclePhase, type DecisionSubphase } from "@shared/schema";
 import { eq, inArray, and } from "drizzle-orm";
 import { SHIPPABLE_TAGS } from '../utils/shippable-tags';
+import { READY_FOR_SHIPDOT_TAG } from '@shared/constants';
 import {
   deriveLifecyclePhase,
   statesAreEqual,
@@ -82,7 +83,7 @@ export async function updateShipmentLifecycleFromData(
 ): Promise<LifecycleUpdateResult> {
   const { logTransition = true, shipmentData } = options;
 
-  // Check if shipment has any shippable tag ('MOVE OVER' or 'READY FOR SHIPDOT')
+  // Check if shipment has the 'MOVE OVER' shippable tag
   const shippableTagResult = await db
     .select({ id: shipmentTags.id })
     .from(shipmentTags)
@@ -92,6 +93,17 @@ export async function updateShipmentLifecycleFromData(
     ))
     .limit(1);
   const hasShippableTag = shippableTagResult.length > 0;
+
+  // Check if shipment has the 'READY FOR SHIPDOT' lifecycle entry tag
+  const readyForShipdotResult = await db
+    .select({ id: shipmentTags.id })
+    .from(shipmentTags)
+    .where(and(
+      eq(shipmentTags.shipmentId, shipment.id),
+      eq(shipmentTags.name, READY_FOR_SHIPDOT_TAG)
+    ))
+    .limit(1);
+  const hasReadyForShipdotTag = readyForShipdotResult.length > 0;
 
   // Merge any provided shipment data updates (for pre-save checks)
   const rawFulfillmentSessionId = shipmentData?.fulfillmentSessionId ?? shipment.fulfillmentSessionId;
@@ -105,6 +117,7 @@ export async function updateShipmentLifecycleFromData(
     fulfillmentSessionId: rawFulfillmentSessionId != null ? String(rawFulfillmentSessionId) : null,
     fingerprintId: shipmentData?.fingerprintId ?? shipment.fingerprintId,
     hasShippableTag,
+    hasReadyForShipdotTag,
     rateCheckStatus: shipmentData?.rateCheckStatus ?? shipment.rateCheckStatus,
     shipmentId: shipmentData?.shipmentId ?? shipment.shipmentId,
     shipToPostalCode: shipmentData?.shipToPostalCode ?? shipment.shipToPostalCode,

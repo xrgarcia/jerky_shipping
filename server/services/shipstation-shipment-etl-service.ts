@@ -15,7 +15,7 @@ import { db } from '../db';
 import { shipmentItems, shipmentTags, shipmentPackages, orderItems, shipmentQcItems, shipments } from '@shared/schema';
 import { eq, inArray } from 'drizzle-orm';
 import { queueLifecycleEvaluation } from './lifecycle-service';
-import { ON_HOLD_BYPASS_TAG } from '@shared/constants';
+import { READY_FOR_SHIPDOT_TAG } from '@shared/constants';
 import logger, { withOrder } from '../utils/logger';
 import { withSpan } from '../utils/tracing';
 
@@ -222,7 +222,7 @@ export class ShipStationShipmentETLService {
     const isOnHoldWithBypassTag = !hasLifecyclePhase
       && newStatus === 'on_hold'
       && shipmentAge > AUTOMATION_GRACE_PERIOD_MS
-      && incomingTagNames.includes(ON_HOLD_BYPASS_TAG);
+      && incomingTagNames.includes(READY_FOR_SHIPDOT_TAG);
 
     if (hasLifecyclePhase || isHoldRelease || isPendingPastGracePeriod || isOnHoldWithBypassTag) {
       await queueLifecycleEvaluation(finalShipmentId, 'shipment_sync', orderNumber || undefined);
@@ -233,7 +233,7 @@ export class ShipStationShipmentETLService {
         logger.info(`[ETL] Fallback: ${orderNumber} has been pending for ${Math.round(shipmentAge / 60000)}min without on_hold — lifecycle evaluation queued`, withOrder(orderNumber, String(shipmentId)));
       }
       if (isOnHoldWithBypassTag) {
-        logger.info(`[ETL] ${ON_HOLD_BYPASS_TAG} tag detected on on_hold shipment ${orderNumber} (age: ${Math.round(shipmentAge / 60000)}min) — lifecycle evaluation queued`, withOrder(orderNumber, String(shipmentId)));
+        logger.info(`[ETL] ${READY_FOR_SHIPDOT_TAG} tag detected on on_hold shipment ${orderNumber} (age: ${Math.round(shipmentAge / 60000)}min) — lifecycle evaluation queued`, withOrder(orderNumber, String(shipmentId)));
       }
     } else {
       logger.info(`[ETL] Skipping lifecycle evaluation for ${orderNumber} — shipment still in initial setup (status: ${newStatus}, previous: ${previousStatus || 'new'})`, withOrder(orderNumber, String(shipmentId)));

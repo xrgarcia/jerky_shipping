@@ -7448,7 +7448,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const notShippableError = {
             code: 'NOT_SHIPPABLE',
             message: 'This order is not shippable',
-            explanation: 'The order does not have a shippable tag ("MOVE OVER" or "READY FOR SHIPDOT"). This means the order may still be in picking, or it hasn\'t been released from SkuVault yet.',
+            explanation: 'The order does not have a shippable tag ("MOVE OVER"). This means the order may still be in picking, or it hasn\'t been released from SkuVault yet.',
             resolution: 'Wait for the order to complete picking in SkuVault, or check with a supervisor if you believe this order should be ready to ship.'
           };
           

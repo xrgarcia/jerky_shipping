@@ -32,7 +32,7 @@ import {
   type InsertFingerprint,
 } from '@shared/schema';
 import { eq, and, or, exists, sql, notExists, inArray, isNull } from 'drizzle-orm';
-import { SHIPPABLE_TAGS } from '../utils/shippable-tags';
+import { READY_FOR_SHIPDOT_TAG } from '@shared/constants';
 import { 
   isKit, 
   getKitComponents,
@@ -70,12 +70,11 @@ interface HydrationStats {
 
 /**
  * Find shipments that need QC items hydrated
- * Criteria: pending status + shippable tag + no session yet + no existing shipment_qc_items
+ * Criteria: has 'READY FOR SHIPDOT' tag + no session yet + no existing shipment_qc_items
  * 
- * This targets the READY_TO_SESSION lifecycle phase - shipments that need fingerprinting
- * before they can be picked up by SkuVault sessioning.
- * 
- * Note: on_hold is BEFORE fulfillment starts, pending is when orders are ready to be sessioned
+ * This targets the READY_TO_FULFILL lifecycle phase — shipments entering the prep pipeline.
+ * The 'READY FOR SHIPDOT' tag is the sole entry condition, replacing the old pending+shippable
+ * tag filter. These orders may be on_hold in ShipStation while prep workers run.
  */
 async function findShipmentsNeedingHydration(limit: number = 50): Promise<{ id: string; orderNumber: string }[]> {
   const results = await db
@@ -86,21 +85,18 @@ async function findShipmentsNeedingHydration(limit: number = 50): Promise<{ id: 
     .from(shipments)
     .where(
       and(
-        // Status is pending (READY_TO_SESSION phase criteria)
-        // on_hold is BEFORE fulfillment starts
-        eq(shipments.shipmentStatus, 'pending'),
-        // Has any shippable tag (READY_TO_SESSION phase criteria)
+        // Has 'READY FOR SHIPDOT' tag — sole lifecycle entry condition
         exists(
           db.select({ one: sql`1` })
             .from(shipmentTags)
             .where(
               and(
                 eq(shipmentTags.shipmentId, shipments.id),
-                inArray(shipmentTags.name, [...SHIPPABLE_TAGS])
+                eq(shipmentTags.name, READY_FOR_SHIPDOT_TAG)
               )
             )
         ),
-        // Not yet picked up by SkuVault (READY_TO_SESSION phase criteria)
+        // Not yet picked up by SkuVault (READY_TO_FULFILL prep pipeline entry check)
         sql`${shipments.sessionStatus} IS NULL`,
         // Does NOT have any shipment_qc_items yet
         notExists(

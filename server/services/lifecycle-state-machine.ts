@@ -5,8 +5,8 @@
  * ready_to_fulfill → ready_to_session → fulfillment_prep → ready_to_pick → picking → packing_ready → on_dock
  *                                                                        ↘ picking_issues (exception path)
  * 
- * READY_TO_FULFILL: On hold + shippable tag - waiting to be released from ShipStation hold
- * READY_TO_SESSION: Pending + shippable tag + no session - fingerprinting & QC explosion happens here
+ * READY_TO_FULFILL: Has 'READY FOR SHIPDOT' tag - entering prep pipeline (regardless of on_hold)
+ * READY_TO_SESSION: Pending + 'MOVE OVER' tag + no session - ready to be picked up for sessioning
  * ON_DOCK: Order has been packaged and is on the dock awaiting pickup from carrier
  *          Requires: shipmentStatus='label_purchased' AND status IN ('NY', 'AC')
  * IN_TRANSIT: Package is on its way to customer
@@ -83,7 +83,8 @@ export interface ShipmentLifecycleData {
   packagingTypeId?: string | null;
   fulfillmentSessionId?: string | number | null; // Local fulfillment session ID
   fingerprintId?: string | null;
-  hasShippableTag?: boolean;        // Whether shipment has any shippable tag ('MOVE OVER' or 'READY FOR SHIPDOT')
+  hasShippableTag?: boolean;        // Whether shipment has 'MOVE OVER' tag (shippable condition)
+  hasReadyForShipdotTag?: boolean;  // Whether shipment has 'READY FOR SHIPDOT' tag (lifecycle entry trigger)
   rateCheckStatus?: string | null;  // Rate check status: 'pending' | 'complete' | 'failed' | 'skipped' | null
   shipmentId?: string | null;       // ShipStation shipment ID (for rate check eligibility)
   shipToPostalCode?: string | null; // Destination postal code (for rate check eligibility)
@@ -112,7 +113,7 @@ const PROBLEM_STATUSES = ['UN', 'EX'];
  * 3. IN_TRANSIT - status IN ('IT', 'shipped') (regardless of shipmentStatus)
  * 4. PROBLEM - status IN ('SP', 'UN', 'EX') (terminal, regardless of shipmentStatus)
  * 5. ON_DOCK - status IN ('NY', 'AC', 'new') AND shipmentStatus='label_purchased'
- * 6. READY_TO_FULFILL - shipmentStatus='on_hold' AND hasShippableTag
+ * 6. READY_TO_FULFILL - hasReadyForShipdotTag (regardless of shipmentStatus)
  * 7. PICKING_ISSUES - sessionStatus='inactive'
  * 8. PACKING_READY - sessionStatus='closed' AND no tracking AND shipmentStatus='pending'
  * 9. PICKING - sessionStatus='active'
@@ -165,10 +166,9 @@ export function deriveLifecyclePhase(shipment: ShipmentLifecycleData): Lifecycle
   // OPERATIONAL PHASES (based on shipmentStatus and session state)
   // ========================================================================
 
-  // READY_TO_FULFILL: On hold + any shippable tag (regardless of session state)
-  // This MUST be checked BEFORE session-based phases to properly reset orders that go back to on_hold
-  if (shipment.shipmentStatus === 'on_hold' && 
-      shipment.hasShippableTag === true) {
+  // READY_TO_FULFILL: Has 'READY FOR SHIPDOT' tag (regardless of session state or on_hold status)
+  // This MUST be checked BEFORE session-based phases as it is the sole lifecycle entry condition
+  if (shipment.hasReadyForShipdotTag === true) {
     const subphase = deriveDecisionSubphase(shipment);
     return { phase: LIFECYCLE_PHASES.READY_TO_FULFILL, subphase };
   }
