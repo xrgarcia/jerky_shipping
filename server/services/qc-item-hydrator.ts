@@ -7,7 +7,7 @@
  * - Maps SKUs to collections for fingerprint calculation
  * - Calculates fingerprint signature and creates/matches fingerprints
  * 
- * Trigger: READY_TO_SESSION phase = on_hold + shippable tag + no session + no QC items
+ * Trigger: READY_TO_FULFILL phase = 'READY FOR SHIPDOT' tag + no session + no QC items
  * 
  * This must run BEFORE SkuVault picks up orders for sessioning to ensure:
  * 1. QC items are exploded and barcodes are available for scanning
