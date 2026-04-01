@@ -1924,6 +1924,39 @@ export const insertShipstationWriteQueueSchema = createInsertSchema(shipstationW
 export type InsertShipstationWriteQueue = z.infer<typeof insertShipstationWriteQueueSchema>;
 export type ShipstationWriteQueue = typeof shipstationWriteQueue.$inferSelect;
 
+export const sessionBuildQueue = pgTable("session_build_queue", {
+  id: serial("id").primaryKey(),
+  status: text("status").notNull().default("queued"),
+  userId: text("user_id").notNull(),
+  orderNumbers: jsonb("order_numbers"),
+  stationType: text("station_type"),
+  progressPhase: text("progress_phase"),
+  progressPercent: integer("progress_percent").default(0),
+  progressDetail: text("progress_detail"),
+  sessionsCreated: integer("sessions_created").default(0),
+  shipmentsAssigned: integer("shipments_assigned").default(0),
+  shipmentsSkipped: integer("shipments_skipped").default(0),
+  result: jsonb("result"),
+  error: text("error"),
+  retryCount: integer("retry_count").notNull().default(0),
+  maxRetries: integer("max_retries").notNull().default(3),
+  retryAfter: timestamp("retry_after"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+}, (table) => ({
+  statusIdx: index("sbq_status_idx").on(table.status),
+  statusCreatedIdx: index("sbq_status_created_idx").on(table.status, table.createdAt),
+}));
+
+export const insertSessionBuildQueueSchema = createInsertSchema(sessionBuildQueue).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertSessionBuildQueue = z.infer<typeof insertSessionBuildQueueSchema>;
+export type SessionBuildQueue = typeof sessionBuildQueue.$inferSelect;
+
 export const rateCheckQueue = pgTable("rate_check_queue", {
   id: serial("id").primaryKey(),
   shipmentId: text("shipment_id").notNull(),

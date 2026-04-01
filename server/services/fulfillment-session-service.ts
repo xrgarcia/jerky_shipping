@@ -182,40 +182,27 @@ async function fetchAndMatchSaleIds(
     
     console.log(`[SaleIdFetch] Fetching sale IDs for ${shipmentData.length} shipments across ${shipmentsByOrder.size} unique orders`);
     
+    const matchedPairs: { id: string; saleId: string }[] = [];
+
     // Fetch sale IDs for each unique order number
     for (const [orderNumber, orderShipments] of Array.from(shipmentsByOrder.entries())) {
       try {
-        // Call SkuVault to get QC sales for this order
         const qcSale = await skuVaultService.getQCSalesByOrderNumber(orderNumber);
         
         if (!qcSale || !qcSale.SaleId) {
-          // No sale found in SkuVault yet - this is normal for orders not yet in a SkuVault session
           console.log(`[SaleIdFetch] No sale ID found for order ${orderNumber}`);
           result.unmatched += orderShipments.length;
           continue;
         }
         
-        // For single shipment orders, we should have one QC sale
-        // For multi-shipment orders, the sale ID format includes the shipment suffix
         const saleId = qcSale.SaleId;
         
-        // Try to match each shipment in this order to the returned sale ID
         for (const shipment of orderShipments) {
-          // Use shipmentId (e.g., "se-947152214") for matching, not internal UUID
           if (matchSaleIdToShipment(saleId, orderNumber, shipment.shipmentId)) {
-            // Update the shipment with the matched sale ID
-            await db
-              .update(shipments)
-              .set({
-                saleId: saleId,
-                updatedAt: new Date(),
-              })
-              .where(eq(shipments.id, shipment.id));
-            
+            matchedPairs.push({ id: shipment.id, saleId });
             console.log(`[SaleIdFetch] Matched sale ID ${saleId} to shipment ${shipment.shipmentId} (order: ${orderNumber})`);
             result.matched++;
           } else {
-            // This shouldn't happen for well-formed data
             console.warn(`[SaleIdFetch] Could not match sale ID ${saleId} to shipment ${shipment.shipmentId} (order: ${orderNumber})`);
             result.errors.push(`Could not match sale ID for shipment ${shipment.shipmentId}`);
             result.unmatched++;
@@ -227,6 +214,21 @@ async function fetchAndMatchSaleIds(
         result.errors.push(`Error for order ${orderNumber}: ${error.message}`);
         result.unmatched += orderShipments.length;
       }
+    }
+
+    if (matchedPairs.length > 0) {
+      const ids = matchedPairs.map(p => p.id);
+      const saleIds = matchedPairs.map(p => p.saleId);
+      await db.execute(sql`
+        UPDATE shipments
+        SET sale_id = batch.sale_id,
+            updated_at = NOW()
+        FROM (
+          SELECT unnest(${ids}::text[]) AS id,
+                 unnest(${saleIds}::text[]) AS sale_id
+        ) AS batch
+        WHERE shipments.id = batch.id
+      `);
     }
     
     console.log(`[SaleIdFetch] Complete: ${result.matched} matched, ${result.unmatched} unmatched`);
@@ -479,9 +481,14 @@ export class FulfillmentSessionService {
    */
   async buildSessions(
     userId: string,
-    options: { stationType?: string; dryRun?: boolean; orderNumbers?: string[] } = {}
+    options: { 
+      stationType?: string; 
+      dryRun?: boolean; 
+      orderNumbers?: string[];
+      onProgress?: (phase: string, percent: number, detail: string) => void | Promise<void>;
+    } = {}
   ): Promise<SessionBuildResult> {
-    const { stationType, dryRun = false, orderNumbers } = options;
+    const { stationType, dryRun = false, orderNumbers, onProgress } = options;
 
     const result: SessionBuildResult = {
       success: true,
@@ -496,6 +503,8 @@ export class FulfillmentSessionService {
     try {
       console.log(`[FulfillmentSession] buildSessions called - stationType: ${stationType || 'any'}, dryRun: ${dryRun}, orderNumbers: ${orderNumbers ? orderNumbers.join(',') : 'none'}`);
       
+      await onProgress?.('finding_orders', 10, 'Finding eligible shipments');
+
       // 1. Find sessionable shipments
       let sessionableShipments = await this.findSessionableShipments(stationType);
       console.log(`[FulfillmentSession] findSessionableShipments returned ${sessionableShipments.length} eligible shipments`);
@@ -514,6 +523,8 @@ export class FulfillmentSessionService {
       }
 
       console.log(`[FulfillmentSession] Found ${sessionableShipments.length} sessionable shipments`);
+
+      await onProgress?.('grouping', 20, `Grouping ${sessionableShipments.length} shipments by station`);
 
       // 2. Group by station type and fingerprint
       const groups = await this.groupShipmentsForBatching(sessionableShipments);
@@ -535,9 +546,16 @@ export class FulfillmentSessionService {
         return result;
       }
 
+      const totalSessionOps = filledSessions.filter(f => f.shipmentIds.length > 0).length + newBatches.length;
+      let completedSessionOps = 0;
+
       // 5. Add shipments to existing draft sessions (with validation)
       for (const filled of filledSessions) {
         if (filled.shipmentIds.length > 0) {
+          completedSessionOps++;
+          const pct = Math.round(30 + (completedSessionOps / totalSessionOps) * 50);
+          await onProgress?.('creating_sessions', pct, `Adding to existing session ${completedSessionOps} of ${totalSessionOps}`);
+
           const addResult = await this.addShipmentsToSession(filled.sessionId, filled.shipmentIds);
           result.shipmentsAssigned += addResult.added;
           result.shipmentsSkipped += addResult.skipped.length;
@@ -552,6 +570,10 @@ export class FulfillmentSessionService {
 
       // 6. Create new sessions for remaining shipments (with validation)
       for (const batch of newBatches) {
+        completedSessionOps++;
+        const pct = Math.round(30 + (completedSessionOps / totalSessionOps) * 50);
+        await onProgress?.('creating_sessions', pct, `Creating session ${completedSessionOps} of ${totalSessionOps}`);
+
         const createResult = await this.createSessionWithShipments(batch, userId);
         if (createResult.session) {
           result.sessions.push(createResult.session);
@@ -562,7 +584,11 @@ export class FulfillmentSessionService {
         result.skippedOrders.push(...createResult.skipped);
       }
 
+      await onProgress?.('matching_sales', 90, 'Matching sale IDs');
+
       console.log(`[FulfillmentSession] Created ${result.sessionsCreated} new sessions, filled ${filledSessions.filter(f => f.shipmentIds.length > 0).length} existing drafts with ${result.shipmentsAssigned} total shipments${result.shipmentsSkipped > 0 ? `, skipped ${result.shipmentsSkipped} (not ready)` : ''}`);
+
+      await onProgress?.('completing', 100, `Done: ${result.sessionsCreated} sessions, ${result.shipmentsAssigned} shipments`);
 
     } catch (error: any) {
       result.success = false;
@@ -778,29 +804,29 @@ export class FulfillmentSessionService {
       .from(shipments)
       .where(eq(shipments.fulfillmentSessionId, sessionId));
     
-    let nextSpot = (maxSpotResult?.maxSpot || 0) + 1;
+    const startSpot = (maxSpotResult?.maxSpot || 0) + 1;
 
-    // Link only validated shipments to session with sequential spot numbers
-    for (const shipmentId of validIds) {
-      await db
-        .update(shipments)
+    await db.transaction(async (tx) => {
+      await tx.execute(sql`
+        UPDATE shipments
+        SET fulfillment_session_id = ${sessionId},
+            smart_session_spot = spot_assign.spot,
+            updated_at = NOW()
+        FROM (
+          SELECT unnest(${validIds}::text[]) AS id,
+                 generate_series(${startSpot}, ${startSpot + validIds.length - 1}) AS spot
+        ) AS spot_assign
+        WHERE shipments.id = spot_assign.id
+      `);
+
+      await tx
+        .update(fulfillmentSessions)
         .set({
-          fulfillmentSessionId: sessionId,
-          smartSessionSpot: nextSpot,
+          orderCount: sql`${fulfillmentSessions.orderCount} + ${validIds.length}`,
           updatedAt: new Date(),
         })
-        .where(eq(shipments.id, shipmentId));
-      nextSpot++;
-    }
-
-    // Update order count on session
-    await db
-      .update(fulfillmentSessions)
-      .set({
-        orderCount: sql`${fulfillmentSessions.orderCount} + ${validIds.length}`,
-        updatedAt: new Date(),
-      })
-      .where(eq(fulfillmentSessions.id, sessionId));
+        .where(eq(fulfillmentSessions.id, sessionId));
+    });
 
     const addedShipmentRows = await db
       .select({ id: shipments.id, orderNumber: shipments.orderNumber })
@@ -812,13 +838,12 @@ export class FulfillmentSessionService {
     );
     console.log(`[FulfillmentSession] Queued ${addedShipmentRows.length} lifecycle events with 'session_add' reason`);
     
-    // Fetch and match SkuVault sale IDs for the added shipments
     const saleIdResult = await fetchAndMatchSaleIds(validIds);
     if (saleIdResult.matched > 0 || saleIdResult.unmatched > 0) {
       console.log(`[FulfillmentSession] Sale IDs: ${saleIdResult.matched} matched, ${saleIdResult.unmatched} unmatched`);
     }
 
-    console.log(`[FulfillmentSession] Added ${validIds.length} shipments to existing session ${sessionId} (spots ${(maxSpotResult?.maxSpot || 0) + 1}-${nextSpot - 1})`);
+    console.log(`[FulfillmentSession] Added ${validIds.length} shipments to existing session ${sessionId} (spots ${startSpot}-${startSpot + validIds.length - 1})`);
     
     return { added: validIds.length, skipped };
   }
@@ -1314,34 +1339,38 @@ export class FulfillmentSessionService {
       // Get next sequence number for today
       const sequenceNumber = await this.getNextSequenceNumber();
 
-      // Create session with actual valid count
-      const [session] = await db
-        .insert(fulfillmentSessions)
-        .values({
-          stationType: batch.stationType,
-          stationId: batch.stationId,
-          orderCount: validIds.length,
-          status: 'draft',
-          sequenceNumber,
-          createdBy: userId,
-        })
-        .returning();
+      // Create session + link shipments in a single transaction
+      const session = await db.transaction(async (tx) => {
+        const [created] = await tx
+          .insert(fulfillmentSessions)
+          .values({
+            stationType: batch.stationType,
+            stationId: batch.stationId,
+            orderCount: validIds.length,
+            status: 'draft',
+            sequenceNumber,
+            createdBy: userId,
+          })
+          .returning();
+
+        if (!created) return null;
+
+        await tx.execute(sql`
+          UPDATE shipments
+          SET fulfillment_session_id = ${created.id},
+              smart_session_spot = spot_assign.spot,
+              updated_at = NOW()
+          FROM (
+            SELECT unnest(${validIds}::text[]) AS id,
+                   generate_series(1, ${validIds.length}) AS spot
+          ) AS spot_assign
+          WHERE shipments.id = spot_assign.id
+        `);
+
+        return created;
+      });
 
       if (!session) return { session: null, added: 0, skipped };
-
-      // Link only validated shipments to session with sequential spot numbers
-      let spot = 1;
-      for (const shipmentId of validIds) {
-        await db
-          .update(shipments)
-          .set({
-            fulfillmentSessionId: session.id,
-            smartSessionSpot: spot,
-            updatedAt: new Date(),
-          })
-          .where(eq(shipments.id, shipmentId));
-        spot++;
-      }
 
       const createdShipmentRows = await db
         .select({ id: shipments.id, orderNumber: shipments.orderNumber })
@@ -1353,13 +1382,12 @@ export class FulfillmentSessionService {
       );
       console.log(`[FulfillmentSession] Queued ${createdShipmentRows.length} lifecycle events with 'session_create' reason`);
       
-      // Fetch and match SkuVault sale IDs for the newly sessioned shipments
       const saleIdResult = await fetchAndMatchSaleIds(validIds);
       if (saleIdResult.matched > 0 || saleIdResult.unmatched > 0) {
         console.log(`[FulfillmentSession] Sale IDs: ${saleIdResult.matched} matched, ${saleIdResult.unmatched} unmatched`);
       }
 
-      console.log(`[FulfillmentSession] Created session ${session.id} with ${validIds.length} shipments (spots 1-${spot - 1})${skipped.length > 0 ? `, skipped ${skipped.length}` : ''}`);
+      console.log(`[FulfillmentSession] Created session ${session.id} with ${validIds.length} shipments (spots 1-${validIds.length})${skipped.length > 0 ? `, skipped ${skipped.length}` : ''}`);
 
       return { session, added: validIds.length, skipped };
     } catch (error) {

@@ -283,6 +283,10 @@ async function initializeAfterListen(storage: any) {
     const { startShipStationWriteQueueWorker } = await import("./services/shipstation-write-queue");
     startShipStationWriteQueueWorker();
 
+    // Start session build queue worker (async session creation with progress tracking)
+    const { startSessionBuildQueueWorker } = await import("./services/session-build-queue");
+    startSessionBuildQueueWorker();
+
     // Start rate check queue worker (reliable, rate-limit-aware rate checking)
     const { startRateCheckQueueWorker } = await import("./services/rate-check-queue");
     startRateCheckQueueWorker();
