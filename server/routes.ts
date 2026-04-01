@@ -13334,6 +13334,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/fulfillment-prep/stats", requireAuth, async (req, res) => {
+    try {
+      const result = await db.execute(sql`
+        WITH categorize_count AS (
+          SELECT COUNT(DISTINCT qc.sku) as cnt
+          FROM shipment_qc_items qc
+          INNER JOIN shipments s ON qc.shipment_id = s.id
+            AND s.fingerprint_status = 'pending_categorization'
+            AND s.tracking_number IS NULL
+            AND s.ship_date IS NULL
+            AND s.lifecycle_phase NOT IN ('cancelled', 'delivered', 'in_transit', 'on_dock')
+          LEFT JOIN product_collection_mappings pcm ON qc.sku = pcm.sku
+          WHERE pcm.id IS NULL
+        ),
+        packaging_count AS (
+          SELECT COUNT(DISTINCT f.id) as cnt
+          FROM fingerprints f
+          INNER JOIN shipments s ON s.fingerprint_id = f.id
+            AND s.lifecycle_phase IN ('ready_to_session', 'fulfillment_prep')
+          LEFT JOIN fingerprint_models fm ON fm.fingerprint_id = f.id
+          WHERE fm.packaging_type_id IS NULL
+        ),
+        build_count AS (
+          SELECT COUNT(*) as cnt
+          FROM shipments
+          WHERE lifecycle_phase = 'ready_to_session'
+        ),
+        live_count AS (
+          SELECT COUNT(*) as cnt
+          FROM fulfillment_sessions
+          WHERE status NOT IN ('completed', 'cancelled')
+        )
+        SELECT
+          (SELECT cnt FROM categorize_count) as categorize_count,
+          (SELECT cnt FROM packaging_count) as packaging_count,
+          (SELECT cnt FROM build_count) as build_count,
+          (SELECT cnt FROM live_count) as live_count
+      `);
+
+      const row = result.rows?.[0] || {};
+      res.json({
+        categorizeCount: Number((row as any).categorize_count) || 0,
+        packagingCount: Number((row as any).packaging_count) || 0,
+        buildCount: Number((row as any).build_count) || 0,
+        liveSessionCount: Number((row as any).live_count) || 0,
+      });
+    } catch (error: any) {
+      console.error("[Fulfillment Prep] Error fetching stats:", error);
+      res.status(500).json({ error: "Failed to fetch fulfillment prep stats" });
+    }
+  });
+
   // Get fingerprint stats only (lightweight - for summary cards)
   app.get("/api/fingerprints/stats", requireAuth, async (req, res) => {
     try {

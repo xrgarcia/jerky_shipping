@@ -467,6 +467,16 @@ export default function Fingerprints() {
     return () => timeouts.forEach(clearTimeout);
   }, [inlineStatus]);
 
+  const { data: prepStats } = useQuery<{
+    categorizeCount: number;
+    packagingCount: number;
+    buildCount: number;
+    liveSessionCount: number;
+  }>({
+    queryKey: ["/api/fulfillment-prep/stats"],
+    refetchInterval: 15_000,
+  });
+
   // Fingerprint stats only (lightweight - for summary cards)
   const { data: fingerprintStatsData } = useQuery<{ total: number; assigned: number; needsDecision: number }>({
     queryKey: ["/api/fingerprints/stats"],
@@ -648,6 +658,7 @@ export default function Fingerprints() {
       queryClient.invalidateQueries({ queryKey: ["/api/fingerprints/needs-mapping"] });
       queryClient.invalidateQueries({ queryKey: ["/api/fingerprints/mapped"] });
       queryClient.invalidateQueries({ queryKey: ["/api/fingerprints/stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-prep/stats"] });
       queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions/preview"] });
       queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions/ready-to-session-orders"] });
     },
@@ -679,6 +690,7 @@ export default function Fingerprints() {
       queryClient.invalidateQueries({ queryKey: ["/api/fingerprints/needs-mapping"] });
       queryClient.invalidateQueries({ queryKey: ["/api/fingerprints/mapped"] });
       queryClient.invalidateQueries({ queryKey: ["/api/fingerprints/stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-prep/stats"] });
       queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions/preview"] });
       queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions/ready-to-session-orders"] });
     },
@@ -767,6 +779,7 @@ export default function Fingerprints() {
         queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions/preview"] });
         queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions"] });
         queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions/ready-to-session-orders"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-prep/stats"] });
         setActiveTab('live');
       } else if (result.success && result.shipmentsAssigned === 0) {
         setLastBuildResult(result);
@@ -824,6 +837,7 @@ export default function Fingerprints() {
       queryClient.invalidateQueries({ queryKey: ["/api/fingerprints/needs-mapping"] });
       queryClient.invalidateQueries({ queryKey: ["/api/fingerprints/mapped"] });
       queryClient.invalidateQueries({ queryKey: ["/api/fingerprints/stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-prep/stats"] });
       setEditingPackaging(null);
       setPackagingForm({ name: "", stationType: "" });
     },
@@ -841,6 +855,7 @@ export default function Fingerprints() {
       toast({ title: "Session deleted", description: "Orders have been released back to the queue" });
       queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions/preview"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-prep/stats"] });
       setSessionToDelete(null);
       setExpandedSessions(new Set());
       setSessionDetails({});
@@ -859,6 +874,7 @@ export default function Fingerprints() {
     onSuccess: () => {
       toast({ title: "Session released", description: "Session is now ready for picking" });
       queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-prep/stats"] });
     },
     onError: (error: Error) => {
       toast({ title: "Failed to release session", description: error.message, variant: "destructive" });
@@ -880,6 +896,7 @@ export default function Fingerprints() {
         description: `${result.updated} session${result.updated !== 1 ? 's' : ''} released to floor` 
       });
       queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-prep/stats"] });
       setSelectedSessionIds(new Set());
     },
     onError: (error: Error) => {
@@ -902,6 +919,7 @@ export default function Fingerprints() {
         description: `${result.updated} session${result.updated !== 1 ? 's' : ''} marked as on the dock` 
       });
       queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-prep/stats"] });
     },
     onError: (error: Error) => {
       toast({ title: "Failed to complete sessions", description: error.message, variant: "destructive" });
@@ -926,6 +944,7 @@ export default function Fingerprints() {
       queryClient.invalidateQueries({ queryKey: ["/api/fingerprints/needs-mapping"] });
       queryClient.invalidateQueries({ queryKey: ["/api/fingerprints/mapped"] });
       queryClient.invalidateQueries({ queryKey: ["/api/fingerprints/stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-prep/stats"] });
       queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions/preview"] });
       queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions/ready-to-session-orders"] });
       setSelectedFingerprintIds(new Set());
@@ -1184,13 +1203,13 @@ export default function Fingerprints() {
           <CardContent>
             <div className="flex items-baseline gap-2">
               <span
-                className={`text-2xl font-bold ${uncategorizedCount > 0 ? 'text-amber-600' : 'text-green-600'}`}
+                className={`text-2xl font-bold ${(prepStats?.categorizeCount ?? 0) > 0 ? 'text-amber-600' : 'text-green-600'}`}
                 data-testid="text-uncategorized-count"
               >
-                {uncategorizedCount}
+                {prepStats?.categorizeCount ?? 0}
               </span>
               <span className="text-sm text-muted-foreground">
-                {uncategorizedCount === 0 ? 'all categorized' : 'need categories'}
+                {(prepStats?.categorizeCount ?? 0) === 0 ? 'all categorized' : 'need categories'}
               </span>
             </div>
           </CardContent>
@@ -1209,13 +1228,13 @@ export default function Fingerprints() {
           <CardContent>
             <div className="flex items-baseline gap-2">
               <span
-                className={`text-2xl font-bold ${(stats?.needsDecision || 0) > 0 ? 'text-amber-600' : 'text-green-600'}`}
+                className={`text-2xl font-bold ${(prepStats?.packagingCount ?? 0) > 0 ? 'text-amber-600' : 'text-green-600'}`}
                 data-testid="text-needs-packaging"
               >
-                {stats?.needsDecision || 0}
+                {prepStats?.packagingCount ?? 0}
               </span>
               <span className="text-sm text-muted-foreground">
-                {(stats?.needsDecision || 0) === 0 ? 'all assigned' : 'need packaging'}
+                {(prepStats?.packagingCount ?? 0) === 0 ? 'all assigned' : 'need packaging'}
               </span>
             </div>
           </CardContent>
@@ -1234,10 +1253,10 @@ export default function Fingerprints() {
           <CardContent>
             <div className="flex items-baseline gap-2">
               <span
-                className={`text-2xl font-bold ${filteredBuildOrders.length > 0 ? 'text-blue-600' : 'text-muted-foreground'}`}
+                className={`text-2xl font-bold ${(prepStats?.buildCount ?? 0) > 0 ? 'text-blue-600' : 'text-muted-foreground'}`}
                 data-testid="text-sessionable-count"
               >
-                {filteredBuildOrders.length}
+                {prepStats?.buildCount ?? 0}
               </span>
               <span className="text-sm text-muted-foreground">
                 ready to session
@@ -1259,10 +1278,10 @@ export default function Fingerprints() {
           <CardContent>
             <div className="flex items-baseline gap-2">
               <span
-                className={`text-2xl font-bold ${liveSessions.length > 0 ? 'text-green-600' : 'text-muted-foreground'}`}
+                className={`text-2xl font-bold ${(prepStats?.liveSessionCount ?? 0) > 0 ? 'text-green-600' : 'text-muted-foreground'}`}
                 data-testid="text-live-sessions-count"
               >
-                {liveSessions.length}
+                {prepStats?.liveSessionCount ?? 0}
               </span>
               <span className="text-sm text-muted-foreground">
                 active sessions
