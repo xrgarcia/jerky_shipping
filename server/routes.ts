@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { reportingStorage } from "./reporting-storage";
 import { reportingSql } from "./reporting-db";
 import { db } from "./db";
-import { users, shipmentSyncFailures, shopifyOrderSyncFailures, orders, orderItems, shipments, orderRefunds, shipmentItems, shipmentTags, shipmentEvents, fingerprints, shipmentQcItems, fingerprintModels, slashbinKitComponentMappings, packagingTypes, slashbinOrders, slashbinOrderItems, slashbinProducts, slashbinProductVariants, shipmentRateAnalysis, featureFlags, shipstationWriteQueue, rateCheckQueue, qcExplosionQueue } from "@shared/schema";
+import { users, shipmentSyncFailures, shopifyOrderSyncFailures, orders, orderItems, shipments, orderRefunds, shipmentItems, shipmentTags, shipmentEvents, fingerprints, shipmentQcItems, fingerprintModels, slashbinKitComponentMappings, packagingTypes, slashbinOrders, slashbinOrderItems, slashbinProducts, slashbinProductVariants, shipmentRateAnalysis, featureFlags, shipstationWriteQueue, rateCheckQueue, qcExplosionQueue, sessionBuildQueue } from "@shared/schema";
 import { eq, count, desc, asc, or, and, sql, gte, lte, ilike, isNotNull, isNull, ne, inArray, notInArray, exists, type SQL } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import { z } from "zod";
@@ -14831,38 +14831,164 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Build fulfillment sessions from sessionable shipments
+  // Build fulfillment sessions — enqueue async job (or run synchronous dry-run)
   app.post("/api/fulfillment-sessions/build", requireAuth, async (req, res) => {
     try {
       const userId = (req as any).user?.id;
       if (!userId) {
         return res.status(401).json({ error: "User not authenticated" });
       }
-      
-      console.log(`[FulfillmentSessions] Build request from user ${userId}:`, JSON.stringify(req.body));
-      
-      const { fulfillmentSessionService } = await import("./services/fulfillment-session-service");
+
       const { stationType, dryRun, orderNumbers } = req.body;
-      
-      const result = await fulfillmentSessionService.buildSessions(userId, {
-        stationType: stationType as string | undefined,
-        dryRun: dryRun === true,
+
+      console.log(`[FulfillmentSessions] Build request from user ${userId}: dryRun=${!!dryRun}, stationType=${stationType || 'any'}, orderNumbers=${Array.isArray(orderNumbers) ? orderNumbers.length : 'none'}`);
+
+      if (dryRun === true) {
+        const { fulfillmentSessionService } = await import("./services/fulfillment-session-service");
+        const result = await fulfillmentSessionService.buildSessions(userId, {
+          stationType: stationType as string | undefined,
+          dryRun: true,
+          orderNumbers: Array.isArray(orderNumbers) ? orderNumbers : undefined,
+        });
+        return res.json(result);
+      }
+
+      const { enqueueSessionBuild, getActiveSessionBuildJob } = await import("./services/session-build-queue");
+
+      const jobId = await enqueueSessionBuild({
+        userId,
         orderNumbers: Array.isArray(orderNumbers) ? orderNumbers : undefined,
+        stationType: stationType as string | undefined,
       });
-      
-      console.log(`[FulfillmentSessions] Build result: ${result.sessionsCreated} sessions, ${result.shipmentsAssigned} assigned, ${result.shipmentsSkipped} skipped, errors: [${result.errors.join(', ')}]`);
-      
-      if (!result.success) {
-        return res.status(400).json({
-          success: false,
-          errors: result.errors,
+
+      if (jobId === null) {
+        const activeJob = await getActiveSessionBuildJob(userId);
+        return res.status(409).json({
+          error: "A session build is already in progress",
+          jobId: activeJob?.id ?? null,
+          status: activeJob?.status ?? 'unknown',
         });
       }
-      
-      res.json(result);
+
+      res.json({ jobId, status: 'queued' });
     } catch (error: any) {
       console.error("[FulfillmentSessions] Error building sessions:", error);
       res.status(500).json({ error: "Failed to build sessions" });
+    }
+  });
+
+  // Get active (queued/processing) build job for current user
+  app.get("/api/fulfillment-sessions/build-jobs/active", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+
+      const { getActiveSessionBuildJob } = await import("./services/session-build-queue");
+      const job = await getActiveSessionBuildJob(userId);
+      res.json({ job });
+    } catch (error: any) {
+      console.error("[FulfillmentSessions] Error getting active build job:", error);
+      res.status(500).json({ error: "Failed to get active build job" });
+    }
+  });
+
+  // Get build job stats (aggregate counts by status)
+  app.get("/api/fulfillment-sessions/build-jobs/stats", requireAuth, async (req, res) => {
+    try {
+      const { getSessionBuildQueueStats } = await import("./services/session-build-queue");
+      const stats = await getSessionBuildQueueStats();
+      res.json(stats);
+    } catch (error: any) {
+      console.error("[FulfillmentSessions] Error getting build job stats:", error);
+      res.status(500).json({ error: "Failed to get build job stats" });
+    }
+  });
+
+  // Get build job by ID (progress polling endpoint, scoped to current user)
+  app.get("/api/fulfillment-sessions/build-jobs/:id", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid job ID" });
+      }
+
+      const { getSessionBuildJobById } = await import("./services/session-build-queue");
+      const job = await getSessionBuildJobById(id);
+      if (!job || job.userId !== userId) {
+        return res.status(404).json({ error: "Build job not found" });
+      }
+
+      res.json(job);
+    } catch (error: any) {
+      console.error("[FulfillmentSessions] Error getting build job:", error);
+      res.status(500).json({ error: "Failed to get build job" });
+    }
+  });
+
+  // List build jobs (paginated, filterable, scoped to current user)
+  app.get("/api/fulfillment-sessions/build-jobs", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+
+      const page = Math.max(1, parseInt(req.query.page as string) || 1);
+      const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 25));
+      const offset = (page - 1) * limit;
+      const statusFilter = req.query.status as string | undefined;
+      const sortBy = (req.query.sortBy as string) || "createdAt";
+      const sortOrder = (req.query.sortOrder as string) || "desc";
+
+      const conditions: SQL[] = [eq(sessionBuildQueue.userId, userId)];
+      if (statusFilter && statusFilter !== "all") {
+        conditions.push(eq(sessionBuildQueue.status, statusFilter));
+      }
+
+      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+      const sortColumnMap: Record<string, any> = {
+        createdAt: sessionBuildQueue.createdAt,
+        id: sessionBuildQueue.id,
+        status: sessionBuildQueue.status,
+        completedAt: sessionBuildQueue.completedAt,
+      };
+      const sortColumn = sortColumnMap[sortBy] || sessionBuildQueue.createdAt;
+      const orderFn = sortOrder === "asc" ? asc : desc;
+
+      const [jobs, totalResult] = await Promise.all([
+        db.select()
+          .from(sessionBuildQueue)
+          .where(whereClause)
+          .orderBy(orderFn(sortColumn))
+          .limit(limit)
+          .offset(offset),
+        db.select({ count: sql<number>`count(*)::int` })
+          .from(sessionBuildQueue)
+          .where(whereClause),
+      ]);
+
+      const total = totalResult[0]?.count ?? 0;
+
+      res.json({
+        jobs,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+        },
+      });
+    } catch (error: any) {
+      console.error("[FulfillmentSessions] Error listing build jobs:", error);
+      res.status(500).json({ error: "Failed to list build jobs" });
     }
   });
 

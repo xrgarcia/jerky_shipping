@@ -1,7 +1,7 @@
 import { db } from '../db';
 import { sessionBuildQueue } from '@shared/schema';
 import type { SessionBuildQueue } from '@shared/schema';
-import { eq, and, asc, sql } from 'drizzle-orm';
+import { eq, and, asc, desc, sql, or } from 'drizzle-orm';
 import logger from '../utils/logger';
 import { fulfillmentSessionService } from './fulfillment-session-service';
 
@@ -23,28 +23,48 @@ export interface EnqueueSessionBuildOptions {
   stationType?: string;
 }
 
-export async function enqueueSessionBuild(options: EnqueueSessionBuildOptions): Promise<number> {
-  const [inserted] = await db.insert(sessionBuildQueue).values({
-    status: 'queued',
-    userId: options.userId,
-    orderNumbers: options.orderNumbers ?? null,
-    stationType: options.stationType ?? null,
-    progressPhase: null,
-    progressPercent: 0,
-    progressDetail: null,
-    sessionsCreated: 0,
-    shipmentsAssigned: 0,
-    shipmentsSkipped: 0,
-    result: null,
-    error: null,
-    retryCount: 0,
-    maxRetries: 3,
-    startedAt: null,
-    completedAt: null,
-  }).returning({ id: sessionBuildQueue.id });
+export async function enqueueSessionBuild(options: EnqueueSessionBuildOptions): Promise<number | null> {
+  return await db.transaction(async (tx) => {
+    const [existing] = await tx
+      .select({ id: sessionBuildQueue.id, status: sessionBuildQueue.status })
+      .from(sessionBuildQueue)
+      .where(
+        and(
+          eq(sessionBuildQueue.userId, options.userId),
+          or(
+            eq(sessionBuildQueue.status, 'queued'),
+            eq(sessionBuildQueue.status, 'processing')
+          )
+        )
+      )
+      .limit(1);
 
-  log(`Enqueued session build job #${inserted.id} for user ${options.userId}`);
-  return inserted.id;
+    if (existing) {
+      return null;
+    }
+
+    const [inserted] = await tx.insert(sessionBuildQueue).values({
+      status: 'queued',
+      userId: options.userId,
+      orderNumbers: options.orderNumbers ?? null,
+      stationType: options.stationType ?? null,
+      progressPhase: null,
+      progressPercent: 0,
+      progressDetail: null,
+      sessionsCreated: 0,
+      shipmentsAssigned: 0,
+      shipmentsSkipped: 0,
+      result: null,
+      error: null,
+      retryCount: 0,
+      maxRetries: 3,
+      startedAt: null,
+      completedAt: null,
+    }).returning({ id: sessionBuildQueue.id });
+
+    log(`Enqueued session build job #${inserted.id} for user ${options.userId}`);
+    return inserted.id;
+  });
 }
 
 export async function getSessionBuildQueueStats(): Promise<{
@@ -77,6 +97,33 @@ export async function getSessionBuildJobs(limit = 20): Promise<SessionBuildQueue
     .from(sessionBuildQueue)
     .orderBy(asc(sessionBuildQueue.createdAt))
     .limit(limit);
+}
+
+export async function getSessionBuildJobById(id: number): Promise<SessionBuildQueue | null> {
+  const [job] = await db
+    .select()
+    .from(sessionBuildQueue)
+    .where(eq(sessionBuildQueue.id, id))
+    .limit(1);
+  return job ?? null;
+}
+
+export async function getActiveSessionBuildJob(userId: string): Promise<SessionBuildQueue | null> {
+  const [job] = await db
+    .select()
+    .from(sessionBuildQueue)
+    .where(
+      and(
+        eq(sessionBuildQueue.userId, userId),
+        or(
+          eq(sessionBuildQueue.status, 'queued'),
+          eq(sessionBuildQueue.status, 'processing')
+        )
+      )
+    )
+    .orderBy(desc(sessionBuildQueue.createdAt))
+    .limit(1);
+  return job ?? null;
 }
 
 async function updateJobProgress(
