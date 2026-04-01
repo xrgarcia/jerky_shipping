@@ -78,6 +78,7 @@ import {
   Copy,
   Search,
   AlertTriangle,
+  XCircle,
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
@@ -399,7 +400,8 @@ export default function Fingerprints() {
     name: "",
     stationType: "",
   });
-  const [lastBuildResult, setLastBuildResult] = useState<BuildSessionsResult | null>(null);
+  const [lastBuildJob, setLastBuildJob] = useState<BuildJobStatus | null>(null);
+  const [detailBuildJob, setDetailBuildJob] = useState<BuildJobStatus | null>(null);
   const [activeBuildJobId, setActiveBuildJobId] = useState<number | null>(null);
   const buildStartTimeRef = useRef<number | null>(null);
   const [expandedSessions, setExpandedSessions] = useState<Set<string>>(new Set());
@@ -655,15 +657,14 @@ export default function Fingerprints() {
 
     if (buildJobStatus.status === 'completed') {
       const r = buildJobStatus.result;
+      setLastBuildJob(buildJobStatus);
       if (r && r.shipmentsAssigned > 0) {
-        setLastBuildResult(r);
         toast({
           title: "Sessions Created",
           description: `Created ${r.sessionsCreated} sessions with ${r.shipmentsAssigned} orders`,
         });
         setActiveTab('live');
       } else {
-        setLastBuildResult(r || { sessionsCreated: 0, shipmentsAssigned: 0, shipmentsSkipped: 0, skippedOrders: [], errors: [] });
         const skippedReasons = r?.skippedOrders?.map((s: { reason: string }) => s.reason) || [];
         const uniqueReasons = [...new Set(skippedReasons)];
         toast({
@@ -682,6 +683,7 @@ export default function Fingerprints() {
       queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions/ready-to-session-orders"] });
       queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-prep/stats"] });
     } else if (buildJobStatus.status === 'failed') {
+      setLastBuildJob(buildJobStatus);
       toast({
         title: "Session build failed",
         description: buildJobStatus.error || "An unknown error occurred",
@@ -868,6 +870,7 @@ export default function Fingerprints() {
       return res.json() as Promise<{ jobId: number; status: string }>;
     },
     onSuccess: (data) => {
+      setLastBuildJob(null);
       setActiveBuildJobId(data.jobId);
       buildStartTimeRef.current = Date.now();
     },
@@ -878,6 +881,7 @@ export default function Fingerprints() {
           if (res.ok) {
             const data = await res.json();
             if (data.job?.id) {
+              setLastBuildJob(null);
               setActiveBuildJobId(data.job.id);
               buildStartTimeRef.current = new Date(data.job.startedAt || data.job.createdAt).getTime();
               return;
@@ -2807,6 +2811,99 @@ export default function Fingerprints() {
                   </div>
                 </div>
               )}
+              {lastBuildJob && lastBuildJob.status === 'completed' && (lastBuildJob.result?.shipmentsAssigned ?? 0) > 0 && (
+                <div className="mb-6 p-4 rounded-lg border border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950/30" data-testid="banner-build-success">
+                  <div className="flex items-center justify-between gap-4 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="h-5 w-5 text-green-600" />
+                      <span className="font-medium text-green-800 dark:text-green-200">Build Complete</span>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setDetailBuildJob(lastBuildJob)}
+                      data-testid="button-build-view-details"
+                    >
+                      <Eye className="h-3.5 w-3.5 mr-1" />
+                      View Details
+                    </Button>
+                  </div>
+                  <div className="text-sm text-green-700 dark:text-green-300 mt-1">
+                    Created {lastBuildJob.result!.sessionsCreated} session{lastBuildJob.result!.sessionsCreated !== 1 ? 's' : ''} with {lastBuildJob.result!.shipmentsAssigned} order{lastBuildJob.result!.shipmentsAssigned !== 1 ? 's' : ''}
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="mt-2 text-green-700"
+                    onClick={() => setLastBuildJob(null)}
+                    data-testid="button-build-dismiss"
+                  >
+                    Dismiss
+                  </Button>
+                </div>
+              )}
+              {lastBuildJob && lastBuildJob.status === 'completed' && (lastBuildJob.result?.shipmentsAssigned ?? 0) === 0 && (
+                <div className="mb-6 p-4 rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30" data-testid="banner-build-warning">
+                  <div className="flex items-center justify-between gap-4 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle className="h-5 w-5 text-amber-600" />
+                      <span className="font-medium text-amber-800 dark:text-amber-200">No Orders Assigned</span>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setDetailBuildJob(lastBuildJob)}
+                      data-testid="button-build-view-details-warning"
+                    >
+                      <Eye className="h-3.5 w-3.5 mr-1" />
+                      View Details
+                    </Button>
+                  </div>
+                  <div className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+                    {lastBuildJob.error || "No eligible orders found. Orders may need packaging or station assignment first."}
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="mt-2 text-amber-700"
+                    onClick={() => setLastBuildJob(null)}
+                    data-testid="button-build-dismiss-warning"
+                  >
+                    Dismiss
+                  </Button>
+                </div>
+              )}
+              {lastBuildJob && lastBuildJob.status === 'failed' && (
+                <div className="mb-6 p-4 rounded-lg border border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/30" data-testid="banner-build-error">
+                  <div className="flex items-center justify-between gap-4 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <XCircle className="h-5 w-5 text-red-600" />
+                      <span className="font-medium text-red-800 dark:text-red-200">Build Failed</span>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setDetailBuildJob(lastBuildJob)}
+                      data-testid="button-build-view-details-error"
+                    >
+                      <Eye className="h-3.5 w-3.5 mr-1" />
+                      View Details
+                    </Button>
+                  </div>
+                  <div className="text-sm text-red-700 dark:text-red-300 mt-1">
+                    {lastBuildJob.error || "An unknown error occurred"}
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="mt-2 text-red-700"
+                    onClick={() => setLastBuildJob(null)}
+                    data-testid="button-build-dismiss-error"
+                  >
+                    Dismiss
+                  </Button>
+                </div>
+              )}
               {filteredReadyCount > 0 && (
                 <div className="mb-6 p-4 rounded-lg border border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/30">
                   <div className="flex items-start gap-3">
@@ -2932,54 +3029,6 @@ export default function Fingerprints() {
               </div>
             </CardHeader>
             <CardContent>
-              {lastBuildResult && lastBuildResult.shipmentsAssigned > 0 && (
-                <div className="mb-6 p-4 rounded-lg border border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950/30">
-                  <div className="flex items-center gap-2 mb-2">
-                    <CheckCircle2 className="h-5 w-5 text-green-600" />
-                    <span className="font-medium text-green-800 dark:text-green-200">Sessions Created Successfully</span>
-                  </div>
-                  <div className="text-sm text-green-700 dark:text-green-300">
-                    Created {lastBuildResult.sessionsCreated} session{lastBuildResult.sessionsCreated !== 1 ? 's' : ''} with {lastBuildResult.shipmentsAssigned} order{lastBuildResult.shipmentsAssigned !== 1 ? 's' : ''}
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="mt-2 text-green-700 hover:text-green-800"
-                    onClick={() => setLastBuildResult(null)}
-                  >
-                    Dismiss
-                  </Button>
-                </div>
-              )}
-              {lastBuildResult && lastBuildResult.shipmentsAssigned === 0 && (
-                <div className="mb-6 p-4 rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30">
-                  <div className="flex items-center gap-2 mb-2">
-                    <AlertTriangle className="h-5 w-5 text-amber-600" />
-                    <span className="font-medium text-amber-800 dark:text-amber-200">No Orders Were Assigned</span>
-                  </div>
-                  <div className="text-sm text-amber-700 dark:text-amber-300">
-                    {lastBuildResult.skippedOrders?.length > 0
-                      ? lastBuildResult.skippedOrders.map((s: { orderNumber: string; reason: string }, i: number) => (
-                          <div key={i} className="flex items-center gap-2">
-                            <span className="font-mono text-xs">{s.orderNumber}</span>
-                            <span className="text-xs">{s.reason}</span>
-                          </div>
-                        ))
-                      : lastBuildResult.errors.length > 0 
-                        ? lastBuildResult.errors.join(". ") 
-                        : "No eligible orders found. Orders may need packaging or station assignment first."}
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="mt-2 text-amber-700 hover:text-amber-800"
-                    onClick={() => setLastBuildResult(null)}
-                  >
-                    Dismiss
-                  </Button>
-                </div>
-              )}
-
               {liveSessions.length === 0 ? (
                 <div className="text-center py-12">
                   <Eye className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
@@ -3726,6 +3775,89 @@ export default function Fingerprints() {
               Close
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={detailBuildJob !== null} onOpenChange={(open) => { if (!open) setDetailBuildJob(null); }}>
+        <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col" data-testid="dialog-build-detail">
+          <DialogHeader>
+            <DialogTitle className="text-sm font-mono">
+              Build Job #{detailBuildJob?.id}
+              {detailBuildJob && (() => {
+                const isSuccess = detailBuildJob.status === 'completed' && (detailBuildJob.shipmentsAssigned ?? 0) > 0;
+                const isZero = detailBuildJob.status === 'completed' && (detailBuildJob.shipmentsAssigned ?? 0) === 0;
+                const isFailed = detailBuildJob.status === 'failed';
+                const badgeClass = isSuccess
+                  ? "bg-green-600"
+                  : isZero
+                    ? "bg-amber-500 dark:bg-amber-600"
+                    : isFailed
+                      ? ""
+                      : "";
+                const badgeVariant = isFailed ? "destructive" as const : "default" as const;
+                const badgeLabel = isSuccess ? "Completed" : isZero ? "No Assignments" : isFailed ? "Failed" : detailBuildJob.status;
+                return (
+                  <Badge variant={badgeVariant} className={`no-default-active-elevate text-xs font-mono ml-2 ${badgeClass}`}>
+                    {badgeLabel}
+                  </Badge>
+                );
+              })()}
+            </DialogTitle>
+            <DialogDescription>
+              {detailBuildJob?.completedAt && (
+                <span className="text-xs">
+                  Completed: {new Date(detailBuildJob.completedAt).toLocaleString()}
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="overflow-auto flex-1 space-y-3">
+            {detailBuildJob?.error && (
+              <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3">
+                <p className="text-xs font-medium text-destructive mb-1">Error</p>
+                <pre className="text-xs font-mono whitespace-pre-wrap break-words text-destructive" data-testid="text-build-error-detail">
+                  {detailBuildJob.error}
+                </pre>
+              </div>
+            )}
+            {detailBuildJob?.result?.skippedOrders && detailBuildJob.result.skippedOrders.length > 0 && (
+              <div className="rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20 p-3">
+                <p className="text-xs font-medium mb-1 text-amber-800 dark:text-amber-200">
+                  Skipped Orders ({detailBuildJob.result.skippedOrders.length})
+                </p>
+                <div className="space-y-1">
+                  {detailBuildJob.result.skippedOrders.map((s, i) => (
+                    <div key={i} className="flex items-center gap-2 text-xs">
+                      <span className="font-mono text-amber-700 dark:text-amber-300">{s.orderNumber}</span>
+                      <span className="text-muted-foreground">{s.reason}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {detailBuildJob?.result?.sessions && detailBuildJob.result.sessions.length > 0 && (
+              <div className="rounded-md border bg-muted/50 p-3">
+                <p className="text-xs font-medium mb-1">Sessions Created ({detailBuildJob.result.sessions.length})</p>
+                <div className="space-y-1">
+                  {detailBuildJob.result.sessions.map((s, i) => (
+                    <div key={i} className="flex items-center gap-3 text-xs">
+                      <span className="font-mono">{s.name}</span>
+                      <Badge variant="outline" className="no-default-active-elevate text-xs">{s.stationType}</Badge>
+                      <span className="text-muted-foreground">{s.orderCount} orders</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {detailBuildJob?.result != null && (
+              <div className="rounded-md border bg-muted/50 p-4">
+                <p className="text-xs font-medium mb-1">Full Result</p>
+                <pre className="text-xs font-mono whitespace-pre-wrap break-words" data-testid="text-build-result-json">
+                  {JSON.stringify(detailBuildJob.result, null, 2)}
+                </pre>
+              </div>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>
