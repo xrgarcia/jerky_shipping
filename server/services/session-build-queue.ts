@@ -156,8 +156,8 @@ async function processNextSessionBuild(): Promise<boolean> {
     const result = await fulfillmentSessionService.buildSessions(job.userId, {
       stationType: job.stationType ?? undefined,
       orderNumbers: orderNumbers ?? undefined,
-      onProgress: async (phase, percent, detail) => {
-        await updateJobProgress(job.id, phase, percent, detail);
+      onProgress: async (phase, percent, detail, counts) => {
+        await updateJobProgress(job.id, phase, percent, detail, counts);
       },
     });
 

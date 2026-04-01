@@ -485,7 +485,7 @@ export class FulfillmentSessionService {
       stationType?: string; 
       dryRun?: boolean; 
       orderNumbers?: string[];
-      onProgress?: (phase: string, percent: number, detail: string) => void | Promise<void>;
+      onProgress?: (phase: string, percent: number, detail: string, counts?: { sessionsCreated?: number; shipmentsAssigned?: number; shipmentsSkipped?: number }) => void | Promise<void>;
     } = {}
   ): Promise<SessionBuildResult> {
     const { stationType, dryRun = false, orderNumbers, onProgress } = options;
@@ -554,13 +554,18 @@ export class FulfillmentSessionService {
         if (filled.shipmentIds.length > 0) {
           completedSessionOps++;
           const pct = Math.round(30 + (completedSessionOps / totalSessionOps) * 50);
-          await onProgress?.('creating_sessions', pct, `Adding to existing session ${completedSessionOps} of ${totalSessionOps}`);
 
           const addResult = await this.addShipmentsToSession(filled.sessionId, filled.shipmentIds);
           result.shipmentsAssigned += addResult.added;
           result.shipmentsSkipped += addResult.skipped.length;
           result.skippedOrders.push(...addResult.skipped);
-          // Fetch updated session to return
+
+          await onProgress?.('creating_sessions', pct, `Adding to existing session ${completedSessionOps} of ${totalSessionOps}`, {
+            sessionsCreated: result.sessionsCreated,
+            shipmentsAssigned: result.shipmentsAssigned,
+            shipmentsSkipped: result.shipmentsSkipped,
+          });
+
           const updatedSession = await this.getSessionById(filled.sessionId);
           if (updatedSession) {
             result.sessions.push(updatedSession);
@@ -572,7 +577,6 @@ export class FulfillmentSessionService {
       for (const batch of newBatches) {
         completedSessionOps++;
         const pct = Math.round(30 + (completedSessionOps / totalSessionOps) * 50);
-        await onProgress?.('creating_sessions', pct, `Creating session ${completedSessionOps} of ${totalSessionOps}`);
 
         const createResult = await this.createSessionWithShipments(batch, userId);
         if (createResult.session) {
@@ -582,6 +586,12 @@ export class FulfillmentSessionService {
         }
         result.shipmentsSkipped += createResult.skipped.length;
         result.skippedOrders.push(...createResult.skipped);
+
+        await onProgress?.('creating_sessions', pct, `Creating session ${completedSessionOps} of ${totalSessionOps}`, {
+          sessionsCreated: result.sessionsCreated,
+          shipmentsAssigned: result.shipmentsAssigned,
+          shipmentsSkipped: result.shipmentsSkipped,
+        });
       }
 
       await onProgress?.('matching_sales', 90, 'Matching sale IDs');
