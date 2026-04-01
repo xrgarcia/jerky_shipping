@@ -2258,7 +2258,7 @@ export default function Fingerprints() {
                       </div>
                     );
                   })()}
-                <ScrollArea className="h-[400px]">
+                <ScrollArea className="h-[800px]">
                   <table className="w-full table-fixed">
                     <colgroup>
                       <col style={{ width: '3%' }} />
