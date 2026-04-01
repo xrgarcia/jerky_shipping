@@ -814,7 +814,7 @@ export class FulfillmentSessionService {
     const startSpot = (maxSpotResult?.maxSpot || 0) + 1;
 
     await db.transaction(async (tx) => {
-      const values = validIds.map((id, i) => sql`(${id}, ${startSpot + i})`);
+      const values = validIds.map((id, i) => sql`(${id}::text, ${startSpot + i}::int)`);
       const valuesList = sql.join(values, sql`, `);
       await tx.execute(sql`
         UPDATE shipments
@@ -1361,7 +1361,7 @@ export class FulfillmentSessionService {
 
         if (!created) return null;
 
-        const values = validIds.map((id, i) => sql`(${id}, ${i + 1})`);
+        const values = validIds.map((id, i) => sql`(${id}::text, ${i + 1}::int)`);
         const valuesList = sql.join(values, sql`, `);
         await tx.execute(sql`
           UPDATE shipments
