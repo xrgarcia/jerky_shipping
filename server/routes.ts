@@ -14947,7 +14947,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const sortBy = (req.query.sortBy as string) || "createdAt";
       const sortOrder = (req.query.sortOrder as string) || "desc";
 
-      const conditions: SQL[] = [eq(sessionBuildQueue.userId, userId)];
+      const scope = req.query.scope as string | undefined;
+      const conditions: SQL[] = [];
+      if (scope !== "all") {
+        conditions.push(eq(sessionBuildQueue.userId, userId));
+      }
       if (statusFilter && statusFilter !== "all") {
         conditions.push(eq(sessionBuildQueue.status, statusFilter));
       }
@@ -14959,6 +14963,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         id: sessionBuildQueue.id,
         status: sessionBuildQueue.status,
         completedAt: sessionBuildQueue.completedAt,
+        sessionsCreated: sessionBuildQueue.sessionsCreated,
+        shipmentsAssigned: sessionBuildQueue.shipmentsAssigned,
       };
       const sortColumn = sortColumnMap[sortBy] || sessionBuildQueue.createdAt;
       const orderFn = sortOrder === "asc" ? asc : desc;

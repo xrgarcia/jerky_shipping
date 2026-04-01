@@ -13,6 +13,7 @@ import {
   Clock,
   Cpu,
   Eye,
+  Hammer,
   Inbox,
   Search,
   Layers,
@@ -1338,6 +1339,433 @@ function PackageUpdatesTab() {
   );
 }
 
+type SessionBuildJob = {
+  id: number;
+  status: string;
+  userId: string;
+  orderNumbers: string[] | null;
+  stationType: string | null;
+  progressPhase: string | null;
+  progressPercent: number;
+  progressDetail: string | null;
+  sessionsCreated: number;
+  shipmentsAssigned: number;
+  shipmentsSkipped: number;
+  result: Record<string, unknown> | null;
+  error: string | null;
+  retryCount: number;
+  maxRetries: number;
+  createdAt: string;
+  startedAt: string | null;
+  completedAt: string | null;
+};
+
+type SessionBuildJobsResponse = {
+  jobs: SessionBuildJob[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+};
+
+type SessionBuildStats = {
+  queued: number;
+  processing: number;
+  completed: number;
+  failed: number;
+};
+
+const SB_PHASE_LABELS: Record<string, string> = {
+  finding_orders: "Finding Orders",
+  grouping: "Grouping",
+  creating_sessions: "Creating Sessions",
+  matching_sales: "Matching Sales",
+  completing: "Completing",
+};
+
+function SessionBuilderTab() {
+  const [page, setPage] = useState(1);
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [sortBy, setSortBy] = useState("createdAt");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [detailJob, setDetailJob] = useState<SessionBuildJob | null>(null);
+
+  const { data: stats, isLoading: statsLoading } = useQuery<SessionBuildStats>({
+    queryKey: ["/api/fulfillment-sessions/build-jobs/stats"],
+    refetchInterval: 5000,
+  });
+
+  const { data: jobsData, isLoading: jobsLoading } = useQuery<SessionBuildJobsResponse>({
+    queryKey: ["/api/fulfillment-sessions/build-jobs", "monitoring", page, statusFilter, sortBy, sortOrder],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: "25",
+        sortBy,
+        sortOrder,
+        scope: "all",
+      });
+      if (statusFilter !== "all") params.set("status", statusFilter);
+      const res = await fetch(`/api/fulfillment-sessions/build-jobs?${params}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch session build jobs");
+      return res.json();
+    },
+    refetchInterval: 5000,
+  });
+
+  const totalJobs = (stats?.queued ?? 0) + (stats?.processing ?? 0) + (stats?.completed ?? 0) + (stats?.failed ?? 0);
+
+  function toggleSort(column: string) {
+    if (sortBy === column) {
+      setSortOrder(prev => prev === "asc" ? "desc" : "asc");
+    } else {
+      setSortBy(column);
+      setSortOrder("desc");
+    }
+    setPage(1);
+  }
+
+  function SortableHeader({ column, children }: { column: string; children: React.ReactNode }) {
+    const isActive = sortBy === column;
+    return (
+      <TableHead
+        className="cursor-pointer select-none"
+        onClick={() => toggleSort(column)}
+        data-testid={`sort-sb-${column}`}
+      >
+        <div className="flex items-center gap-1">
+          {children}
+          <ArrowUpDown className={`h-3 w-3 ${isActive ? "text-foreground" : "text-muted-foreground/50"}`} />
+        </div>
+      </TableHead>
+    );
+  }
+
+  function formatDuration(start: string, end: string): string {
+    const ms = new Date(end).getTime() - new Date(start).getTime();
+    if (ms < 1000) return `${ms}ms`;
+    const seconds = Math.floor(ms / 1000);
+    if (seconds < 60) return `${seconds}s`;
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes}m ${remainingSeconds}s`;
+  }
+
+  return (
+    <div className="space-y-4 py-4" data-testid="session-builder-view">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card data-testid="card-sb-total">
+          <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Jobs</CardTitle>
+            <Layers className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            {statsLoading ? <Skeleton className="h-8 w-16" /> : (
+              <div className="text-2xl font-bold" data-testid="text-sb-total">{totalJobs}</div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card data-testid="card-sb-queued">
+          <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Queued</CardTitle>
+            <Inbox className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            {statsLoading ? <Skeleton className="h-8 w-16" /> : (
+              <>
+                <div className="text-2xl font-bold" data-testid="text-sb-queued">{stats?.queued ?? 0}</div>
+                <p className="text-xs text-muted-foreground">{stats?.processing ?? 0} processing</p>
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card data-testid="card-sb-completed">
+          <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Completed</CardTitle>
+            <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            {statsLoading ? <Skeleton className="h-8 w-16" /> : (
+              <div className="text-2xl font-bold" data-testid="text-sb-completed">{stats?.completed ?? 0}</div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card data-testid="card-sb-failed">
+          <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Failed</CardTitle>
+            <XCircle className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            {statsLoading ? <Skeleton className="h-8 w-16" /> : (
+              <div className="text-2xl font-bold" data-testid="text-sb-failed">{stats?.failed ?? 0}</div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card data-testid="card-sb-jobs">
+        <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 flex-wrap">
+          <CardTitle className="text-sm font-medium">Build Jobs</CardTitle>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1); }}>
+              <SelectTrigger className="w-[140px]" data-testid="select-sb-status-filter">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="queued">Queued</SelectItem>
+                <SelectItem value="processing">Processing</SelectItem>
+                <SelectItem value="completed">Completed</SelectItem>
+                <SelectItem value="failed">Failed</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions/build-jobs"] });
+                queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions/build-jobs/stats"] });
+              }}
+              data-testid="button-refresh-sb"
+            >
+              <RefreshCw className="h-3 w-3 mr-1" />
+              Refresh
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {jobsLoading ? (
+            <div className="space-y-2">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Skeleton key={i} className="h-8 w-full" />
+              ))}
+            </div>
+          ) : !jobsData?.jobs?.length ? (
+            <p className="text-sm text-muted-foreground">No session build jobs found</p>
+          ) : (
+            <>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <SortableHeader column="id">ID</SortableHeader>
+                      <TableHead>User</TableHead>
+                      <TableHead>Orders</TableHead>
+                      <SortableHeader column="status">Status</SortableHeader>
+                      <TableHead>Progress</TableHead>
+                      <SortableHeader column="sessionsCreated">Sessions</SortableHeader>
+                      <SortableHeader column="shipmentsAssigned">Shipments</SortableHeader>
+                      <SortableHeader column="createdAt">Created</SortableHeader>
+                      <SortableHeader column="completedAt">Completed</SortableHeader>
+                      <TableHead>Error</TableHead>
+                      <TableHead>Detail</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {jobsData.jobs.map((job) => {
+                      const statusMeta = STATUS_BADGE_MAP[job.status] ?? { variant: "outline" as const, label: job.status };
+                      const orderCount = Array.isArray(job.orderNumbers) ? job.orderNumbers.length : null;
+                      return (
+                        <TableRow key={job.id} data-testid={`row-sb-job-${job.id}`}>
+                          <TableCell className="font-mono text-xs" data-testid={`text-sb-id-${job.id}`}>
+                            #{job.id}
+                          </TableCell>
+                          <TableCell className="text-xs whitespace-nowrap" data-testid={`text-sb-user-${job.id}`}>
+                            {job.userId}
+                          </TableCell>
+                          <TableCell className="text-xs" data-testid={`text-sb-orders-${job.id}`}>
+                            {orderCount != null ? (
+                              <Badge variant="outline" className="no-default-active-elevate text-xs">
+                                {orderCount}
+                              </Badge>
+                            ) : (
+                              <span className="text-muted-foreground">All</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={statusMeta.variant}
+                              className={`no-default-active-elevate text-xs ${statusMeta.className ?? ""}`}
+                            >
+                              {statusMeta.label}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-xs whitespace-nowrap">
+                            {job.status === "processing" && job.progressPhase ? (
+                              <span>
+                                {job.progressPercent}% {SB_PHASE_LABELS[job.progressPhase] ?? job.progressPhase}
+                              </span>
+                            ) : job.status === "completed" ? (
+                              <span className="text-muted-foreground">100%</span>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-xs text-center" data-testid={`text-sb-sessions-${job.id}`}>
+                            {job.sessionsCreated ?? 0}
+                          </TableCell>
+                          <TableCell className="text-xs text-center" data-testid={`text-sb-shipments-${job.id}`}>
+                            {job.shipmentsAssigned ?? 0}
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                            {formatDistanceToNow(new Date(job.createdAt), { addSuffix: true })}
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                            {job.completedAt ? (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className="cursor-help">
+                                    {formatDistanceToNow(new Date(job.completedAt), { addSuffix: true })}
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p className="text-xs">
+                                    Duration: {job.startedAt ? formatDuration(job.startedAt, job.completedAt) : "N/A"}
+                                  </p>
+                                </TooltipContent>
+                              </Tooltip>
+                            ) : job.status === "processing" ? (
+                              <span className="text-blue-500">processing...</span>
+                            ) : (
+                              "-"
+                            )}
+                          </TableCell>
+                          <TableCell className="text-xs max-w-[200px]">
+                            {job.error ? (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className="text-destructive truncate block max-w-[200px] cursor-help">
+                                    {job.error}
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent side="left" className="max-w-sm">
+                                  <p className="break-words text-xs">{job.error}</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {(job.result != null || job.error != null || (Array.isArray(job.orderNumbers) && job.orderNumbers.length > 0)) ? (
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => setDetailJob(job)}
+                                data-testid={`button-sb-detail-${job.id}`}
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">-</span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {jobsData.pagination.totalPages > 1 && (
+                <div className="flex items-center justify-between gap-2 pt-4">
+                  <p className="text-xs text-muted-foreground">
+                    Showing {((page - 1) * 25) + 1}-{Math.min(page * 25, jobsData.pagination.total)} of {jobsData.pagination.total}
+                  </p>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      size="icon"
+                      variant="outline"
+                      disabled={page <= 1}
+                      onClick={() => setPage(p => p - 1)}
+                      data-testid="button-sb-prev"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <span className="text-sm px-2">
+                      {page} / {jobsData.pagination.totalPages}
+                    </span>
+                    <Button
+                      size="icon"
+                      variant="outline"
+                      disabled={page >= jobsData.pagination.totalPages}
+                      onClick={() => setPage(p => p + 1)}
+                      data-testid="button-sb-next"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog open={detailJob !== null} onOpenChange={(open) => { if (!open) setDetailJob(null); }}>
+        <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col" data-testid="dialog-sb-detail">
+          <DialogHeader>
+            <DialogTitle className="text-sm font-mono">
+              Build Job #{detailJob?.id}
+              {detailJob && (
+                <Badge
+                  variant={STATUS_BADGE_MAP[detailJob.status]?.variant ?? "outline"}
+                  className={`no-default-active-elevate text-xs font-mono ml-2 ${STATUS_BADGE_MAP[detailJob.status]?.className ?? ""}`}
+                >
+                  {STATUS_BADGE_MAP[detailJob.status]?.label ?? detailJob.status}
+                </Badge>
+              )}
+            </DialogTitle>
+            <DialogDescription>
+              {detailJob?.userId && <span>User: {detailJob.userId}</span>}
+              {detailJob?.startedAt && detailJob?.completedAt && (
+                <span className="ml-2">
+                  Duration: {formatDuration(detailJob.startedAt, detailJob.completedAt)}
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="overflow-auto flex-1 space-y-3">
+            {detailJob?.error && (
+              <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3">
+                <p className="text-xs font-medium text-destructive mb-1">Error</p>
+                <pre className="text-xs font-mono whitespace-pre-wrap break-words text-destructive" data-testid="text-sb-error-detail">
+                  {detailJob.error}
+                </pre>
+              </div>
+            )}
+            {Array.isArray(detailJob?.orderNumbers) && detailJob!.orderNumbers!.length > 0 && (
+              <div className="rounded-md border bg-muted/50 p-3">
+                <p className="text-xs font-medium mb-1">Input Order Numbers ({detailJob!.orderNumbers!.length})</p>
+                <p className="text-xs font-mono break-words" data-testid="text-sb-order-numbers">
+                  {detailJob!.orderNumbers!.join(", ")}
+                </p>
+              </div>
+            )}
+            {detailJob?.result != null && (
+              <div className="rounded-md border bg-muted/50 p-4">
+                <p className="text-xs font-medium mb-1">Result</p>
+                <pre className="text-xs font-mono whitespace-pre-wrap break-words" data-testid="text-sb-result-json">
+                  {JSON.stringify(detailJob.result, null, 2)}
+                </pre>
+              </div>
+            )}
+            {!detailJob?.error && !detailJob?.result && (!Array.isArray(detailJob?.orderNumbers) || detailJob!.orderNumbers!.length === 0) && (
+              <p className="text-sm text-muted-foreground">No detail data available</p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
 function RateCheckerTab() {
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState("all");
@@ -2247,6 +2675,9 @@ export default function LifecyclePhases() {
           <TabsTrigger value="rate-checker" data-testid="tab-rate-checker">
             Rate Checker
           </TabsTrigger>
+          <TabsTrigger value="session-builder" data-testid="tab-session-builder">
+            Session Builder
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="state-machine">
@@ -2272,6 +2703,10 @@ export default function LifecyclePhases() {
 
         <TabsContent value="rate-checker">
           <RateCheckerTab />
+        </TabsContent>
+
+        <TabsContent value="session-builder">
+          <SessionBuilderTab />
         </TabsContent>
       </Tabs>
     </div>
