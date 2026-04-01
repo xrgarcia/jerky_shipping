@@ -613,18 +613,16 @@ export default function Fingerprints() {
 
   const filteredBuildOrders = useMemo(() => {
     if (!readyToSessionOrdersData?.orders) return [];
+    const userIsFiltering = defaultBuildTags.size > 0 &&
+      [...defaultBuildTags].some(tag => !selectedBuildTags.has(tag));
     let orders = readyToSessionOrdersData.orders.filter(order => {
       if (selectedBuildStationTypes.size > 0) {
         const stationTypeKey = order.stationType || '__none__';
         if (!selectedBuildStationTypes.has(stationTypeKey)) return false;
       }
       const orderTagNames = order.tags?.map(t => t.name) || [];
-      const uncheckedTags = orderTagNames.filter(tag => !selectedBuildTags.has(tag));
-      if (uncheckedTags.length > 0) return false;
-      const userIsFiltering = defaultBuildTags.size > 0 &&
-        [...defaultBuildTags].some(tag => !selectedBuildTags.has(tag));
+      if (orderTagNames.some(tag => !selectedBuildTags.has(tag))) return false;
       if (userIsFiltering && orderTagNames.length === 0) return false;
-      if (userIsFiltering && !orderTagNames.some(tag => selectedBuildTags.has(tag))) return false;
       return true;
     });
     if (buildOrderSearch.trim()) {
