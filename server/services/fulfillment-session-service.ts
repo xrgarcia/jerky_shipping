@@ -217,16 +217,13 @@ async function fetchAndMatchSaleIds(
     }
 
     if (matchedPairs.length > 0) {
-      const ids = matchedPairs.map(p => p.id);
-      const saleIds = matchedPairs.map(p => p.saleId);
+      const values = matchedPairs.map(p => sql`(${p.id}, ${p.saleId})`);
+      const valuesList = sql.join(values, sql`, `);
       await db.execute(sql`
         UPDATE shipments
         SET sale_id = batch.sale_id,
             updated_at = NOW()
-        FROM (
-          SELECT unnest(${ids}::text[]) AS id,
-                 unnest(${saleIds}::text[]) AS sale_id
-        ) AS batch
+        FROM (VALUES ${valuesList}) AS batch(id, sale_id)
         WHERE shipments.id = batch.id
       `);
     }
@@ -817,15 +814,14 @@ export class FulfillmentSessionService {
     const startSpot = (maxSpotResult?.maxSpot || 0) + 1;
 
     await db.transaction(async (tx) => {
+      const values = validIds.map((id, i) => sql`(${id}, ${startSpot + i})`);
+      const valuesList = sql.join(values, sql`, `);
       await tx.execute(sql`
         UPDATE shipments
         SET fulfillment_session_id = ${sessionId},
             smart_session_spot = spot_assign.spot,
             updated_at = NOW()
-        FROM (
-          SELECT unnest(${validIds}::text[]) AS id,
-                 generate_series(${startSpot}, ${startSpot + validIds.length - 1}) AS spot
-        ) AS spot_assign
+        FROM (VALUES ${valuesList}) AS spot_assign(id, spot)
         WHERE shipments.id = spot_assign.id
       `);
 
@@ -1365,15 +1361,14 @@ export class FulfillmentSessionService {
 
         if (!created) return null;
 
+        const values = validIds.map((id, i) => sql`(${id}, ${i + 1})`);
+        const valuesList = sql.join(values, sql`, `);
         await tx.execute(sql`
           UPDATE shipments
           SET fulfillment_session_id = ${created.id},
               smart_session_spot = spot_assign.spot,
               updated_at = NOW()
-          FROM (
-            SELECT unnest(${validIds}::text[]) AS id,
-                   generate_series(1, ${validIds.length}) AS spot
-          ) AS spot_assign
+          FROM (VALUES ${valuesList}) AS spot_assign(id, spot)
           WHERE shipments.id = spot_assign.id
         `);
 
