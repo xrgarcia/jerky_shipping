@@ -15014,7 +15014,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      const sessions = await fulfillmentSessionService.getSessions(status as any);
+      const orderNumber = (req.query.orderNumber as string || "").trim() || undefined;
+      const sessions = await fulfillmentSessionService.getSessions(status as any, orderNumber);
       res.json(sessions);
     } catch (error: any) {
       console.error("[FulfillmentSessions] Error getting sessions:", error);

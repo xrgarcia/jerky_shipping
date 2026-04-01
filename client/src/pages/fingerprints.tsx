@@ -407,6 +407,8 @@ export default function Fingerprints() {
   const buildStartTimeRef = useRef<number | null>(null);
   const [expandedSessions, setExpandedSessions] = useState<Set<string>>(new Set());
   const [sessionDetails, setSessionDetails] = useState<Record<string, SessionDetailResponse>>({});
+  const [sessionOrderSearch, setSessionOrderSearch] = useState("");
+  const [debouncedSessionOrderSearch, setDebouncedSessionOrderSearch] = useState("");
   const [sessionToDelete, setSessionToDelete] = useState<FulfillmentSession | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<UncategorizedProduct | null>(null);
   const [selectedFingerprintForShipments, setSelectedFingerprintForShipments] = useState<string | null>(null);
@@ -467,6 +469,11 @@ export default function Fingerprints() {
     }
   }, [activeTab, filter]);
   
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSessionOrderSearch(sessionOrderSearch), 300);
+    return () => clearTimeout(timer);
+  }, [sessionOrderSearch]);
+
   // Session selection state for bulk release
   const [selectedSessionIds, setSelectedSessionIds] = useState<Set<string>>(new Set());
   
@@ -616,7 +623,14 @@ export default function Fingerprints() {
     isLoading: liveSessionsLoading,
     refetch: refetchLiveSessions,
   } = useQuery<FulfillmentSession[]>({
-    queryKey: ["/api/fulfillment-sessions"],
+    queryKey: ["/api/fulfillment-sessions", { orderNumber: debouncedSessionOrderSearch || undefined }],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (debouncedSessionOrderSearch) params.set('orderNumber', debouncedSessionOrderSearch);
+      const res = await fetch(`/api/fulfillment-sessions${params.toString() ? `?${params}` : ''}`, { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch sessions');
+      return res.json();
+    },
   });
 
   // Ready-to-session orders (for Build Sessions tab table)
@@ -1361,7 +1375,7 @@ export default function Fingerprints() {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
               <Eye className="h-4 w-4" />
-              Live Sessions
+              Sessions
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -1417,7 +1431,7 @@ export default function Fingerprints() {
           </TabsTrigger>
           <TabsTrigger value="live" className="flex items-center gap-2" data-testid="tab-live">
             <Eye className="h-4 w-4" />
-            Live
+            Sessions
             {liveSessions.length > 0 && (
               <Badge variant="secondary" className="ml-1 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
                 {liveSessions.length}
@@ -3003,7 +3017,7 @@ export default function Fingerprints() {
         <TabsContent value="live" className="mt-6">
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
                 <div>
                   <CardTitle className="flex items-center gap-2">
                     <Eye className="h-5 w-5" />
@@ -3018,33 +3032,64 @@ export default function Fingerprints() {
                     </div>
                   )}
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => refetchLiveSessions()}
-                  data-testid="button-refresh-sessions"
-                >
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Refresh
-                </Button>
+                <div className="flex items-center gap-2">
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Filter by order #"
+                      value={sessionOrderSearch}
+                      onChange={(e) => setSessionOrderSearch(e.target.value)}
+                      className="pl-8 w-48"
+                      data-testid="input-session-order-search"
+                    />
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => refetchLiveSessions()}
+                    data-testid="button-refresh-sessions"
+                  >
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Refresh
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent>
               {liveSessions.length === 0 ? (
                 <div className="text-center py-12">
                   <Eye className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">No Active Sessions</h3>
-                  <p className="text-muted-foreground mb-4">
-                    Build sessions from the Build tab to see them here
-                  </p>
-                  <Button
-                    variant="outline"
-                    onClick={() => setActiveTab('sessions')}
-                    data-testid="button-go-to-build"
-                  >
-                    <ArrowRight className="h-4 w-4 mr-2" />
-                    Go to Build Sessions
-                  </Button>
+                  {debouncedSessionOrderSearch ? (
+                    <>
+                      <h3 className="text-lg font-semibold mb-2">No Matching Sessions</h3>
+                      <p className="text-muted-foreground mb-4">
+                        No sessions contain an order matching "{debouncedSessionOrderSearch}"
+                      </p>
+                      <Button
+                        variant="outline"
+                        onClick={() => setSessionOrderSearch('')}
+                        data-testid="button-clear-session-search"
+                      >
+                        <X className="h-4 w-4 mr-2" />
+                        Clear Search
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <h3 className="text-lg font-semibold mb-2">No Active Sessions</h3>
+                      <p className="text-muted-foreground mb-4">
+                        Build sessions from the Build tab to see them here
+                      </p>
+                      <Button
+                        variant="outline"
+                        onClick={() => setActiveTab('sessions')}
+                        data-testid="button-go-to-build"
+                      >
+                        <ArrowRight className="h-4 w-4 mr-2" />
+                        Go to Build Sessions
+                      </Button>
+                    </>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-4">

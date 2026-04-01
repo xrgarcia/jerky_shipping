@@ -25,7 +25,7 @@ import {
   type Station,
   type FulfillmentSessionStatus,
 } from "@shared/schema";
-import { eq, and, or, isNull, isNotNull, ne, desc, asc, inArray, sql } from "drizzle-orm";
+import { eq, and, or, isNull, isNotNull, ne, desc, asc, inArray, sql, ilike, type SQL } from "drizzle-orm";
 import { queueLifecycleEvaluationBatch, updateShipmentLifecycleBatch } from "./lifecycle-service";
 import { skuVaultService } from "./skuvault-service";
 
@@ -939,8 +939,21 @@ export class FulfillmentSessionService {
   /**
    * Get all sessions with optional status filter, including station name and total weight
    */
-  async getSessions(status?: FulfillmentSessionStatus): Promise<FulfillmentSessionWithStation[]> {
-    const conditions = status ? [eq(fulfillmentSessions.status, status)] : [];
+  async getSessions(status?: FulfillmentSessionStatus, orderNumber?: string): Promise<FulfillmentSessionWithStation[]> {
+    const conditions: SQL[] = [];
+    if (status) {
+      conditions.push(eq(fulfillmentSessions.status, status));
+    }
+    if (orderNumber) {
+      const matchingSessionIds = db
+        .selectDistinct({ sessionId: shipments.fulfillmentSessionId })
+        .from(shipments)
+        .where(and(
+          isNotNull(shipments.fulfillmentSessionId),
+          ilike(shipments.orderNumber, `%${orderNumber}%`),
+        ));
+      conditions.push(inArray(fulfillmentSessions.id, matchingSessionIds));
+    }
 
     const sessions = await db
       .select({
