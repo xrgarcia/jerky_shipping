@@ -1693,17 +1693,22 @@ export class SkuVaultService {
           if (qcSale) {
             console.log(`[SkuVault QC Sales] Found matching QC Sale for shipment suffix ${shipmentIdSuffix} in initial results`);
           } else if (qcSales.length === 1) {
-            // SINGLE RESULT FALLBACK: For Amazon orders and single-shipment orders,
-            // SkuVault may use internal SaleId format (e.g., "1-352444-8-12075-ORDER-NUMBER")
-            // that doesn't contain the ShipStation suffix.
-            // If we have exactly ONE result that contains the order number, accept it.
             const singleResult = qcSales[0];
-            const saleIdUpper = (singleResult.SaleId || '').toUpperCase();
+            const saleId = singleResult.SaleId || '';
+            const saleIdUpper = saleId.toUpperCase();
             const orderNumberUpper = orderNumber.toUpperCase();
             
             if (saleIdUpper.includes(orderNumberUpper)) {
-              qcSale = singleResult;
-              console.log(`[SkuVault QC Sales] Single result contains order number - accepting as match (SaleId: ${singleResult.SaleId})`);
+              const orderIdx = saleId.toUpperCase().lastIndexOf(orderNumberUpper);
+              const afterOrderNumber = saleId.substring(orderIdx + orderNumber.length);
+              const trailingSuffixMatch = afterOrderNumber.match(/-(\d+)$/);
+              
+              if (trailingSuffixMatch && trailingSuffixMatch[1] !== shipmentIdSuffix) {
+                console.log(`[SkuVault QC Sales] Single result SaleId ends with suffix ${trailingSuffixMatch[1]} which belongs to a different shipment (looking for ${shipmentIdSuffix}), rejecting and trying composite search... (SaleId: ${saleId})`);
+              } else {
+                qcSale = singleResult;
+                console.log(`[SkuVault QC Sales] Single result contains order number - accepting as match (SaleId: ${saleId})`);
+              }
             } else {
               console.log(`[SkuVault QC Sales] Single result doesn't contain order number, trying composite search...`);
             }
