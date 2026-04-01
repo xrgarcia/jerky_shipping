@@ -1,10 +1,11 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { BUILD_DEFAULT_EXCLUDED_TAGS } from "@shared/constants";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
@@ -200,6 +201,31 @@ interface BuildSessionsResult {
   }>;
 }
 
+interface BuildJobStatus {
+  id: number;
+  status: string;
+  userId: string;
+  progressPhase: string | null;
+  progressPercent: number;
+  progressDetail: string | null;
+  sessionsCreated: number;
+  shipmentsAssigned: number;
+  shipmentsSkipped: number;
+  result: BuildSessionsResult | null;
+  error: string | null;
+  createdAt: string;
+  startedAt: string | null;
+  completedAt: string | null;
+}
+
+const PHASE_LABELS: Record<string, string> = {
+  finding_orders: "Finding eligible orders",
+  grouping: "Grouping shipments by station",
+  creating_sessions: "Creating sessions",
+  matching_sales: "Matching sale IDs",
+  completing: "Finalizing",
+};
+
 interface FulfillmentSession {
   id: string;
   name: string | null;
@@ -372,6 +398,8 @@ export default function Fingerprints() {
     stationType: "",
   });
   const [lastBuildResult, setLastBuildResult] = useState<BuildSessionsResult | null>(null);
+  const [activeBuildJobId, setActiveBuildJobId] = useState<number | null>(null);
+  const buildStartTimeRef = useRef<number | null>(null);
   const [expandedSessions, setExpandedSessions] = useState<Set<string>>(new Set());
   const [sessionDetails, setSessionDetails] = useState<Record<string, SessionDetailResponse>>({});
   const [sessionToDelete, setSessionToDelete] = useState<FulfillmentSession | null>(null);
@@ -597,6 +625,66 @@ export default function Fingerprints() {
     enabled: activeTab === 'sessions',
   });
 
+  const { data: activeJobData } = useQuery<{ job: BuildJobStatus | null }>({
+    queryKey: ["/api/fulfillment-sessions/build-jobs/active"],
+    enabled: !activeBuildJobId,
+  });
+
+  useEffect(() => {
+    if (activeJobData?.job?.id && !activeBuildJobId) {
+      setActiveBuildJobId(activeJobData.job.id);
+      buildStartTimeRef.current = new Date(activeJobData.job.startedAt || activeJobData.job.createdAt).getTime();
+      setActiveTab('sessions');
+    }
+  }, [activeJobData]);
+
+  const { data: buildJobStatus } = useQuery<BuildJobStatus>({
+    queryKey: ["/api/fulfillment-sessions/build-jobs", activeBuildJobId],
+    enabled: !!activeBuildJobId,
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      if (status === 'completed' || status === 'failed') return false;
+      return 1500;
+    },
+  });
+
+  useEffect(() => {
+    if (!buildJobStatus) return;
+
+    if (buildJobStatus.status === 'completed') {
+      const r = buildJobStatus.result;
+      if (r && r.shipmentsAssigned > 0) {
+        setLastBuildResult(r);
+        toast({
+          title: "Sessions Created",
+          description: `Created ${r.sessionsCreated} sessions with ${r.shipmentsAssigned} orders`,
+        });
+        setActiveTab('live');
+      } else {
+        toast({
+          title: "No Orders Assigned",
+          description: r?.errors?.length ? r.errors.join(", ") : "No eligible orders found for session building.",
+          variant: "destructive",
+        });
+      }
+      setActiveBuildJobId(null);
+      buildStartTimeRef.current = null;
+      setSelectedBuildOrderNumbers(new Set());
+      queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions/preview"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions/ready-to-session-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-prep/stats"] });
+    } else if (buildJobStatus.status === 'failed') {
+      toast({
+        title: "Session build failed",
+        description: buildJobStatus.error || "An unknown error occurred",
+        variant: "destructive",
+      });
+      setActiveBuildJobId(null);
+      buildStartTimeRef.current = null;
+    }
+  }, [buildJobStatus?.status]);
+
   // Initialize tag filter with all tags checked EXCEPT default excluded tags
   useEffect(() => {
     if (readyToSessionOrdersData?.orders && !buildTagsInitialized) {
@@ -770,41 +858,26 @@ export default function Fingerprints() {
         body.orderNumbers = orderNumbers;
       }
       const res = await apiRequest("POST", "/api/fulfillment-sessions/build", body);
-      return res.json() as Promise<BuildSessionsResult>;
+      return res.json() as Promise<{ jobId: number; status: string }>;
     },
-    onSuccess: (result) => {
-      if (result.success && result.shipmentsAssigned > 0) {
-        setLastBuildResult(result);
-        setSelectedBuildOrderNumbers(new Set());
-        toast({
-          title: "Sessions Created",
-          description: `Created ${result.sessionsCreated} sessions with ${result.shipmentsAssigned} orders`,
-        });
-        queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions/preview"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions/ready-to-session-orders"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-prep/stats"] });
-        setActiveTab('live');
-      } else if (result.success && result.shipmentsAssigned === 0) {
-        setLastBuildResult(result);
-        toast({
-          title: "No Orders Assigned",
-          description: result.errors.length > 0 
-            ? result.errors.join(", ") 
-            : "No eligible orders found for session building. Orders may need packaging or station assignment first.",
-          variant: "destructive",
-        });
-        queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions/preview"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/fulfillment-sessions/ready-to-session-orders"] });
-      } else {
-        toast({
-          title: "Failed to build sessions",
-          description: result.errors.join(", "),
-          variant: "destructive",
-        });
+    onSuccess: (data) => {
+      setActiveBuildJobId(data.jobId);
+      buildStartTimeRef.current = Date.now();
+    },
+    onError: async (error: any) => {
+      if (error?.message?.includes("409")) {
+        try {
+          const res = await fetch("/api/fulfillment-sessions/build-jobs/active");
+          if (res.ok) {
+            const data = await res.json();
+            if (data.job?.id) {
+              setActiveBuildJobId(data.job.id);
+              buildStartTimeRef.current = new Date(data.job.startedAt || data.job.createdAt).getTime();
+              return;
+            }
+          }
+        } catch {}
       }
-    },
-    onError: (error: Error) => {
       toast({
         title: "Error building sessions",
         description: error.message,
@@ -2656,6 +2729,8 @@ export default function Fingerprints() {
                     .filter(order => order.readyToSession)
                     .map(order => order.orderNumber);
                   
+                  const isBuildActive = !!activeBuildJobId || buildSessionsMutation.isPending;
+                  
                   return (
                     <Button
                       onClick={() => {
@@ -2663,13 +2738,13 @@ export default function Fingerprints() {
                           buildSessionsMutation.mutate(visibleSelectedOrders);
                         }
                       }}
-                      disabled={buildSessionsMutation.isPending || visibleSelectedOrders.length === 0}
+                      disabled={isBuildActive || visibleSelectedOrders.length === 0}
                       data-testid="button-build-sessions"
                     >
-                      {buildSessionsMutation.isPending ? (
+                      {isBuildActive ? (
                         <>
                           <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Building...
+                          Build in Progress...
                         </>
                       ) : (
                         <>
@@ -2685,6 +2760,46 @@ export default function Fingerprints() {
               </div>
             </CardHeader>
             <CardContent>
+              {buildJobStatus && activeBuildJobId && (buildJobStatus.status === 'queued' || buildJobStatus.status === 'processing') && (
+                <div className="mb-6 p-4 rounded-lg border border-border bg-muted/40" data-testid="build-progress-bar">
+                  <div className="flex items-center justify-between gap-4 mb-2">
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                      <span className="font-medium text-sm" data-testid="text-build-phase">
+                        {buildJobStatus.status === 'queued' 
+                          ? 'Waiting to start...' 
+                          : buildJobStatus.progressPhase 
+                            ? (PHASE_LABELS[buildJobStatus.progressPhase] || buildJobStatus.progressPhase)
+                            : 'Building Sessions'}
+                      </span>
+                    </div>
+                    <span className="text-sm text-muted-foreground tabular-nums" data-testid="text-build-percent">
+                      {buildJobStatus.progressPercent}%
+                    </span>
+                  </div>
+                  <Progress value={buildJobStatus.progressPercent} className="h-2 mb-2" />
+                  <div className="flex items-center justify-between gap-4 flex-wrap">
+                    <span className="text-xs text-muted-foreground" data-testid="text-build-detail">
+                      {buildJobStatus.progressDetail || (buildJobStatus.status === 'queued' ? 'Queued for processing' : 'Starting...')}
+                    </span>
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                      {buildJobStatus.progressPercent > 0 && buildStartTimeRef.current && (() => {
+                        const elapsed = Date.now() - buildStartTimeRef.current!;
+                        const estimated = (elapsed / buildJobStatus.progressPercent) * (100 - buildJobStatus.progressPercent);
+                        const secs = Math.max(1, Math.round(estimated / 1000));
+                        return <span data-testid="text-build-eta">{secs < 60 ? `~${secs}s remaining` : `~${Math.ceil(secs / 60)}m remaining`}</span>;
+                      })()}
+                      {(buildJobStatus.sessionsCreated > 0 || buildJobStatus.shipmentsAssigned > 0) && (
+                        <span data-testid="text-build-counters">
+                          {buildJobStatus.sessionsCreated > 0 && `${buildJobStatus.sessionsCreated} session${buildJobStatus.sessionsCreated !== 1 ? 's' : ''}`}
+                          {buildJobStatus.sessionsCreated > 0 && buildJobStatus.shipmentsAssigned > 0 && ' · '}
+                          {buildJobStatus.shipmentsAssigned > 0 && `${buildJobStatus.shipmentsAssigned} assigned`}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
               {filteredReadyCount > 0 && (
                 <div className="mb-6 p-4 rounded-lg border border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/30">
                   <div className="flex items-start gap-3">
