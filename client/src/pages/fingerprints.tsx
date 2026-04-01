@@ -445,6 +445,7 @@ export default function Fingerprints() {
   
   // Tag filter state for Build tab
   const [selectedBuildTags, setSelectedBuildTags] = useState<Set<string>>(new Set());
+  const [defaultBuildTags, setDefaultBuildTags] = useState<Set<string>>(new Set());
   const [buildTagsInitialized, setBuildTagsInitialized] = useState(false);
 
   // Order search and sort state for Build tab
@@ -605,6 +606,7 @@ export default function Fingerprints() {
       });
       BUILD_DEFAULT_EXCLUDED_TAGS.forEach(tag => allTagNames.delete(tag));
       setSelectedBuildTags(allTagNames);
+      setDefaultBuildTags(new Set(allTagNames));
       setBuildTagsInitialized(true);
     }
   }, [readyToSessionOrdersData, buildTagsInitialized]);
@@ -619,6 +621,10 @@ export default function Fingerprints() {
       const orderTagNames = order.tags?.map(t => t.name) || [];
       const uncheckedTags = orderTagNames.filter(tag => !selectedBuildTags.has(tag));
       if (uncheckedTags.length > 0) return false;
+      const userIsFiltering = defaultBuildTags.size > 0 &&
+        [...defaultBuildTags].some(tag => !selectedBuildTags.has(tag));
+      if (userIsFiltering && orderTagNames.length === 0) return false;
+      if (userIsFiltering && !orderTagNames.some(tag => selectedBuildTags.has(tag))) return false;
       return true;
     });
     if (buildOrderSearch.trim()) {
@@ -632,7 +638,7 @@ export default function Fingerprints() {
       });
     }
     return orders;
-  }, [readyToSessionOrdersData, selectedBuildStationTypes, selectedBuildTags, buildOrderSearch, buildOrderSortDir]);
+  }, [readyToSessionOrdersData, selectedBuildStationTypes, selectedBuildTags, defaultBuildTags, buildOrderSearch, buildOrderSortDir]);
 
   // Mutations
   const assignMutation = useMutation({
