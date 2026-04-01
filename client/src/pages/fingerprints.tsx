@@ -225,6 +225,7 @@ const PHASE_LABELS: Record<string, string> = {
   finding_orders: "Finding eligible orders",
   grouping: "Grouping shipments by station",
   creating_sessions: "Creating sessions",
+  updating_lifecycle: "Updating lifecycle",
   matching_sales: "Matching sale IDs",
   completing: "Finalizing",
 };

@@ -1381,6 +1381,7 @@ const SB_PHASE_LABELS: Record<string, string> = {
   finding_orders: "Finding Orders",
   grouping: "Grouping",
   creating_sessions: "Creating Sessions",
+  updating_lifecycle: "Updating Lifecycle",
   matching_sales: "Matching Sales",
   completing: "Completing",
 };

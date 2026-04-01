@@ -14422,8 +14422,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .leftJoin(fingerprintModels, eq(shipments.fingerprintId, fingerprintModels.fingerprintId))
         .leftJoin(packagingTypes, eq(fingerprintModels.packagingTypeId, packagingTypes.id))
         .where(
-          // Use lifecycle_phase as single source of truth
-          eq(shipments.lifecyclePhase, 'ready_to_session')
+          and(
+            eq(shipments.lifecyclePhase, 'ready_to_session'),
+            isNull(shipments.fulfillmentSessionId),
+          )
         )
         .orderBy(asc(shipments.orderNumber));
 

@@ -26,7 +26,7 @@ import {
   type FulfillmentSessionStatus,
 } from "@shared/schema";
 import { eq, and, or, isNull, isNotNull, ne, desc, asc, inArray, sql } from "drizzle-orm";
-import { queueLifecycleEvaluationBatch } from "./lifecycle-service";
+import { queueLifecycleEvaluationBatch, updateShipmentLifecycleBatch } from "./lifecycle-service";
 import { skuVaultService } from "./skuvault-service";
 
 // ============================================================================
@@ -515,7 +515,43 @@ export class FulfillmentSessionService {
       
       if (sessionableShipments.length === 0) {
         console.log(`[FulfillmentSession] No sessionable shipments found - returning early`);
-        result.errors.push('No sessionable shipments found');
+        if (orderNumbers && orderNumbers.length > 0) {
+          const requestedShipments = await db.select({
+            orderNumber: shipments.orderNumber,
+            fulfillmentSessionId: shipments.fulfillmentSessionId,
+            decisionSubphase: shipments.decisionSubphase,
+            packagingTypeId: shipments.packagingTypeId,
+            assignedStationId: shipments.assignedStationId,
+          })
+          .from(shipments)
+          .where(inArray(shipments.orderNumber, orderNumbers));
+
+          const foundOrderNumbers = new Set(requestedShipments.map(s => s.orderNumber));
+          for (const on of orderNumbers) {
+            if (!foundOrderNumbers.has(on)) {
+              result.skippedOrders.push({ orderNumber: on, reason: 'Order not found' });
+            }
+          }
+          for (const s of requestedShipments) {
+            if (s.fulfillmentSessionId) {
+              result.skippedOrders.push({ orderNumber: s.orderNumber, reason: 'Already in a session' });
+            } else if (s.decisionSubphase !== 'needs_session') {
+              result.skippedOrders.push({ orderNumber: s.orderNumber, reason: `In ${s.decisionSubphase} subphase` });
+            } else if (!s.packagingTypeId) {
+              result.skippedOrders.push({ orderNumber: s.orderNumber, reason: 'Missing packaging' });
+            } else if (!s.assignedStationId) {
+              result.skippedOrders.push({ orderNumber: s.orderNumber, reason: 'Missing station' });
+            }
+          }
+          result.shipmentsSkipped = result.skippedOrders.length;
+          if (result.skippedOrders.length > 0) {
+            result.errors.push(`${result.skippedOrders.length} orders not eligible`);
+          } else {
+            result.errors.push('No sessionable shipments found');
+          }
+        } else {
+          result.errors.push('No sessionable shipments found');
+        }
         return result;
       }
 
@@ -590,6 +626,8 @@ export class FulfillmentSessionService {
           shipmentsSkipped: result.shipmentsSkipped,
         });
       }
+
+      await onProgress?.('updating_lifecycle', 85, `Updating lifecycle for ${result.shipmentsAssigned} shipments`);
 
       await onProgress?.('matching_sales', 90, 'Matching sale IDs');
 
@@ -834,15 +872,8 @@ export class FulfillmentSessionService {
         .where(eq(fulfillmentSessions.id, sessionId));
     });
 
-    const addedShipmentRows = await db
-      .select({ id: shipments.id, orderNumber: shipments.orderNumber })
-      .from(shipments)
-      .where(inArray(shipments.id, validIds));
-    await queueLifecycleEvaluationBatch(
-      addedShipmentRows.map(s => ({ shipmentId: s.id, orderNumber: s.orderNumber || undefined })),
-      'session_add'
-    );
-    console.log(`[FulfillmentSession] Queued ${addedShipmentRows.length} lifecycle events with 'session_add' reason`);
+    await updateShipmentLifecycleBatch(validIds);
+    console.log(`[FulfillmentSession] Updated lifecycle for ${validIds.length} shipments after session_add`);
     
     const saleIdResult = await fetchAndMatchSaleIds(validIds);
     if (saleIdResult.matched > 0 || saleIdResult.unmatched > 0) {
@@ -1377,15 +1408,8 @@ export class FulfillmentSessionService {
 
       if (!session) return { session: null, added: 0, skipped };
 
-      const createdShipmentRows = await db
-        .select({ id: shipments.id, orderNumber: shipments.orderNumber })
-        .from(shipments)
-        .where(inArray(shipments.id, validIds));
-      await queueLifecycleEvaluationBatch(
-        createdShipmentRows.map(s => ({ shipmentId: s.id, orderNumber: s.orderNumber || undefined })),
-        'session_create'
-      );
-      console.log(`[FulfillmentSession] Queued ${createdShipmentRows.length} lifecycle events with 'session_create' reason`);
+      await updateShipmentLifecycleBatch(validIds);
+      console.log(`[FulfillmentSession] Updated lifecycle for ${validIds.length} shipments after session_create`);
       
       const saleIdResult = await fetchAndMatchSaleIds(validIds);
       if (saleIdResult.matched > 0 || saleIdResult.unmatched > 0) {
