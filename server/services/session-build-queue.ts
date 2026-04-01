@@ -214,12 +214,20 @@ async function processNextSessionBuild(): Promise<boolean> {
       return true;
     }
 
+    let errorSummary: string | null = null;
+    if (result.shipmentsAssigned === 0 && result.skippedOrders?.length > 0) {
+      const skippedSummary = result.skippedOrders
+        .map((s: { orderNumber: string; reason: string }) => `${s.orderNumber}: ${s.reason}`)
+        .join('; ');
+      errorSummary = `All orders skipped: ${skippedSummary}`;
+    }
+
     await db.update(sessionBuildQueue)
       .set({
         status: 'completed',
         completedAt: new Date(),
         result: result,
-        error: null,
+        error: errorSummary,
         progressPhase: 'completing',
         progressPercent: 100,
         progressDetail: `Done: ${result.sessionsCreated} sessions, ${result.shipmentsAssigned} shipments`,

@@ -1569,7 +1569,10 @@ function SessionBuilderTab() {
                   </TableHeader>
                   <TableBody>
                     {jobsData.jobs.map((job) => {
-                      const statusMeta = STATUS_BADGE_MAP[job.status] ?? { variant: "outline" as const, label: job.status };
+                      const isZeroAssignment = job.status === 'completed' && (job.shipmentsAssigned ?? 0) === 0;
+                      const statusMeta = isZeroAssignment
+                        ? { variant: "default" as const, className: "bg-amber-500 dark:bg-amber-600", label: "No Assignments" }
+                        : STATUS_BADGE_MAP[job.status] ?? { variant: "outline" as const, label: job.status };
                       const orderCount = Array.isArray(job.orderNumbers) ? job.orderNumbers.length : null;
                       return (
                         <TableRow key={job.id} data-testid={`row-sb-job-${job.id}`}>
@@ -1713,14 +1716,20 @@ function SessionBuilderTab() {
           <DialogHeader>
             <DialogTitle className="text-sm font-mono">
               Build Job #{detailJob?.id}
-              {detailJob && (
-                <Badge
-                  variant={STATUS_BADGE_MAP[detailJob.status]?.variant ?? "outline"}
-                  className={`no-default-active-elevate text-xs font-mono ml-2 ${STATUS_BADGE_MAP[detailJob.status]?.className ?? ""}`}
-                >
-                  {STATUS_BADGE_MAP[detailJob.status]?.label ?? detailJob.status}
-                </Badge>
-              )}
+              {detailJob && (() => {
+                const isZero = detailJob.status === 'completed' && (detailJob.shipmentsAssigned ?? 0) === 0;
+                const meta = isZero
+                  ? { variant: "default" as const, className: "bg-amber-500 dark:bg-amber-600", label: "No Assignments" }
+                  : STATUS_BADGE_MAP[detailJob.status] ?? { variant: "outline" as const, label: detailJob.status };
+                return (
+                  <Badge
+                    variant={meta.variant}
+                    className={`no-default-active-elevate text-xs font-mono ml-2 ${meta.className ?? ""}`}
+                  >
+                    {meta.label}
+                  </Badge>
+                );
+              })()}
             </DialogTitle>
             <DialogDescription>
               {detailJob?.userId && <span>User: {detailJob.userId}</span>}

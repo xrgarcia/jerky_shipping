@@ -192,7 +192,9 @@ interface BuildSessionsResult {
   success: boolean;
   sessionsCreated: number;
   shipmentsAssigned: number;
+  shipmentsSkipped: number;
   errors: string[];
+  skippedOrders?: Array<{ orderNumber: string; reason: string }>;
   sessions?: Array<{
     id: string;
     name: string;
@@ -661,9 +663,14 @@ export default function Fingerprints() {
         });
         setActiveTab('live');
       } else {
+        setLastBuildResult(r || { sessionsCreated: 0, shipmentsAssigned: 0, shipmentsSkipped: 0, skippedOrders: [], errors: [] });
+        const skippedReasons = r?.skippedOrders?.map((s: { reason: string }) => s.reason) || [];
+        const uniqueReasons = [...new Set(skippedReasons)];
         toast({
           title: "No Orders Assigned",
-          description: r?.errors?.length ? r.errors.join(", ") : "No eligible orders found for session building.",
+          description: uniqueReasons.length > 0
+            ? `Skipped: ${uniqueReasons.join(', ')}`
+            : r?.errors?.length ? r.errors.join(", ") : "No eligible orders found for session building.",
           variant: "destructive",
         });
       }
@@ -2951,9 +2958,16 @@ export default function Fingerprints() {
                     <span className="font-medium text-amber-800 dark:text-amber-200">No Orders Were Assigned</span>
                   </div>
                   <div className="text-sm text-amber-700 dark:text-amber-300">
-                    {lastBuildResult.errors.length > 0 
-                      ? lastBuildResult.errors.join(". ") 
-                      : "No eligible orders found. Orders may need packaging or station assignment first."}
+                    {lastBuildResult.skippedOrders?.length > 0
+                      ? lastBuildResult.skippedOrders.map((s: { orderNumber: string; reason: string }, i: number) => (
+                          <div key={i} className="flex items-center gap-2">
+                            <span className="font-mono text-xs">{s.orderNumber}</span>
+                            <span className="text-xs">{s.reason}</span>
+                          </div>
+                        ))
+                      : lastBuildResult.errors.length > 0 
+                        ? lastBuildResult.errors.join(". ") 
+                        : "No eligible orders found. Orders may need packaging or station assignment first."}
                   </div>
                   <Button
                     variant="ghost"
