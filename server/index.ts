@@ -408,4 +408,23 @@ async function initializeAfterListen(storage: any) {
       console.error("Failed to bootstrap products from Shopify:", error);
     }
   }
+
+  const gracefulShutdown = async (signal: string) => {
+    log(`Received ${signal}, shutting down workers...`);
+    const { stopSessionBuildQueueWorker } = await import("./services/session-build-queue");
+    const { stopShipStationWriteQueueWorker } = await import("./services/shipstation-write-queue");
+    const { stopRateCheckQueueWorker } = await import("./services/rate-check-queue");
+    const { stopQcExplosionQueueWorker } = await import("./services/qc-explosion-queue");
+    const { stopLifecycleWorker } = await import("./lifecycle-event-worker");
+    stopSessionBuildQueueWorker();
+    stopShipStationWriteQueueWorker();
+    stopRateCheckQueueWorker();
+    stopQcExplosionQueueWorker();
+    stopLifecycleWorker();
+    log("All workers stopped");
+    process.exit(0);
+  };
+
+  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 }

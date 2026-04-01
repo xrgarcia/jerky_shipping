@@ -171,7 +171,7 @@ async function processNextSessionBuild(): Promise<boolean> {
       .set({
         status: 'completed',
         completedAt: new Date(),
-        result: result as any,
+        result: result,
         error: null,
         progressPhase: 'completing',
         progressPercent: 100,
