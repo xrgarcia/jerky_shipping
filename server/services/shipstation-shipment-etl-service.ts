@@ -13,7 +13,7 @@ import type { IStorage } from '../storage';
 import type { InsertShipment, InsertShipmentItem, InsertShipmentTag, InsertShipmentPackage } from '@shared/schema';
 import { db } from '../db';
 import { shipmentItems, shipmentTags, shipmentPackages, orderItems, shipmentQcItems, shipments } from '@shared/schema';
-import { eq, inArray } from 'drizzle-orm';
+import { eq, and, inArray, sql } from 'drizzle-orm';
 import { queueLifecycleEvaluation } from './lifecycle-service';
 import { READY_FOR_SHIPDOT_TAG } from '@shared/constants';
 import logger, { withOrder } from '../utils/logger';
@@ -183,60 +183,42 @@ export class ShipStationShipmentETLService {
     await this.processShipmentTags(finalShipmentId, shipmentData, orderNumber);
     await this.processShipmentPackages(finalShipmentId, shipmentData);
     
-    // GATE: Only queue lifecycle evaluation when the shipment is ready for processing.
-    // ShipStation automation rules (Product Defaults, On Hold, Move Over Tag) take
-    // several minutes to run after a shipment is first imported. If we trigger lifecycle
-    // evaluation too early, the package sync PUT fires before automation completes,
-    // causing race conditions (e.g., writing back null service_code).
-    //
-    // The warehouse workflow is:
-    //   1. Order imported → pending
-    //   2. ShipStation automation puts it on_hold (e.g., "On Hold 365 days" rule)
-    //   3. Warehouse manager releases the hold → status returns to pending
-    //   4. THAT is when lifecycle evaluation should begin
+    // GATE: Tag-based lifecycle entry with one-shot guarantee.
+    // The READY FOR SHIPDOT tag is the sole entry signal for the lifecycle state machine.
+    // Orders without the tag just get their data synced — no lifecycle evaluation.
     //
     // Rules:
     //   - Shipment already has a lifecycle phase → always evaluate (continue in-progress work)
-    //   - Previous status was on_hold, new status is pending → evaluate (manager released hold)
-    //   - Shipment has been pending for 10+ minutes without lifecycle phase → evaluate (fallback
-    //     for orders that never hit on_hold, e.g., automation disabled or manual changes)
-    //   - Shipment is on_hold, past grace period, and has the bypass tag → evaluate (READY FOR SHIPDOT)
-    //   - Otherwise (new shipment or still in initial setup) → skip evaluation
-    const previousStatus = existing?.shipmentStatus;
-    const newStatus = shipmentRecord.shipmentStatus;
+    //   - Has READY FOR SHIPDOT tag in local shipment_tags AND lifecycle_entry_queued is false
+    //     → queue evaluation, set lifecycle_entry_queued = true and tag_discovered_at = NOW()
+    //   - Otherwise → just sync data, don't touch lifecycle
     const hasLifecyclePhase = existing?.lifecyclePhase != null;
-    const isHoldRelease = previousStatus === 'on_hold' && newStatus === 'pending';
 
-    const AUTOMATION_GRACE_PERIOD_MS = 10 * 60 * 1000; // 10 minutes
-    const shipmentAge = existing?.createdAt
-      ? Date.now() - new Date(existing.createdAt).getTime()
-      : 0;
-    const isPendingPastGracePeriod = !hasLifecyclePhase
-      && newStatus === 'pending'
-      && previousStatus === 'pending'
-      && shipmentAge > AUTOMATION_GRACE_PERIOD_MS;
-
-    const incomingTagNames: string[] = Array.isArray(shipmentData?.tags)
-      ? shipmentData.tags.map((t: any) => t?.name?.trim()).filter(Boolean)
-      : [];
-    const isOnHoldWithBypassTag = !hasLifecyclePhase
-      && newStatus === 'on_hold'
-      && shipmentAge > AUTOMATION_GRACE_PERIOD_MS
-      && incomingTagNames.includes(READY_FOR_SHIPDOT_TAG);
-
-    if (hasLifecyclePhase || isHoldRelease || isPendingPastGracePeriod || isOnHoldWithBypassTag) {
+    if (hasLifecyclePhase) {
       await queueLifecycleEvaluation(finalShipmentId, 'shipment_sync', orderNumber || undefined);
-      if (isHoldRelease && !hasLifecyclePhase) {
-        logger.info(`[ETL] Hold released for ${orderNumber} (on_hold → pending) — lifecycle evaluation queued`, withOrder(orderNumber, String(shipmentId)));
-      }
-      if (isPendingPastGracePeriod) {
-        logger.info(`[ETL] Fallback: ${orderNumber} has been pending for ${Math.round(shipmentAge / 60000)}min without on_hold — lifecycle evaluation queued`, withOrder(orderNumber, String(shipmentId)));
-      }
-      if (isOnHoldWithBypassTag) {
-        logger.info(`[ETL] ${READY_FOR_SHIPDOT_TAG} tag detected on on_hold shipment ${orderNumber} (age: ${Math.round(shipmentAge / 60000)}min) — lifecycle evaluation queued`, withOrder(orderNumber, String(shipmentId)));
-      }
     } else {
-      logger.info(`[ETL] Skipping lifecycle evaluation for ${orderNumber} — shipment still in initial setup (status: ${newStatus}, previous: ${previousStatus || 'new'})`, withOrder(orderNumber, String(shipmentId)));
+      const alreadyQueued = existing?.lifecycleEntryQueued === true;
+
+      if (!alreadyQueued) {
+        const [hasReadyTag] = await db
+          .select({ id: shipmentTags.id })
+          .from(shipmentTags)
+          .where(
+            and(
+              eq(shipmentTags.shipmentId, finalShipmentId),
+              eq(shipmentTags.name, READY_FOR_SHIPDOT_TAG)
+            )
+          )
+          .limit(1);
+
+        if (hasReadyTag) {
+          await queueLifecycleEvaluation(finalShipmentId, 'shipment_sync', orderNumber || undefined);
+          await db.update(shipments)
+            .set({ lifecycleEntryQueued: true, tagDiscoveredAt: sql`COALESCE(${shipments.tagDiscoveredAt}, NOW())` })
+            .where(and(eq(shipments.id, finalShipmentId), eq(shipments.lifecycleEntryQueued, false)));
+          logger.info(`[ETL] ${READY_FOR_SHIPDOT_TAG} tag found for ${orderNumber} — lifecycle evaluation queued (one-shot)`, withOrder(orderNumber, String(shipmentId)));
+        }
+      }
     }
     
     return { id: finalShipmentId };

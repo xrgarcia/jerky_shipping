@@ -31,7 +31,7 @@ The UI/UX features a warm earth-tone palette and large typography for warehouse 
 ### System Design Choices
 - **Webhook Configuration**: Environment-aware webhook registration with automatic rollback.
 - **Worker Coordination Resilience**: Error handling with fail-safe semantics.
-- **On-Hold Shipment Handling**: Managed by the Unified Shipment Sync Worker's cursor-based polling; lifecycle evaluation is gated until hold release to prevent race conditions.
+- **On-Hold Shipment Handling**: Managed by the Unified Shipment Sync Worker's cursor-based polling. Lifecycle entry is tag-based: the READY FOR SHIPDOT tag in local `shipment_tags` is the sole entry signal, with a one-shot `lifecycle_entry_queued` flag preventing duplicate evaluations. `tag_discovered_at` timestamps when the tag was first detected for audit trail.
 - **Lifecycle State Machine**: Single source of truth for order status determination, preventing backward phase transitions.
 - **Decision Subphase Chain**: Defined progression within `fulfillment_prep` ensures proper evaluation order and data integrity.
 - **Kit Explosion Race Condition Prevention**: Multi-layered approach using caching, GCP sync, proactive hydration, and repair jobs.

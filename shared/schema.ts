@@ -382,6 +382,8 @@ export const shipments = pgTable("shipments", {
   lifecyclePhase: text("lifecycle_phase"), // Current phase: fulfillment_prep, ready_to_pick, picking, packing_ready, on_dock, picking_issues
   decisionSubphase: text("decision_subphase"), // Subphase within fulfillment_prep: needs_hydration, needs_categorization, needs_fingerprint, needs_packaging, needs_rate_check, needs_session
   lifecyclePhaseChangedAt: timestamp("lifecycle_phase_changed_at"), // When the lifecycle phase last changed
+  lifecycleEntryQueued: boolean("lifecycle_entry_queued").notNull().default(false),
+  tagDiscoveredAt: timestamp("tag_discovered_at"),
   // Rate check tracking (automated rate optimization)
   rateCheckStatus: text("rate_check_status"), // 'pending' | 'complete' | 'failed' | 'skipped' | null
   rateCheckAttemptedAt: timestamp("rate_check_attempted_at"), // When rate check was last attempted

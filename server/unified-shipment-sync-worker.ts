@@ -599,10 +599,7 @@ async function refreshTagsForOnHoldShipments(): Promise<{ queued: number; fetche
   const { shipmentTags } = await import('@shared/schema');
   const { queueLifecycleEvaluation } = await import('./services/lifecycle-service');
 
-  const GRACE_PERIOD_MS = 15 * 60 * 1000; // 15 minutes — automation fires ~12 steps over ~10 minutes
-  const graceCutoff = new Date(Date.now() - GRACE_PERIOD_MS).toISOString();
-
-  // All on_hold shipments with no lifecycle phase past the grace period
+  // All on_hold shipments that haven't entered the lifecycle yet (one-shot flag not set)
   const candidates = await db
     .select({
       id: shipments.id,
@@ -615,8 +612,8 @@ async function refreshTagsForOnHoldShipments(): Promise<{ queued: number; fetche
       and(
         eq(shipments.shipmentStatus, 'on_hold'),
         isNull(shipments.lifecyclePhase),
-        sql`${shipments.shipmentId} IS NOT NULL`,
-        lt(shipments.createdAt, sql`${graceCutoff}::timestamptz`)
+        eq(shipments.lifecycleEntryQueued, false),
+        sql`${shipments.shipmentId} IS NOT NULL`
       )
     )
     .limit(TAG_REFRESH_BATCH_SIZE);
@@ -641,9 +638,11 @@ async function refreshTagsForOnHoldShipments(): Promise<{ queued: number; fetche
       const localTagNames = new Set(localTags.map(t => t.name));
 
       if (localTagNames.has(READY_FOR_SHIPDOT_TAG)) {
-        // Tag already in DB — just ensure lifecycle evaluation is queued
         await queueLifecycleEvaluation(shipment.id, 'shipment_sync', shipment.orderNumber || undefined);
-        logger.info(`[UnifiedSync] Queuing lifecycle for on_hold ${shipment.orderNumber} — ${READY_FOR_SHIPDOT_TAG} tag already present locally`, withOrder(shipment.orderNumber, shipment.shipmentId));
+        await db.update(shipments)
+          .set({ lifecycleEntryQueued: true, tagDiscoveredAt: sql`COALESCE(${shipments.tagDiscoveredAt}, NOW())` })
+          .where(and(eq(shipments.id, shipment.id), eq(shipments.lifecycleEntryQueued, false)));
+        logger.info(`[UnifiedSync] Queuing lifecycle for on_hold ${shipment.orderNumber} — ${READY_FOR_SHIPDOT_TAG} tag already present locally (one-shot)`, withOrder(shipment.orderNumber, shipment.shipmentId));
         queued++;
         continue;
       }
@@ -689,7 +688,10 @@ async function refreshTagsForOnHoldShipments(): Promise<{ queued: number; fetche
           }
         }
         await queueLifecycleEvaluation(shipment.id, 'shipment_sync', shipment.orderNumber || undefined);
-        logger.info(`[UnifiedSync] ${READY_FOR_SHIPDOT_TAG} tag found in ShipStation for on_hold ${shipment.orderNumber} — tags updated, lifecycle queued`, withOrder(shipment.orderNumber, shipment.shipmentId));
+        await db.update(shipments)
+          .set({ lifecycleEntryQueued: true, tagDiscoveredAt: sql`COALESCE(${shipments.tagDiscoveredAt}, NOW())` })
+          .where(and(eq(shipments.id, shipment.id), eq(shipments.lifecycleEntryQueued, false)));
+        logger.info(`[UnifiedSync] ${READY_FOR_SHIPDOT_TAG} tag found in ShipStation for on_hold ${shipment.orderNumber} — tags updated, lifecycle queued (one-shot)`, withOrder(shipment.orderNumber, shipment.shipmentId));
         queued++;
       }
     } catch (err) {
