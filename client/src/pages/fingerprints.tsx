@@ -728,7 +728,7 @@ export default function Fingerprints() {
         if (!selectedBuildStationTypes.has(stationTypeKey)) return false;
       }
       const orderTagNames = order.tags?.map(t => t.name) || [];
-      if (!orderTagNames.every(tag => selectedBuildTags.has(tag))) return false;
+      if (!orderTagNames.some(tag => selectedBuildTags.has(tag))) return false;
       return true;
     });
     if (buildOrderSearch.trim()) {
