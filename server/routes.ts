@@ -8245,11 +8245,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // SKUVAULT IS SOURCE OF TRUTH: Validate barcode directly against SkuVault QCSale data
       // This bypasses shipment_items (from ShipStation) which may have different SKU formats
-      console.log(`[Packing Validation] Validating barcode ${barcode} against SkuVault QCSale for order ${orderNumber}`);
+      const shipmentIdStr = typeof shipmentId === 'string' ? shipmentId : undefined;
+      console.log(`[Packing Validation] Validating barcode ${barcode} against SkuVault QCSale for order ${orderNumber}${shipmentIdStr ? ` (shipmentId: ${shipmentIdStr})` : ''}`);
       
       try {
         // 1. Fetch QCSale from SkuVault - this is the authoritative source
-        const qcSale = await skuVaultService.getQCSalesByOrderNumber(orderNumber);
+        const qcSale = await skuVaultService.getQCSalesByOrderNumber(orderNumber, shipmentIdStr);
         
         if (!qcSale || !qcSale.Items || qcSale.Items.length === 0) {
           console.log(`[Packing Validation] No QCSale found in SkuVault for order ${orderNumber}`);
