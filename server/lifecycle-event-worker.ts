@@ -391,6 +391,12 @@ const reasonSideEffects: ReasonSideEffectConfig[] = [
           return { success: true, shouldRetry: false, shouldRequeue: false };
         }
 
+        const actionableStatuses = ['pending', 'on_hold'];
+        if (!actionableStatuses.includes(shipment.shipmentStatus)) {
+          log(`Package sync: Shipment ${ref} status is "${shipment.shipmentStatus}" (not pending/on_hold), skipping`, 'info', withOrder(orderNumber, shipmentId));
+          return { success: true, shouldRetry: false, shouldRequeue: false };
+        }
+
         const patchPayload: Record<string, any> = {
           packages: [{
             package_id: packageInfo.packageId,
