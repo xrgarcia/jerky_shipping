@@ -722,18 +722,13 @@ export default function Fingerprints() {
 
   const filteredBuildOrders = useMemo(() => {
     if (!readyToSessionOrdersData?.orders) return [];
-    const userIsFiltering = selectedBuildTags.size > 0 &&
-      selectedBuildTags.size < defaultBuildTags.size;
     let orders = readyToSessionOrdersData.orders.filter(order => {
       if (selectedBuildStationTypes.size > 0) {
         const stationTypeKey = order.stationType || '__none__';
         if (!selectedBuildStationTypes.has(stationTypeKey)) return false;
       }
-      if (userIsFiltering) {
-        const orderTagNames = order.tags?.map(t => t.name) || [];
-        if (orderTagNames.length === 0) return false;
-        if (!orderTagNames.some(tag => selectedBuildTags.has(tag))) return false;
-      }
+      const orderTagNames = order.tags?.map(t => t.name) || [];
+      if (!orderTagNames.every(tag => selectedBuildTags.has(tag))) return false;
       return true;
     });
     if (buildOrderSearch.trim()) {
@@ -747,7 +742,7 @@ export default function Fingerprints() {
       });
     }
     return orders;
-  }, [readyToSessionOrdersData, selectedBuildStationTypes, selectedBuildTags, defaultBuildTags, buildOrderSearch, buildOrderSortDir]);
+  }, [readyToSessionOrdersData, selectedBuildStationTypes, selectedBuildTags, buildOrderSearch, buildOrderSortDir]);
 
   // Mutations
   const assignMutation = useMutation({
