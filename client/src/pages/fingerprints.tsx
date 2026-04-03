@@ -2554,7 +2554,18 @@ export default function Fingerprints() {
                                     variant={buildTagFilterMode === 'include' ? 'default' : 'outline'}
                                     size="sm"
                                     className="h-6 px-2 text-xs flex-1"
-                                    onClick={() => setBuildTagFilterMode('include')}
+                                    onClick={() => {
+                                      if (buildTagFilterMode !== 'include') {
+                                        const allTags = new Set<string>();
+                                        readyToSessionOrdersData.orders.forEach(order => {
+                                          order.tags?.forEach(tag => allTags.add(tag.name));
+                                        });
+                                        const inverted = new Set<string>();
+                                        allTags.forEach(tag => { if (!selectedBuildTags.has(tag)) inverted.add(tag); });
+                                        setSelectedBuildTags(inverted);
+                                        setBuildTagFilterMode('include');
+                                      }
+                                    }}
                                     data-testid="button-tag-mode-include"
                                   >
                                     Include
@@ -2563,7 +2574,18 @@ export default function Fingerprints() {
                                     variant={buildTagFilterMode === 'exclude' ? 'default' : 'outline'}
                                     size="sm"
                                     className="h-6 px-2 text-xs flex-1"
-                                    onClick={() => setBuildTagFilterMode('exclude')}
+                                    onClick={() => {
+                                      if (buildTagFilterMode !== 'exclude') {
+                                        const allTags = new Set<string>();
+                                        readyToSessionOrdersData.orders.forEach(order => {
+                                          order.tags?.forEach(tag => allTags.add(tag.name));
+                                        });
+                                        const inverted = new Set<string>();
+                                        allTags.forEach(tag => { if (!selectedBuildTags.has(tag)) inverted.add(tag); });
+                                        setSelectedBuildTags(inverted);
+                                        setBuildTagFilterMode('exclude');
+                                      }
+                                    }}
                                     data-testid="button-tag-mode-exclude"
                                   >
                                     Exclude
