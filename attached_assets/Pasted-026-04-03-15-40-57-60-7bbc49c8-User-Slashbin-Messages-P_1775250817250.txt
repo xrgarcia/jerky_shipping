@@ -1,0 +1,56 @@
+026-04-03 15:40:57.60
+7bbc49c8
+User
+[Slashbin/Messages] Payload (1533 chars): {"tags":"Subscription, Subscription Recurring Order","notes":null,"customer":{"id":9434274988346,"zip":"06614","city":"Stratford","name":"Epifanio falconieri","note":null,"email":"falconieri@hotmail.com","phone":"+12033957601","company":null,"country":"United States","default":true,"address1":"30 Overland Drive","address2":null,"currency":"USD","province":"Connecticut","last_name":"falconieri","created_at":"2025-09-22T18:25:47-05:00","first_name":"Epifanio","tax_exempt":false,"updated_at":"2026-04-03T15:29:03-05:00","customer_id":9434274988346,"country_code":"US","country_name":"United States","province_code":"CT","verified_email":true},"shipping":{"zip":"06614","city":"Stratford","name":"Epifanio falconieri","phone":"+12033957601","company":null,"country":"United States","address1":"30 Overland Drive","address2":null,"province":"Connecticut","last_name":"falconieri","first_name":"Epifanio","country_code":"US","province_code":"CT"},"sub_total":33.24,"tax_total":0,"order_date":"2026-04-03T15:28:52-05:00","buyer_email":"falconieri@hotmail.com","order_items":[{"qty":1,"sku":"BTJ-BEJ-1-16-X4","tax":0,"price":33.24,"weight":12,"subtotal":33.24,"product_id":11821191311,"product_name":"Soft and Tender Style Beef Jerky - Original - 4X the Meat","product_brand":"Bricktown Jerky","fulfillment_status":null}],"order_total":40.15,"order_number":"JK3825373446","order_status":"unshipped","refund_total":0,"sales_channel":"jerky.com","shipping_cost":6.91,"discount_total":0,"shipping_method":"Economy - 7 to 10 Business Days"}
+2026-04-03 15:43:37.29
+7bbc49c8
+User
+8:43:37 PM [info][ETL] Extracted shipmentStatus: pending for order JK3825373446 {"orderNumber":"JK3825373446","shipmentId":"se-972743635"}
+2026-04-03 15:43:37.73
+7bbc49c8
+User
+8:43:37 PM [info][ETL] Skipping lifecycle evaluation for JK3825373446 — shipment still in initial setup (status: pending, previous: new) {"orderNumber":"JK3825373446","shipmentId":"se-972743635"}
+2026-04-03 15:45:31.46
+7bbc49c8
+User
+8:45:31 PM [info][ETL] Found existing shipment d66e60e9-5ff9-4db5-8722-759393d04afa by ShipStation ID se-972743635 {"orderNumber":"JK3825373446","shipmentId":"se-972743635"}
+2026-04-03 15:45:31.52
+7bbc49c8
+User
+8:45:31 PM [info][ETL] Updating existing shipment d66e60e9-5ff9-4db5-8722-759393d04afa (ShipStation ID: se-972743635) {"orderNumber":"JK3825373446","shipmentId":"se-972743635"}
+2026-04-03 15:45:31.52
+7bbc49c8
+User
+8:45:31 PM [info][ETL] Extracted shipmentStatus: pending for order JK3825373446 {"orderNumber":"JK3825373446","shipmentId":"se-972743635"}
+2026-04-03 15:45:31.95
+7bbc49c8
+User
+8:45:31 PM [info][ETL] Skipping lifecycle evaluation for JK3825373446 — shipment still in initial setup (status: pending, previous: pending) {"orderNumber":"JK3825373446","shipmentId":"se-972743635"}
+2026-04-03 15:50:12.48
+7bbc49c8
+User
+8:50:12 PM [info][ETL] Found existing shipment d66e60e9-5ff9-4db5-8722-759393d04afa by ShipStation ID se-972743635 {"orderNumber":"JK3825373446","shipmentId":"se-972743635"}
+2026-04-03 15:50:12.53
+7bbc49c8
+User
+8:50:12 PM [info][ETL] Extracted shipmentStatus: on_hold for order JK3825373446 {"orderNumber":"JK3825373446","shipmentId":"se-972743635"}
+2026-04-03 15:50:12.53
+7bbc49c8
+User
+8:50:12 PM [info][ETL] Updating existing shipment d66e60e9-5ff9-4db5-8722-759393d04afa (ShipStation ID: se-972743635) {"orderNumber":"JK3825373446","shipmentId":"se-972743635"}
+2026-04-03 15:51:05.31
+7bbc49c8
+User
+8:51:05 PM [info][ETL] Found existing shipment d66e60e9-5ff9-4db5-8722-759393d04afa by ShipStation ID se-972743635 {"orderNumber":"JK3825373446","shipmentId":"se-972743635"}
+2026-04-03 15:51:05.36
+7bbc49c8
+User
+8:51:05 PM [info][ETL] Extracted shipmentStatus: on_hold for order JK3825373446 {"orderNumber":"JK3825373446","shipmentId":"se-972743635"}
+2026-04-03 15:51:05.36
+7bbc49c8
+User
+8:51:05 PM [info][ETL] Updating existing shipment d66e60e9-5ff9-4db5-8722-759393d04afa (ShipStation ID: se-972743635) {"orderNumber":"JK3825373446","shipmentId":"se-972743635"}
+2026-04-03 15:51:05.85
+7bbc49c8
+User
+8:51:05 PM [info][ETL] Skipping lifecycle evaluation for JK3825373446 — shipment still in initial setup (status: on_hold, previous: on_hold) {"orderNumber":"JK3825373446","shipmentId":"se-972743635"}

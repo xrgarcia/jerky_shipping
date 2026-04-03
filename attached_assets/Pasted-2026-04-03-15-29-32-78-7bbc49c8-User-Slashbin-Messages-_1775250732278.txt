@@ -1,0 +1,52 @@
+2026-04-03 15:29:32.78
+7bbc49c8
+User
+[Slashbin/Messages] Payload (1591 chars): {"tags":"577334967965291448, TikTok Shop","notes":"","customer":{"id":10123516838202,"zip":"50627","city":"Eldora","name":"trinity hess","note":null,"email":"v4bdlxwge4yger5apnjudrfdkdk3u@scs.tiktokw.us","phone":"+16413513094","company":null,"country":"United States","default":true,"address1":"1201 14TH ST","address2":null,"currency":"USD","province":"Iowa","last_name":"hess","created_at":"2026-04-03T15:29:11-05:00","first_name":"trinity","tax_exempt":false,"updated_at":"2026-04-03T15:29:13-05:00","customer_id":10123516838202,"country_code":"US","country_name":"United States","province_code":"IA","verified_email":true},"shipping":{"zip":"50627","city":"Eldora","name":"trinity hess","phone":"+16413513094","company":null,"country":"United States","address1":"1201 14TH ST","address2":null,"province":"Iowa","last_name":"hess","first_name":"trinity","country_code":"US","province_code":"IA"},"sub_total":13,"tax_total":0,"order_date":"2026-04-03T15:29:11-05:00","buyer_email":"v4bdlxwge4yger5apnjudrfdkdk3u@scs.tiktokw.us","order_items":[{"qty":1,"sku":"JCB-INFHS-TTA","tax":0,"price":13,"weight":5.2,"subtotal":13,"product_id":10237704700218,"product_name":"6pc. Inferno Hot Sampler - High Protein, Healthy, Low Fat Dried Snack Sticks - Ghost Pepper Jerky, Carolina Reaper Jerky, Assorted Hot Beef & Pork Sticks - 5.2 total oz.","product_brand":"Jerky.com","fulfillment_status":null}],"order_total":18.45,"order_number":"JK3825373447","order_status":"unshipped","refund_total":0,"sales_channel":"tiktok.com","shipping_cost":5.45,"discount_total":0,"shipping_method":"SEND_BY_SELLER"}
+2026-04-03 15:43:46.03
+7bbc49c8
+User
+8:43:46 PM [info][ETL] Extracted shipmentStatus: pending for order JK3825373447 {"orderNumber":"JK3825373447","shipmentId":"se-972743647"}
+2026-04-03 15:43:46.47
+7bbc49c8
+User
+8:43:46 PM [info][ETL] Skipping lifecycle evaluation for JK3825373447 — shipment still in initial setup (status: pending, previous: new) {"orderNumber":"JK3825373447","shipmentId":"se-972743647"}
+2026-04-03 15:45:40.18
+7bbc49c8
+User
+8:45:40 PM [info][ETL] Skipping lifecycle evaluation for JK3825373447 — shipment still in initial setup (status: pending, previous: pending) {"orderNumber":"JK3825373447","shipmentId":"se-972743647"}
+2026-04-03 15:48:36.50
+7bbc49c8
+User
+8:48:36 PM [info][ETL] Found existing shipment d6b7d0de-c066-4beb-8ee6-24176b29bcc9 by ShipStation ID se-972743647 {"orderNumber":"JK3825373447","shipmentId":"se-972743647"}
+2026-04-03 15:48:36.55
+7bbc49c8
+User
+8:48:36 PM [info][ETL] Updating existing shipment d6b7d0de-c066-4beb-8ee6-24176b29bcc9 (ShipStation ID: se-972743647) {"orderNumber":"JK3825373447","shipmentId":"se-972743647"}
+2026-04-03 15:48:36.55
+7bbc49c8
+User
+8:48:36 PM [info][ETL] Extracted shipmentStatus: on_hold for order JK3825373447 {"orderNumber":"JK3825373447","shipmentId":"se-972743647"}
+2026-04-03 15:48:37.04
+7bbc49c8
+User
+8:48:37 PM [info][ETL] Skipping lifecycle evaluation for JK3825373447 — shipment still in initial setup (status: on_hold, previous: pending) {"orderNumber":"JK3825373447","shipmentId":"se-972743647"}
+2026-04-03 15:50:03.78
+7bbc49c8
+User
+8:50:03 PM [info][ETL] Found existing shipment d6b7d0de-c066-4beb-8ee6-24176b29bcc9 by ShipStation ID se-972743647 {"orderNumber":"JK3825373447","shipmentId":"se-972743647"}
+2026-04-03 15:50:56.54
+7bbc49c8
+User
+8:50:56 PM [info][ETL] Found existing shipment d6b7d0de-c066-4beb-8ee6-24176b29bcc9 by ShipStation ID se-972743647 {"orderNumber":"JK3825373447","shipmentId":"se-972743647"}
+2026-04-03 15:50:56.59
+7bbc49c8
+User
+8:50:56 PM [info][ETL] Updating existing shipment d6b7d0de-c066-4beb-8ee6-24176b29bcc9 (ShipStation ID: se-972743647) {"orderNumber":"JK3825373447","shipmentId":"se-972743647"}
+2026-04-03 15:50:56.59
+7bbc49c8
+User
+8:50:56 PM [info][ETL] Extracted shipmentStatus: on_hold for order JK3825373447 {"orderNumber":"JK3825373447","shipmentId":"se-972743647"}
+2026-04-03 15:50:57.09
+7bbc49c8
+User
+8:50:57 PM [info][ETL] Skipping lifecycle evaluation for JK3825373447 — shipment still in initial setup (status: on_hold, previous: on_hold) {"orderNumber":"JK3825373447","shipmentId":"se-972743647"}
