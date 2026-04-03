@@ -1,5 +1,4 @@
 import { useState, useEffect, useMemo, useRef } from "react";
-import { BUILD_DEFAULT_EXCLUDED_TAGS } from "@shared/constants";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
@@ -709,14 +708,12 @@ export default function Fingerprints() {
     }
   }, [buildJobStatus?.status]);
 
-  // Initialize tag filter with all tags checked EXCEPT default excluded tags
   useEffect(() => {
     if (readyToSessionOrdersData?.orders && !buildTagsInitialized) {
       const allTagNames = new Set<string>();
       readyToSessionOrdersData.orders.forEach(order => {
         order.tags?.forEach(tag => allTagNames.add(tag.name));
       });
-      BUILD_DEFAULT_EXCLUDED_TAGS.forEach(tag => allTagNames.delete(tag));
       setSelectedBuildTags(allTagNames);
       setDefaultBuildTags(new Set(allTagNames));
       setBuildTagsInitialized(true);
@@ -725,16 +722,18 @@ export default function Fingerprints() {
 
   const filteredBuildOrders = useMemo(() => {
     if (!readyToSessionOrdersData?.orders) return [];
-    const userIsFiltering = defaultBuildTags.size > 0 &&
-      [...defaultBuildTags].some(tag => !selectedBuildTags.has(tag));
+    const userIsFiltering = selectedBuildTags.size > 0 &&
+      selectedBuildTags.size < defaultBuildTags.size;
     let orders = readyToSessionOrdersData.orders.filter(order => {
       if (selectedBuildStationTypes.size > 0) {
         const stationTypeKey = order.stationType || '__none__';
         if (!selectedBuildStationTypes.has(stationTypeKey)) return false;
       }
-      const orderTagNames = order.tags?.map(t => t.name) || [];
-      if (orderTagNames.some(tag => !selectedBuildTags.has(tag))) return false;
-      if (userIsFiltering && orderTagNames.length === 0) return false;
+      if (userIsFiltering) {
+        const orderTagNames = order.tags?.map(t => t.name) || [];
+        if (orderTagNames.length === 0) return false;
+        if (!orderTagNames.some(tag => selectedBuildTags.has(tag))) return false;
+      }
       return true;
     });
     if (buildOrderSearch.trim()) {

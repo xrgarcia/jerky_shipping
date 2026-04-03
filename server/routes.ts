@@ -5,7 +5,7 @@ import { reportingStorage } from "./reporting-storage";
 import { reportingSql } from "./reporting-db";
 import { db } from "./db";
 import { users, shipmentSyncFailures, shopifyOrderSyncFailures, orders, orderItems, shipments, orderRefunds, shipmentItems, shipmentTags, shipmentEvents, fingerprints, shipmentQcItems, fingerprintModels, slashbinKitComponentMappings, packagingTypes, slashbinOrders, slashbinOrderItems, slashbinProducts, slashbinProductVariants, shipmentRateAnalysis, featureFlags, shipstationWriteQueue, rateCheckQueue, qcExplosionQueue, sessionBuildQueue } from "@shared/schema";
-import { eq, count, desc, asc, or, and, sql, gte, lte, ilike, isNotNull, isNull, ne, inArray, notInArray, exists, type SQL } from "drizzle-orm";
+import { eq, count, desc, asc, or, and, sql, gte, lte, ilike, isNotNull, isNull, ne, inArray, notInArray, exists, not, type SQL } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import { z } from "zod";
 import { createHash } from "crypto";
@@ -14426,6 +14426,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           and(
             eq(shipments.lifecyclePhase, 'ready_to_session'),
             isNull(shipments.fulfillmentSessionId),
+            ne(shipments.shipmentStatus, 'cancelled'),
+            not(exists(
+              db.select({ id: shipmentTags.id })
+                .from(shipmentTags)
+                .where(
+                  and(
+                    eq(shipmentTags.shipmentId, shipments.id),
+                    eq(shipmentTags.name, 'NOT SHIPPABLE')
+                  )
+                )
+            )),
           )
         )
         .orderBy(asc(shipments.orderNumber));

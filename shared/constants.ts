@@ -24,8 +24,3 @@ export type ShippableTag = (typeof SHIPPABLE_TAGS)[number];
  */
 export const READY_FOR_SHIPDOT_TAG = 'READY FOR SHIPDOT' as const;
 
-export const BUILD_DEFAULT_EXCLUDED_TAGS = [
-  'KIKI Membership - 20th',
-  'KIKI + KOOZIE',
-  'NOT SHIPPABLE',
-] as const;
