@@ -1,0 +1,164 @@
+2026-04-03 14:31:30.57
+5cf04e4c
+User
+7:31:30 PM [info][ETL] Skipping lifecycle evaluation for JK3825373404 — shipment still in initial setup (status: on_hold, previous: pending) {"orderNumber":"JK3825373404","shipmentId":"se-972718987"}
+2026-04-03 14:33:12.75
+5cf04e4c
+User
+7:33:12 PM [info][ETL] Found existing shipment 9068a693-6fd0-48d0-a75e-ee54125a5e43 by ShipStation ID se-972718987 {"orderNumber":"JK3825373404","shipmentId":"se-972718987"}
+2026-04-03 14:33:12.80
+5cf04e4c
+User
+7:33:12 PM [info][ETL] Extracted shipmentStatus: on_hold for order JK3825373404 {"orderNumber":"JK3825373404","shipmentId":"se-972718987"}
+2026-04-03 14:33:12.80
+5cf04e4c
+User
+7:33:12 PM [info][ETL] Updating existing shipment 9068a693-6fd0-48d0-a75e-ee54125a5e43 (ShipStation ID: se-972718987) {"orderNumber":"JK3825373404","shipmentId":"se-972718987"}
+2026-04-03 14:33:13.33
+5cf04e4c
+User
+7:33:13 PM [info][ETL] Skipping lifecycle evaluation for JK3825373404 — shipment still in initial setup (status: on_hold, previous: on_hold) {"orderNumber":"JK3825373404","shipmentId":"se-972718987"}
+2026-04-03 14:33:18.98
+749c4053
+User
+7:33:18 PM [info][ETL] Found existing shipment 9068a693-6fd0-48d0-a75e-ee54125a5e43 by ShipStation ID se-972718987 {"orderNumber":"JK3825373404","shipmentId":"se-972718987"}
+2026-04-03 14:33:19.04
+749c4053
+User
+7:33:19 PM [info][ETL] Updating existing shipment 9068a693-6fd0-48d0-a75e-ee54125a5e43 (ShipStation ID: se-972718987) {"orderNumber":"JK3825373404","shipmentId":"se-972718987"}
+2026-04-03 14:36:13.79
+5cf04e4c
+User
+7:36:13 PM [info][ETL] Updating existing shipment 9068a693-6fd0-48d0-a75e-ee54125a5e43 (ShipStation ID: se-972718987) {"orderNumber":"JK3825373404","shipmentId":"se-972718987"}
+2026-04-03 14:36:13.79
+5cf04e4c
+User
+7:36:13 PM [info][ETL] Extracted shipmentStatus: on_hold for order JK3825373404 {"orderNumber":"JK3825373404","shipmentId":"se-972718987"}
+2026-04-03 14:36:14.29
+5cf04e4c
+User
+7:36:14 PM [info][ETL] READY FOR SHIPDOT tag detected on on_hold shipment JK3825373404 (age: 10min) — lifecycle evaluation queued {"orderNumber":"JK3825373404","shipmentId":"se-972718987"}
+2026-04-03 14:36:15.25
+5cf04e4c
+User
+7:36:15 PM [info][lifecycle-worker] Triggering side effect for #JK3825373404: Enqueue QC explosion to dedicated queue {"orderNumber":"JK3825373404","shipmentId":"9068a693-6fd0-48d0-a75e-ee54125a5e43","subphase":"needs_hydration"}
+2026-04-03 14:36:15.25
+5cf04e4c
+User
+7:36:15 PM [info][Lifecycle] JK3825373404: null → ready_to_session/needs_hydration {"orderNumber":"JK3825373404","shipmentId":"9068a693-6fd0-48d0-a75e-ee54125a5e43","phase":"ready_to_session","subphase":"needs_hydration"}
+2026-04-03 14:36:15.91
+5cf04e4c
+User
+7:36:15 PM [info][lifecycle-worker] Side effect: Enqueued QC explosion job #8599 for JK3825373404
+2026-04-03 14:36:15.91
+5cf04e4c
+User
+7:36:15 PM [info][QcExplosionQueue] Enqueued QC explosion job #8599 for JK3825373404 {"orderNumber":"JK3825373404","shipmentId":"9068a693-6fd0-48d0-a75e-ee54125a5e43"}
+2026-04-03 14:36:20.98
+5cf04e4c
+User
+7:36:20 PM [info][QcExplosionQueue] Processing job #8599 for JK3825373404 (attempt 1/8) {"orderNumber":"JK3825373404","shipmentId":"9068a693-6fd0-48d0-a75e-ee54125a5e43","queueItemId":"8599"}
+2026-04-03 14:36:30.59
+5cf04e4c
+User
+7:36:30 PM [info][lifecycle-worker] Triggering side effect for #JK3825373404: Enqueue rate check to dedicated queue {"orderNumber":"JK3825373404","shipmentId":"9068a693-6fd0-48d0-a75e-ee54125a5e43","subphase":"needs_rate_check"}
+2026-04-03 14:36:30.59
+5cf04e4c
+User
+7:36:30 PM [info][Lifecycle] JK3825373404: ready_to_session/needs_hydration → ready_to_session/needs_rate_check {"orderNumber":"JK3825373404","shipmentId":"9068a693-6fd0-48d0-a75e-ee54125a5e43","phase":"ready_to_session","subphase":"needs_rate_check"}
+2026-04-03 14:36:31.24
+5cf04e4c
+User
+7:36:31 PM [info][RateCheckQueue] Enqueued rate check job #8467 for se-972718987 {"orderNumber":"JK3825373404","shipmentId":"se-972718987"}
+2026-04-03 14:36:31.24
+5cf04e4c
+User
+7:36:31 PM [info][lifecycle-worker] Side effect: Enqueued rate check job #8467 for JK3825373404
+2026-04-03 14:36:31.41
+5cf04e4c
+User
+7:36:31 PM [info][lifecycle-worker] Triggering reason-based side effect for #JK3825373404: Sync package dimensions to ShipStation when packaging type is determined {"orderNumber":"JK3825373404","shipmentId":"9068a693-6fd0-48d0-a75e-ee54125a5e43"}
+2026-04-03 14:36:32.11
+5cf04e4c
+User
+7:36:32 PM [info][lifecycle-worker] Package sync: Shipment JK3825373404 status is "on_hold", not "pending", skipping {"orderNumber":"JK3825373404","shipmentId":"9068a693-6fd0-48d0-a75e-ee54125a5e43"}
+2026-04-03 14:36:35.40
+5cf04e4c
+User
+7:36:35 PM [info][RateCheckQueue] Processing job #8467 for se-972718987 (attempt 1/5) {"orderNumber":"JK3825373404","shipmentId":"se-972718987","queueItemId":"8467"}
+2026-04-03 14:36:38.73
+5cf04e4c
+User
+7:36:38 PM [info][RateCheckQueue] Job #8467 completed: rate check successful {"orderNumber":"JK3825373404","shipmentId":"se-972718987","queueItemId":"8467"}
+2026-04-03 14:36:40.34
+5cf04e4c
+User
+7:36:40 PM [info][ETL] Found existing shipment 9068a693-6fd0-48d0-a75e-ee54125a5e43 by ShipStation ID se-972718987 {"orderNumber":"JK3825373404","shipmentId":"se-972718987"}
+2026-04-03 14:36:40.39
+5cf04e4c
+User
+7:36:40 PM [info][ETL] Extracted shipmentStatus: on_hold for order JK3825373404 {"orderNumber":"JK3825373404","shipmentId":"se-972718987"}
+2026-04-03 14:36:40.39
+5cf04e4c
+User
+7:36:40 PM [info][ETL] Updating existing shipment 9068a693-6fd0-48d0-a75e-ee54125a5e43 (ShipStation ID: se-972718987) {"orderNumber":"JK3825373404","shipmentId":"se-972718987"}
+2026-04-03 14:36:40.62
+5cf04e4c
+User
+7:36:40 PM [info][Lifecycle] JK3825373404: ready_to_session/needs_rate_check → ready_to_session/needs_session {"orderNumber":"JK3825373404","shipmentId":"9068a693-6fd0-48d0-a75e-ee54125a5e43","phase":"ready_to_session","subphase":"needs_session"}
+2026-04-03 14:36:51.66
+5cf04e4c
+User
+7:36:51 PM [info][ETL] Found existing shipment 9068a693-6fd0-48d0-a75e-ee54125a5e43 by ShipStation ID se-972718987 {"orderNumber":"JK3825373404","shipmentId":"se-972718987"}
+2026-04-03 14:36:51.72
+5cf04e4c
+User
+7:36:51 PM [info][ETL] Extracted shipmentStatus: on_hold for order JK3825373404 {"orderNumber":"JK3825373404","shipmentId":"se-972718987"}
+2026-04-03 14:36:51.72
+5cf04e4c
+User
+7:36:51 PM [info][ETL] Updating existing shipment 9068a693-6fd0-48d0-a75e-ee54125a5e43 (ShipStation ID: se-972718987) {"orderNumber":"JK3825373404","shipmentId":"se-972718987"}
+2026-04-03 14:37:20.80
+5cf04e4c
+User
+7:37:20 PM [info][ETL] Found existing shipment 9068a693-6fd0-48d0-a75e-ee54125a5e43 by ShipStation ID se-972718987 {"orderNumber":"JK3825373404","shipmentId":"se-972718987"}
+2026-04-03 14:37:20.85
+5cf04e4c
+User
+7:37:20 PM [info][ETL] Extracted shipmentStatus: on_hold for order JK3825373404 {"orderNumber":"JK3825373404","shipmentId":"se-972718987"}
+2026-04-03 14:37:34.67
+5cf04e4c
+User
+7:37:34 PM [info][ETL] Found existing shipment 9068a693-6fd0-48d0-a75e-ee54125a5e43 by ShipStation ID se-972718987 {"orderNumber":"JK3825373404","shipmentId":"se-972718987"}
+2026-04-03 14:37:34.72
+5cf04e4c
+User
+7:37:34 PM [info][ETL] Extracted shipmentStatus: on_hold for order JK3825373404 {"orderNumber":"JK3825373404","shipmentId":"se-972718987"}
+2026-04-03 14:37:34.72
+5cf04e4c
+User
+7:37:34 PM [info][ETL] Updating existing shipment 9068a693-6fd0-48d0-a75e-ee54125a5e43 (ShipStation ID: se-972718987) {"orderNumber":"JK3825373404","shipmentId":"se-972718987"}
+2026-04-03 14:37:48.12
+5cf04e4c
+User
+7:37:48 PM [info][ETL] Found existing shipment 9068a693-6fd0-48d0-a75e-ee54125a5e43 by ShipStation ID se-972718987 {"orderNumber":"JK3825373404","shipmentId":"se-972718987"}
+2026-04-03 14:37:48.18
+5cf04e4c
+User
+7:37:48 PM [info][ETL] Extracted shipmentStatus: on_hold for order JK3825373404 {"orderNumber":"JK3825373404","shipmentId":"se-972718987"}
+2026-04-03 14:37:48.18
+5cf04e4c
+User
+7:37:48 PM [info][ETL] Updating existing shipment 9068a693-6fd0-48d0-a75e-ee54125a5e43 (ShipStation ID: se-972718987) {"orderNumber":"JK3825373404","shipmentId":"se-972718987"}
+2026-04-03 14:38:14.37
+5cf04e4c
+User
+7:38:14 PM [info][ETL] Found existing shipment 9068a693-6fd0-48d0-a75e-ee54125a5e43 by ShipStation ID se-972718987 {"orderNumber":"JK3825373404","shipmentId":"se-972718987"}
+2026-04-03 14:38:14.42
+5cf04e4c
+User
+7:38:14 PM [info][ETL] Updating existing shipment 9068a693-6fd0-48d0-a75e-ee54125a5e43 (ShipStation ID: se-972718987) {"orderNumber":"JK3825373404","shipmentId":"se-972718987"}
+2026-04-03 14:38:14.42
+5cf04e4c
+User
+7:38:14 PM [info][ETL] Extracted shipmentStatus: on_hold for order JK3825373404 {"orderNumber":"JK3825373404","shipmentId":"se-972718987"}
