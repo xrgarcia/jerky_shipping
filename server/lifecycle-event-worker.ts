@@ -48,9 +48,10 @@ import { type LifecycleUpdateResult } from './services/lifecycle-state-machine';
 import { withSpan, tagCurrentSpan } from './utils/tracing';
 import { SmartCarrierRateService } from './services/smart-carrier-rate-service';
 import { db } from './db';
-import { shipments, packagingTypes, featureFlags, fingerprintModels, shipmentSyncFailures } from '@shared/schema';
-import { eq } from 'drizzle-orm';
+import { shipments, shipmentTags, packagingTypes, featureFlags, fingerprintModels, shipmentSyncFailures } from '@shared/schema';
+import { eq, and } from 'drizzle-orm';
 import { DECISION_SUBPHASES } from '@shared/schema';
+import { READY_FOR_SHIPDOT_TAG } from '@shared/constants';
 
 // Feature flag helper - checks if a feature is enabled in the database
 async function isFeatureFlagEnabled(key: string): Promise<boolean> {
@@ -374,8 +375,19 @@ const reasonSideEffects: ReasonSideEffectConfig[] = [
           return { success: true, shouldRetry: false, shouldRequeue: false };
         }
 
-        if (shipment.shipmentStatus !== 'pending') {
-          log(`Package sync: Shipment ${ref} status is "${shipment.shipmentStatus}", not "pending", skipping`, 'info', withOrder(orderNumber, shipmentId));
+        const [hasTag] = await db
+          .select({ id: shipmentTags.id })
+          .from(shipmentTags)
+          .where(
+            and(
+              eq(shipmentTags.shipmentId, shipmentId),
+              eq(shipmentTags.name, READY_FOR_SHIPDOT_TAG)
+            )
+          )
+          .limit(1);
+
+        if (!hasTag) {
+          log(`Package sync: Shipment ${ref} missing "${READY_FOR_SHIPDOT_TAG}" tag, skipping`, 'info', withOrder(orderNumber, shipmentId));
           return { success: true, shouldRetry: false, shouldRequeue: false };
         }
 
