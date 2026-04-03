@@ -486,6 +486,7 @@ export default function Fingerprints() {
   const [selectedBuildTags, setSelectedBuildTags] = useState<Set<string>>(new Set());
   const [defaultBuildTags, setDefaultBuildTags] = useState<Set<string>>(new Set());
   const [buildTagsInitialized, setBuildTagsInitialized] = useState(false);
+  const [buildTagFilterMode, setBuildTagFilterMode] = useState<'include' | 'exclude'>('include');
 
   // Order search and sort state for Build tab
   const [buildOrderSearch, setBuildOrderSearch] = useState('');
@@ -728,7 +729,9 @@ export default function Fingerprints() {
         if (!selectedBuildStationTypes.has(stationTypeKey)) return false;
       }
       const orderTagNames = order.tags?.map(t => t.name) || [];
-      if (!orderTagNames.some(tag => selectedBuildTags.has(tag))) return false;
+      const hasCheckedTag = orderTagNames.some(tag => selectedBuildTags.has(tag));
+      if (buildTagFilterMode === 'include' && !hasCheckedTag) return false;
+      if (buildTagFilterMode === 'exclude' && hasCheckedTag) return false;
       return true;
     });
     if (buildOrderSearch.trim()) {
@@ -742,7 +745,7 @@ export default function Fingerprints() {
       });
     }
     return orders;
-  }, [readyToSessionOrdersData, selectedBuildStationTypes, selectedBuildTags, buildOrderSearch, buildOrderSortDir]);
+  }, [readyToSessionOrdersData, selectedBuildStationTypes, selectedBuildTags, buildTagFilterMode, buildOrderSearch, buildOrderSortDir]);
 
   // Mutations
   const assignMutation = useMutation({
@@ -2515,7 +2518,7 @@ export default function Fingerprints() {
                             </PopoverTrigger>
                             <PopoverContent className="w-64 p-2" align="start">
                               <div className="space-y-2">
-                                <div className="flex items-center justify-between pb-2 border-b">
+                                <div className="flex items-center justify-between gap-1 pb-2 border-b">
                                   <span className="text-sm font-medium">Filter by Tag</span>
                                   <div className="flex gap-1">
                                     <Button
@@ -2545,6 +2548,26 @@ export default function Fingerprints() {
                                       None
                                     </Button>
                                   </div>
+                                </div>
+                                <div className="flex items-center gap-1 pb-2 border-b">
+                                  <Button
+                                    variant={buildTagFilterMode === 'include' ? 'default' : 'outline'}
+                                    size="sm"
+                                    className="h-6 px-2 text-xs flex-1"
+                                    onClick={() => setBuildTagFilterMode('include')}
+                                    data-testid="button-tag-mode-include"
+                                  >
+                                    Include
+                                  </Button>
+                                  <Button
+                                    variant={buildTagFilterMode === 'exclude' ? 'default' : 'outline'}
+                                    size="sm"
+                                    className="h-6 px-2 text-xs flex-1"
+                                    onClick={() => setBuildTagFilterMode('exclude')}
+                                    data-testid="button-tag-mode-exclude"
+                                  >
+                                    Exclude
+                                  </Button>
                                 </div>
                                 <ScrollArea className="h-[200px]">
                                   {(() => {
