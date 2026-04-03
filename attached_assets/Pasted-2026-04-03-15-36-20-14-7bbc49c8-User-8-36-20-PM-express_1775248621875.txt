@@ -1,0 +1,208 @@
+2026-04-03 15:36:20.14
+7bbc49c8
+User
+8:36:20 PM [express] POST /api/webhooks/shipstation/shipments 200 in 7ms :: {"success":true}
+2026-04-03 15:36:20.14
+7bbc49c8
+User
+8:36:20 PM [info][UnifiedSync] Immediate poll requested
+2026-04-03 15:36:21.37
+7bbc49c8
+User
+[Desktop WS] Auth SUCCESS - IP: 127.0.0.1, ClientId: 940090068b05eb762b6edda36bb23a1f
+2026-04-03 15:36:21.37
+7bbc49c8
+User
+[Desktop WS] Client 940090068b05eb762b6edda36bb23a1f connected
+2026-04-03 15:36:21.37
+7bbc49c8
+User
+[Desktop WS] Client 940090068b05eb762b6edda36bb23a1f authenticated
+2026-04-03 15:36:21.47
+7bbc49c8
+User
+[WS] Broadcast station 85d575ed-48ec-4942-948d-6be827deb117 connection change: online
+2026-04-03 15:36:21.47
+7bbc49c8
+User
+[Desktop WS] Client 940090068b05eb762b6edda36bb23a1f subscribed to station 85d575ed-48ec-4942-948d-6be827deb117
+2026-04-03 15:36:22.53
+7bbc49c8
+User
+8:36:22 PM [info][Webhook] ShipStation API_TRACK: tracking=9400150106151161433016 status=IT
+2026-04-03 15:36:22.54
+7bbc49c8
+User
+8:36:22 PM [info][UnifiedSync] Immediate poll requested
+2026-04-03 15:36:22.54
+7bbc49c8
+User
+8:36:22 PM [info][UnifiedSync] Waking idle worker for immediate poll
+2026-04-03 15:36:22.54
+7bbc49c8
+User
+8:36:22 PM [express] POST /api/webhooks/shipstation/shipments 200 in 5ms :: {"success":true}
+2026-04-03 15:36:22.64
+7bbc49c8
+User
+8:36:22 PM [info][UnifiedSync] Starting poll from cursor: 2026-04-03T20:34:12.443Z
+2026-04-03 15:36:23.26
+7bbc49c8
+User
+8:36:23 PM [info][UnifiedSync] Webhook triggered immediate poll during last cycle
+2026-04-03 15:36:23.32
+7bbc49c8
+User
+8:36:23 PM [info][ETL] Found existing shipment 61112655-47b9-4dd9-9184-eaede29d7b11 by ShipStation ID se-969638627 {"orderNumber":"JK3825371705","shipmentId":"se-969638627"}
+2026-04-03 15:36:23.37
+7bbc49c8
+User
+8:36:23 PM [info][ETL] Updating existing shipment 61112655-47b9-4dd9-9184-eaede29d7b11 (ShipStation ID: se-969638627) {"orderNumber":"JK3825371705","shipmentId":"se-969638627"}
+2026-04-03 15:36:23.37
+7bbc49c8
+User
+8:36:23 PM [info][ETL] Extracted shipmentStatus: on_hold for order JK3825371705 {"orderNumber":"JK3825371705","shipmentId":"se-969638627"}
+2026-04-03 15:36:24.04
+7bbc49c8
+User
+Updated shipment dc7f3770-0d25-4756-9326-e544bc82f5fa with tracking 9400150106151161433016 from webhook
+2026-04-03 15:36:24.08
+7bbc49c8
+User
+8:36:24 PM [info][ETL] Found existing shipment aeb92375-7d87-4c77-8b63-c46c70dd11a1 by tracking number 9400150206217626879153 (shipmentId: se-972076296) {"orderNumber":"JK3825-040126-7-RG","shipmentId":"se-972076296","trackingNumber":"9400150206217626879153"}
+2026-04-03 15:36:24.24
+7bbc49c8
+User
+8:36:24 PM [info][ETL] Updating existing shipment aeb92375-7d87-4c77-8b63-c46c70dd11a1 (ShipStation ID: se-972076296) {"orderNumber":"JK3825-040126-7-RG","shipmentId":"se-972076296"}
+2026-04-03 15:36:24.87
+7bbc49c8
+User
+8:36:24 PM [info][ETL] Found existing shipment 49117955-6cdc-4fa0-9d56-58bfc324ab35 by ShipStation ID se-969959980 {"orderNumber":"JK3825371845","shipmentId":"se-969959980"}
+2026-04-03 15:36:24.93
+7bbc49c8
+User
+8:36:24 PM [info][ETL] Updating existing shipment 49117955-6cdc-4fa0-9d56-58bfc324ab35 (ShipStation ID: se-969959980) {"orderNumber":"JK3825371845","shipmentId":"se-969959980"}
+2026-04-03 15:36:24.93
+7bbc49c8
+User
+8:36:24 PM [info][ETL] Extracted shipmentStatus: on_hold for order JK3825371845 {"orderNumber":"JK3825371845","shipmentId":"se-969959980"}
+2026-04-03 15:36:25.60
+7bbc49c8
+User
+8:36:25 PM [info][ETL] Found existing shipment 33ff9466-e10f-4194-883f-767502cca642 by ShipStation ID se-970628409 {"orderNumber":"JK3825372289","shipmentId":"se-970628409"}
+2026-04-03 15:36:25.65
+7bbc49c8
+User
+8:36:25 PM [info][ETL] Extracted shipmentStatus: on_hold for order JK3825372289 {"orderNumber":"JK3825372289","shipmentId":"se-970628409"}
+2026-04-03 15:36:25.65
+7bbc49c8
+User
+8:36:25 PM [info][ETL] Updating existing shipment 33ff9466-e10f-4194-883f-767502cca642 (ShipStation ID: se-970628409) {"orderNumber":"JK3825372289","shipmentId":"se-970628409"}
+2026-04-03 15:36:26.20
+7bbc49c8
+User
+8:36:26 PM [info][UnifiedSync] Poll complete: 4 processed, 0 errors, 1 pages
+2026-04-03 15:36:26.20
+7bbc49c8
+User
+8:36:26 PM [info][UnifiedSync] Page 1: processed 4 shipments (0 errors so far)
+2026-04-03 15:36:26.24
+7bbc49c8
+User
+8:36:26 PM [info][Webhook] ShipStation API_TRACK: tracking=9400150106151161871214 status=IT
+2026-04-03 15:36:26.24
+7bbc49c8
+User
+8:36:26 PM [info][UnifiedSync] Immediate poll requested
+2026-04-03 15:36:26.24
+7bbc49c8
+User
+8:36:26 PM [express] POST /api/webhooks/shipstation/shipments 200 in 5ms :: {"success":true}
+2026-04-03 15:36:28.99
+7bbc49c8
+User
+Updated shipment c33790d1-df11-4079-a922-b96fb4edd163 with tracking 9400150106151161871214 from webhook
+2026-04-03 15:36:29.06
+7bbc49c8
+User
+8:36:29 PM [express] Background worker processed 1 webhook(s) in 194ms, 0 remaining
+2026-04-03 15:36:30.45
+7bbc49c8
+User
+8:36:30 PM [info][UnifiedSync] More pages remain, scheduling immediate follow-up poll
+2026-04-03 15:36:31.55
+7bbc49c8
+User
+8:36:31 PM [info][UnifiedSync] Starting poll from cursor: 2026-04-03T20:34:12.443Z
+2026-04-03 15:36:32.27
+7bbc49c8
+User
+8:36:32 PM [info][ETL] Found existing shipment 61112655-47b9-4dd9-9184-eaede29d7b11 by ShipStation ID se-969638627 {"orderNumber":"JK3825371705","shipmentId":"se-969638627"}
+2026-04-03 15:36:32.32
+7bbc49c8
+User
+8:36:32 PM [info][ETL] Extracted shipmentStatus: on_hold for order JK3825371705 {"orderNumber":"JK3825371705","shipmentId":"se-969638627"}
+2026-04-03 15:36:32.32
+7bbc49c8
+User
+8:36:32 PM [info][ETL] Updating existing shipment 61112655-47b9-4dd9-9184-eaede29d7b11 (ShipStation ID: se-969638627) {"orderNumber":"JK3825371705","shipmentId":"se-969638627"}
+2026-04-03 15:36:32.71
+7bbc49c8
+User
+8:36:32 PM [info][Webhook] ShipStation API_TRACK: tracking=9400150206217623251525 status=IT
+2026-04-03 15:36:32.71
+7bbc49c8
+User
+8:36:32 PM [info][UnifiedSync] Immediate poll requested
+2026-04-03 15:36:32.71
+7bbc49c8
+User
+8:36:32 PM [express] POST /api/webhooks/shipstation/shipments 200 in 6ms :: {"success":true}
+2026-04-03 15:36:32.95
+7bbc49c8
+User
+8:36:32 PM [info][ETL] Found existing shipment aeb92375-7d87-4c77-8b63-c46c70dd11a1 by tracking number 9400150206217626879153 (shipmentId: se-972076296) {"orderNumber":"JK3825-040126-7-RG","shipmentId":"se-972076296","trackingNumber":"9400150206217626879153"}
+2026-04-03 15:36:33.10
+7bbc49c8
+User
+8:36:33 PM [info][ETL] Extracted shipmentStatus: on_hold for order JK3825-040126-7-RG {"orderNumber":"JK3825-040126-7-RG","shipmentId":"se-972076296"}
+2026-04-03 15:36:33.10
+7bbc49c8
+User
+8:36:33 PM [info][ETL] Updating existing shipment aeb92375-7d87-4c77-8b63-c46c70dd11a1 (ShipStation ID: se-972076296) {"orderNumber":"JK3825-040126-7-RG","shipmentId":"se-972076296"}
+2026-04-03 15:36:33.69
+7bbc49c8
+User
+8:36:33 PM [info][ETL] Found existing shipment 49117955-6cdc-4fa0-9d56-58bfc324ab35 by ShipStation ID se-969959980 {"orderNumber":"JK3825371845","shipmentId":"se-969959980"}
+2026-04-03 15:36:33.74
+7bbc49c8
+User
+8:36:33 PM [info][ETL] Updating existing shipment 49117955-6cdc-4fa0-9d56-58bfc324ab35 (ShipStation ID: se-969959980) {"orderNumber":"JK3825371845","shipmentId":"se-969959980"}
+2026-04-03 15:36:33.74
+7bbc49c8
+User
+8:36:33 PM [info][ETL] Extracted shipmentStatus: on_hold for order JK3825371845 {"orderNumber":"JK3825371845","shipmentId":"se-969959980"}
+2026-04-03 15:36:34.10
+7bbc49c8
+User
+Updated shipment de6b2fc5-b917-4ed5-a5e8-d4888aae7588 with tracking 9400150206217623251525 from webhook
+2026-04-03 15:36:34.16
+7bbc49c8
+User
+8:36:34 PM [express] Background worker processed 1 webhook(s) in 289ms, 0 remaining
+2026-04-03 15:36:34.31
+7bbc49c8
+User
+8:36:34 PM [info][Lifecycle] 114-1026342-9050623: problem → in_transit {"orderNumber":"114-1026342-9050623","shipmentId":"dc7f3770-0d25-4756-9326-e544bc82f5fa","phase":"in_transit"}
+2026-04-03 15:36:34.37
+7bbc49c8
+User
+8:36:34 PM [info][ETL] Found existing shipment 33ff9466-e10f-4194-883f-767502cca642 by ShipStation ID se-970628409 {"orderNumber":"JK3825372289","shipmentId":"se-970628409"}
+2026-04-03 15:36:34.42
+7bbc49c8
+User
+8:36:34 PM [info][ETL] Updating existing shipment 33ff9466-e10f-4194-883f-767502cca642 (ShipStation ID: se-970628409) {"orderNumber":"JK3825372289","shipmentId":"se-970628409"}
+2026-04-03 15:36:34.42
+7bbc49c8
+User
+8:36:34 PM [info][ETL] Extracted shipmentStatus: on_hold for order JK3825372289 {"orderNumber":"JK3825372289","shipmentId":"se-970628409"}
