@@ -397,6 +397,11 @@ const reasonSideEffects: ReasonSideEffectConfig[] = [
           return { success: true, shouldRetry: false, shouldRequeue: false };
         }
 
+        if (shipment.labelUrl) {
+          log(`Package sync: Shipment ${ref} already has a label, skipping`, 'info', withOrder(orderNumber, shipmentId));
+          return { success: true, shouldRetry: false, shouldRequeue: false };
+        }
+
         const patchPayload: Record<string, any> = {
           packages: [{
             package_id: packageInfo.packageId,
