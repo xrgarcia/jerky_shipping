@@ -484,9 +484,7 @@ export default function Fingerprints() {
   
   // Tag filter state for Build tab
   const [selectedBuildTags, setSelectedBuildTags] = useState<Set<string>>(new Set());
-  const [defaultBuildTags, setDefaultBuildTags] = useState<Set<string>>(new Set());
   const [buildTagsInitialized, setBuildTagsInitialized] = useState(false);
-  const [buildTagFilterMode, setBuildTagFilterMode] = useState<'include' | 'exclude'>('include');
 
   // Order search and sort state for Build tab
   const [buildOrderSearch, setBuildOrderSearch] = useState('');
@@ -711,15 +709,38 @@ export default function Fingerprints() {
 
   useEffect(() => {
     if (readyToSessionOrdersData?.orders && !buildTagsInitialized) {
-      const allTagNames = new Set<string>();
+      const totalOrders = readyToSessionOrdersData.orders.length;
+      const tagCounts = new Map<string, number>();
       readyToSessionOrdersData.orders.forEach(order => {
-        order.tags?.forEach(tag => allTagNames.add(tag.name));
+        order.tags?.forEach(tag => {
+          tagCounts.set(tag.name, (tagCounts.get(tag.name) || 0) + 1);
+        });
       });
-      setSelectedBuildTags(allTagNames);
-      setDefaultBuildTags(new Set(allTagNames));
+      const filterableTags = new Set(
+        [...tagCounts.entries()]
+          .filter(([_, count]) => count < totalOrders)
+          .map(([name]) => name)
+      );
+      setSelectedBuildTags(filterableTags);
       setBuildTagsInitialized(true);
     }
   }, [readyToSessionOrdersData, buildTagsInitialized]);
+
+  const filterableTagNames = useMemo(() => {
+    if (!readyToSessionOrdersData?.orders) return new Set<string>();
+    const totalOrders = readyToSessionOrdersData.orders.length;
+    const tagCounts = new Map<string, number>();
+    readyToSessionOrdersData.orders.forEach(order => {
+      order.tags?.forEach(tag => {
+        tagCounts.set(tag.name, (tagCounts.get(tag.name) || 0) + 1);
+      });
+    });
+    return new Set(
+      [...tagCounts.entries()]
+        .filter(([_, count]) => count < totalOrders)
+        .map(([name]) => name)
+    );
+  }, [readyToSessionOrdersData]);
 
   const filteredBuildOrders = useMemo(() => {
     if (!readyToSessionOrdersData?.orders) return [];
@@ -729,9 +750,8 @@ export default function Fingerprints() {
         if (!selectedBuildStationTypes.has(stationTypeKey)) return false;
       }
       const orderTagNames = order.tags?.map(t => t.name) || [];
-      const hasCheckedTag = orderTagNames.some(tag => selectedBuildTags.has(tag));
-      if (buildTagFilterMode === 'include' && !hasCheckedTag) return false;
-      if (buildTagFilterMode === 'exclude' && hasCheckedTag) return false;
+      const filterableTags = orderTagNames.filter(tag => filterableTagNames.has(tag));
+      if (filterableTags.length > 0 && !filterableTags.every(tag => selectedBuildTags.has(tag))) return false;
       return true;
     });
     if (buildOrderSearch.trim()) {
@@ -745,7 +765,7 @@ export default function Fingerprints() {
       });
     }
     return orders;
-  }, [readyToSessionOrdersData, selectedBuildStationTypes, selectedBuildTags, buildTagFilterMode, buildOrderSearch, buildOrderSortDir]);
+  }, [readyToSessionOrdersData, selectedBuildStationTypes, selectedBuildTags, filterableTagNames, buildOrderSearch, buildOrderSortDir]);
 
   // Mutations
   const assignMutation = useMutation({
@@ -2549,68 +2569,29 @@ export default function Fingerprints() {
                                     </Button>
                                   </div>
                                 </div>
-                                <div className="flex items-center gap-1 pb-2 border-b">
-                                  <Button
-                                    variant={buildTagFilterMode === 'include' ? 'default' : 'outline'}
-                                    size="sm"
-                                    className="h-6 px-2 text-xs flex-1"
-                                    onClick={() => {
-                                      if (buildTagFilterMode !== 'include') {
-                                        const allTags = new Set<string>();
-                                        readyToSessionOrdersData.orders.forEach(order => {
-                                          order.tags?.forEach(tag => allTags.add(tag.name));
-                                        });
-                                        const inverted = new Set<string>();
-                                        allTags.forEach(tag => { if (!selectedBuildTags.has(tag)) inverted.add(tag); });
-                                        setSelectedBuildTags(inverted);
-                                        setBuildTagFilterMode('include');
-                                      }
-                                    }}
-                                    data-testid="button-tag-mode-include"
-                                  >
-                                    Include
-                                  </Button>
-                                  <Button
-                                    variant={buildTagFilterMode === 'exclude' ? 'default' : 'outline'}
-                                    size="sm"
-                                    className="h-6 px-2 text-xs flex-1"
-                                    onClick={() => {
-                                      if (buildTagFilterMode !== 'exclude') {
-                                        const allTags = new Set<string>();
-                                        readyToSessionOrdersData.orders.forEach(order => {
-                                          order.tags?.forEach(tag => allTags.add(tag.name));
-                                        });
-                                        const inverted = new Set<string>();
-                                        allTags.forEach(tag => { if (!selectedBuildTags.has(tag)) inverted.add(tag); });
-                                        setSelectedBuildTags(inverted);
-                                        setBuildTagFilterMode('exclude');
-                                      }
-                                    }}
-                                    data-testid="button-tag-mode-exclude"
-                                  >
-                                    Exclude
-                                  </Button>
-                                </div>
                                 <ScrollArea className="h-[200px]">
                                   {(() => {
-                                    // Get unique tags from all orders
-                                    const allTags = new Map<string, string | null>();
+                                    const totalOrders = readyToSessionOrdersData.orders.length;
+                                    const tagData = new Map<string, { color: string | null; count: number }>();
                                     readyToSessionOrdersData.orders.forEach(order => {
                                       order.tags?.forEach(tag => {
-                                        if (!allTags.has(tag.name)) {
-                                          allTags.set(tag.name, tag.color);
+                                        const existing = tagData.get(tag.name);
+                                        if (existing) {
+                                          existing.count++;
+                                        } else {
+                                          tagData.set(tag.name, { color: tag.color, count: 1 });
                                         }
                                       });
                                     });
-                                    const sortedTags = [...allTags.entries()].sort((a, b) => {
-                                      return a[0].localeCompare(b[0]);
-                                    });
+                                    const sortedTags = [...tagData.entries()]
+                                      .filter(([_, data]) => data.count < totalOrders)
+                                      .sort((a, b) => a[0].localeCompare(b[0]));
                                     
                                     if (sortedTags.length === 0) {
                                       return <div className="text-sm text-muted-foreground py-2">No tags found</div>;
                                     }
                                     
-                                    return sortedTags.map(([tagName, tagColor]) => {
+                                    return sortedTags.map(([tagName, tagInfo]) => {
                                       return (
                                       <div key={tagName} className="flex items-center space-x-2 py-1">
                                         <Checkbox
@@ -2633,7 +2614,7 @@ export default function Fingerprints() {
                                           htmlFor={`tag-filter-${tagName}`}
                                           className="text-sm flex-1 flex items-center gap-2 cursor-pointer"
                                         >
-                                          <Tag className="h-3 w-3" style={{ color: tagColor || undefined }} />
+                                          <Tag className="h-3 w-3" style={{ color: tagInfo.color || undefined }} />
                                           {tagName}
                                         </label>
                                       </div>
