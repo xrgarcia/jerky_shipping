@@ -1364,10 +1364,10 @@ export default function Fingerprints() {
           <CardContent>
             <div className="flex items-baseline gap-2">
               <span
-                className={`text-2xl font-bold ${(prepStats?.buildCount ?? 0) > 0 ? 'text-blue-600' : 'text-muted-foreground'}`}
+                className={`text-2xl font-bold ${(readyToSessionOrdersData?.orders?.length ?? prepStats?.buildCount ?? 0) > 0 ? 'text-blue-600' : 'text-muted-foreground'}`}
                 data-testid="text-sessionable-count"
               >
-                {prepStats?.buildCount ?? 0}
+                {readyToSessionOrdersData?.orders?.length ?? prepStats?.buildCount ?? 0}
               </span>
               <span className="text-sm text-muted-foreground">
                 ready to session
