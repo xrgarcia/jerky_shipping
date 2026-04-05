@@ -869,6 +869,7 @@ function UnifiedSyncButtons({
   const [isPollLoading, setIsPollLoading] = useState(false);
   const [isResyncLoading, setIsResyncLoading] = useState(false);
   const [isResync1Loading, setIsResync1Loading] = useState(false);
+  const [isResync14Loading, setIsResync14Loading] = useState(false);
   const [isResync30Loading, setIsResync30Loading] = useState(false);
   const [isResync90Loading, setIsResync90Loading] = useState(false);
   const [isResyncAllLoading, setIsResyncAllLoading] = useState(false);
@@ -957,6 +958,35 @@ function UnifiedSyncButtons({
       >
         <RefreshCw className={cn("h-3 w-3 mr-1", isResyncLoading && "animate-spin")} />
         {isResyncLoading ? "Resetting..." : "Resync (7-day)"}
+      </Button>
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={async () => {
+          setIsResync14Loading(true);
+          try {
+            await apiRequest('POST', '/api/operations/force-unified-resync-14');
+            queryClient.invalidateQueries({ queryKey: ["/api/operations/queue-stats"] });
+            toast({
+              title: "14-Day Resync Started",
+              description: "Cursor reset to 14 days ago.",
+            });
+          } catch (err) {
+            console.error('Failed to force 14-day resync:', err);
+            toast({
+              title: "Failed to force 14-day resync",
+              description: err instanceof Error ? err.message : "Unknown error",
+              variant: "destructive",
+            });
+          } finally {
+            setIsResync14Loading(false);
+          }
+        }}
+        disabled={!credentialsConfigured || isResync14Loading}
+        data-testid="button-force-unified-resync-14"
+      >
+        <RefreshCw className={cn("h-3 w-3 mr-1", isResync14Loading && "animate-spin")} />
+        {isResync14Loading ? "Resetting..." : "Resync (14-day)"}
       </Button>
       <Button
         size="sm"

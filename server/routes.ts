@@ -6080,6 +6080,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Force 14-day resync (reset cursor to 14 days ago)
+  app.post("/api/operations/force-unified-resync-14", requireAuth, async (req, res) => {
+    try {
+      const { forceResyncWithDays } = await import("./unified-shipment-sync-worker");
+      await forceResyncWithDays(14);
+      res.json({ success: true, message: "Full resync initiated - cursor reset to 14-day lookback" });
+    } catch (error) {
+      console.error("Error forcing 14-day unified resync:", error);
+      res.status(500).json({ error: "Failed to force 14-day unified resync" });
+    }
+  });
+
   // Force 30-day resync (reset cursor to 30 days ago)
   app.post("/api/operations/force-unified-resync-30", requireAuth, async (req, res) => {
     try {
