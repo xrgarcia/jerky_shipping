@@ -84,7 +84,7 @@ import {
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { UNIVERSAL_TAGS, TAG_COLORS, TAG_PRIORITY } from "@shared/constants";
+import { UNIVERSAL_TAGS, DEFAULT_UNCHECKED_TAGS, TAG_COLORS, TAG_PRIORITY } from "@shared/constants";
 
 interface FingerprintData {
   id: string;
@@ -715,7 +715,7 @@ export default function Fingerprints() {
         order.tags?.forEach(tag => tagNames.add(tag.name));
       });
       const filterableTags = new Set(
-        [...tagNames].filter(name => !UNIVERSAL_TAGS.has(name))
+        [...tagNames].filter(name => !UNIVERSAL_TAGS.has(name) && !DEFAULT_UNCHECKED_TAGS.has(name))
       );
       setSelectedBuildTags(filterableTags);
       setBuildTagsInitialized(true);
