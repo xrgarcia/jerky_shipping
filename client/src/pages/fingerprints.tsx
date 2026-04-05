@@ -84,6 +84,7 @@ import {
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { TAG_COLORS, TAG_PRIORITY } from "@shared/constants";
 
 interface FingerprintData {
   id: string;
@@ -2380,9 +2381,9 @@ export default function Fingerprints() {
                       <col style={{ width: '3%' }} />
                       <col style={{ width: '16%' }} />
                       <col style={{ width: '10%' }} />
-                      <col style={{ width: '16%' }} />
+                      <col style={{ width: '24%' }} />
                       <col style={{ width: '9%' }} />
-                      <col style={{ width: '40%' }} />
+                      <col style={{ width: '32%' }} />
                       <col style={{ width: '6%' }} />
                     </colgroup>
                     <thead className="sticky top-0 z-10 bg-card border-b shadow-sm">
@@ -2683,21 +2684,26 @@ export default function Fingerprints() {
                               if (optionalTags.length === 0) {
                                 return <span className="text-muted-foreground/50">-</span>;
                               }
+                              const sortedTags = [...optionalTags].sort((a, b) =>
+                                (TAG_PRIORITY[a.name] ?? 50) - (TAG_PRIORITY[b.name] ?? 50)
+                              );
                               return (
                                 <div className="flex flex-wrap gap-1">
-                                  {optionalTags.slice(0, 2).map((tag, idx) => (
-                                    <Badge 
-                                      key={idx} 
-                                      variant="outline" 
-                                      className="text-xs px-1.5 py-0"
-                                      style={{ borderColor: tag.color || undefined, color: tag.color || undefined }}
-                                    >
-                                      {tag.name}
-                                    </Badge>
-                                  ))}
-                                  {optionalTags.length > 2 && (
+                                  {sortedTags.slice(0, 4).map((tag, idx) => {
+                                    const colors = TAG_COLORS[tag.name];
+                                    return (
+                                      <Badge 
+                                        key={idx} 
+                                        variant="outline" 
+                                        className={`text-xs px-1.5 py-0 ${colors ? `${colors.bg} ${colors.text} ${colors.border}` : ''}`}
+                                      >
+                                        {tag.name}
+                                      </Badge>
+                                    );
+                                  })}
+                                  {sortedTags.length > 4 && (
                                     <Badge variant="secondary" className="text-xs px-1.5 py-0">
-                                      +{optionalTags.length - 2}
+                                      +{sortedTags.length - 4}
                                     </Badge>
                                   )}
                                 </div>
