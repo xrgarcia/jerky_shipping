@@ -71,10 +71,10 @@ export const TAG_PRIORITY: Record<string, number> = {
   'Service Contacted': 5,
   'EMPLOYEE ORDER  - Mark As Shipped': 5,
   'Flavor Drop Bundle': 5,
+  'TikTok Order': 6,
+  'TODAY': 7,
   'MOVE OVER': 90,
   'READY FOR SHIPDOT': 91,
   'All Orders': 92,
-  'TODAY': 93,
-  'TikTok Order': 94,
 };
 
