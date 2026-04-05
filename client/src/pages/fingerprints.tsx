@@ -84,7 +84,7 @@ import {
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { TAG_COLORS, TAG_PRIORITY } from "@shared/constants";
+import { UNIVERSAL_TAGS, TAG_COLORS, TAG_PRIORITY } from "@shared/constants";
 
 interface FingerprintData {
   id: string;
@@ -710,17 +710,12 @@ export default function Fingerprints() {
 
   useEffect(() => {
     if (readyToSessionOrdersData?.orders && !buildTagsInitialized) {
-      const totalOrders = readyToSessionOrdersData.orders.length;
-      const tagCounts = new Map<string, number>();
+      const tagNames = new Set<string>();
       readyToSessionOrdersData.orders.forEach(order => {
-        order.tags?.forEach(tag => {
-          tagCounts.set(tag.name, (tagCounts.get(tag.name) || 0) + 1);
-        });
+        order.tags?.forEach(tag => tagNames.add(tag.name));
       });
       const filterableTags = new Set(
-        [...tagCounts.entries()]
-          .filter(([_, count]) => count < totalOrders)
-          .map(([name]) => name)
+        [...tagNames].filter(name => !UNIVERSAL_TAGS.has(name))
       );
       setSelectedBuildTags(filterableTags);
       setBuildTagsInitialized(true);
@@ -729,18 +724,13 @@ export default function Fingerprints() {
 
   const filterableTagNames = useMemo(() => {
     if (!readyToSessionOrdersData?.orders) return new Set<string>();
-    const totalOrders = readyToSessionOrdersData.orders.length;
-    const tagCounts = new Map<string, number>();
+    const allTagNames = new Set<string>();
     readyToSessionOrdersData.orders.forEach(order => {
       order.tags?.forEach(tag => {
-        tagCounts.set(tag.name, (tagCounts.get(tag.name) || 0) + 1);
+        if (!UNIVERSAL_TAGS.has(tag.name)) allTagNames.add(tag.name);
       });
     });
-    return new Set(
-      [...tagCounts.entries()]
-        .filter(([_, count]) => count < totalOrders)
-        .map(([name]) => name)
-    );
+    return allTagNames;
   }, [readyToSessionOrdersData]);
 
   const filteredBuildOrders = useMemo(() => {
@@ -2549,7 +2539,9 @@ export default function Fingerprints() {
                                       onClick={() => {
                                         const allTagNames = new Set<string>();
                                         readyToSessionOrdersData.orders.forEach(order => {
-                                          order.tags?.forEach(tag => allTagNames.add(tag.name));
+                                          order.tags?.forEach(tag => {
+                                            if (!UNIVERSAL_TAGS.has(tag.name)) allTagNames.add(tag.name);
+                                          });
                                         });
                                         setSelectedBuildTags(allTagNames);
                                       }}
@@ -2572,7 +2564,6 @@ export default function Fingerprints() {
                                 </div>
                                 <ScrollArea className="h-[200px]">
                                   {(() => {
-                                    const totalOrders = readyToSessionOrdersData.orders.length;
                                     const tagData = new Map<string, { color: string | null; count: number }>();
                                     readyToSessionOrdersData.orders.forEach(order => {
                                       order.tags?.forEach(tag => {
@@ -2585,7 +2576,7 @@ export default function Fingerprints() {
                                       });
                                     });
                                     const sortedTags = [...tagData.entries()]
-                                      .filter(([_, data]) => data.count < totalOrders)
+                                      .filter(([name]) => !UNIVERSAL_TAGS.has(name))
                                       .sort((a, b) => a[0].localeCompare(b[0]));
                                     
                                     if (sortedTags.length === 0) {
@@ -2702,9 +2693,29 @@ export default function Fingerprints() {
                                     );
                                   })}
                                   {sortedTags.length > 4 && (
-                                    <Badge variant="secondary" className="text-xs px-1.5 py-0">
-                                      +{sortedTags.length - 4}
-                                    </Badge>
+                                    <Popover>
+                                      <PopoverTrigger asChild>
+                                        <Badge variant="secondary" className="text-xs px-1.5 py-0 cursor-pointer" data-testid={`badge-overflow-${order.orderNumber}`}>
+                                          +{sortedTags.length - 4}
+                                        </Badge>
+                                      </PopoverTrigger>
+                                      <PopoverContent className="w-auto p-2" align="start">
+                                        <div className="flex flex-col gap-1">
+                                          {sortedTags.slice(4).map((tag, idx) => {
+                                            const colors = TAG_COLORS[tag.name];
+                                            return (
+                                              <Badge
+                                                key={idx}
+                                                variant="outline"
+                                                className={`text-xs px-1.5 py-0 ${colors ? `${colors.bg} ${colors.text} ${colors.border}` : ''}`}
+                                              >
+                                                {tag.name}
+                                              </Badge>
+                                            );
+                                          })}
+                                        </div>
+                                      </PopoverContent>
+                                    </Popover>
                                   )}
                                 </div>
                               );

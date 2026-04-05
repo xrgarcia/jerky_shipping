@@ -24,6 +24,14 @@ export type ShippableTag = (typeof SHIPPABLE_TAGS)[number];
  */
 export const READY_FOR_SHIPDOT_TAG = 'READY FOR SHIPDOT' as const;
 
+export const UNIVERSAL_TAGS = new Set([
+  'All Orders',
+  'MOVE OVER',
+  'READY FOR SHIPDOT',
+  'TikTok Order',
+  'TODAY',
+]);
+
 export const TAG_COLORS: Record<string, { bg: string; text: string; border: string }> = {
   'OOS item':                      { bg: 'bg-red-50',    text: 'text-red-700',    border: 'border-red-300' },
   'Backorder':                     { bg: 'bg-red-50',    text: 'text-red-700',    border: 'border-red-300' },
@@ -59,8 +67,10 @@ export const TAG_PRIORITY: Record<string, number> = {
   'KIKI + KOOZIE': 3,
   'Gift': 4,
   'Military': 4,
+  'International - Discreet Packaging': 4,
   'Service Contacted': 5,
   'EMPLOYEE ORDER  - Mark As Shipped': 5,
+  'Flavor Drop Bundle': 5,
   'MOVE OVER': 90,
   'READY FOR SHIPDOT': 91,
   'All Orders': 92,
