@@ -317,8 +317,7 @@ const reasonSideEffects: ReasonSideEffectConfig[] = [
         }
         
         if (!packagingTypeIdToSync) {
-          log(`Package sync: No packagingTypeId set for ${ref} — event reason '${metadata?.reason || 'unknown'}' expected packaging to exist`, 'warn', withOrder(orderNumber, shipmentId));
-          return { success: false, shouldRetry: false, shouldRequeue: false, error: `No packagingTypeId set for ${ref}` };
+          return { success: true, shouldRetry: false, shouldRequeue: false };
         }
 
         const [packagingType] = await db
