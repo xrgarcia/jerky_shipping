@@ -22,7 +22,7 @@ export const pool = new Pool({
   // Send keepalive probe immediately when connection becomes idle
   keepAliveInitialDelayMillis: 0,
   // Maximum number of connections in the pool
-  max: 10,
+  max: 25,
   // Minimum number of connections to keep warm (prevents full cold start)
   min: 1,
   // How long a connection can be idle before being closed (5 minutes)

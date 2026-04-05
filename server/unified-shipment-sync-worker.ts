@@ -938,29 +938,26 @@ async function pollCycle(): Promise<{
         }
       }
       
-      // Process each shipment (now with labels/tracking attached)
-      for (const shipment of pageResult.shipments) {
+      // Process shipments with bounded concurrency to avoid DB connection exhaustion
+      const SYNC_CONCURRENCY = 3;
+      const processShipmentItem = async (shipment: any) => {
         const shipmentId = shipment.shipment_id;
         const modifiedAt = shipment.modified_at || '';
         
-        // Skip already dead-lettered shipments - check database by shipmentId only
-        // This handles cases where modifiedAt changes but shipment is still dead-lettered
         if (shipmentId) {
           const dbDeadLetter = await storage.getShipmentsDeadLetter(shipmentId);
           if (dbDeadLetter) {
-            // Silently skip - no need to log every time, just advance cursor
             if (modifiedAt) {
               successTimestamps.push(modifiedAt);
             }
-            continue;
+            return;
           }
           
-          // Also check Redis as secondary mechanism (for recently dead-lettered before DB write)
           if (modifiedAt) {
             const redisDeadLettered = await isShipmentDeadLettered(shipmentId, modifiedAt);
             if (redisDeadLettered) {
               successTimestamps.push(modifiedAt);
-              continue;
+              return;
             }
           }
         }
@@ -968,20 +965,16 @@ async function pollCycle(): Promise<{
         try {
           const syncResult = await syncShipment(shipment);
           
-          // Handle skipped shipments (e.g., dead-lettered) - count as success, not error
           if (syncResult.skipped) {
-            // Track timestamp for cursor advancement but don't count as processed
             if (modifiedAt) {
               successTimestamps.push(modifiedAt);
             }
-            continue;
+            return;
           }
           
           totalProcessed++;
-          // Track successful timestamps for cursor advancement
           if (modifiedAt) {
             successTimestamps.push(modifiedAt);
-            // Clear any previous failure count on success
             if (shipmentId) {
               await clearShipmentSyncFailureCount(shipmentId, modifiedAt);
             }
@@ -991,16 +984,13 @@ async function pollCycle(): Promise<{
           const errorMessage = err?.message || 'Unknown error';
           console.error(`[UnifiedSync] Error syncing shipment ${shipmentId}:`, err);
           
-          // Track failure in Redis and check if we should dead-letter
           if (shipmentId && modifiedAt) {
             const failureCount = await incrementShipmentSyncFailureCount(shipmentId, modifiedAt);
             
             if (failureCount >= MAX_SYNC_FAILURES_BEFORE_DEADLETTER) {
-              // Dead-letter this shipment
               logger.info(`[UnifiedSync] Dead-lettering shipment ${shipmentId} after ${failureCount} failures`, withOrder(shipment.order_number, shipmentId));
               
               try {
-                // Insert into shipmentSyncFailures table
                 await db.insert(shipmentSyncFailures).values({
                   shipstationShipmentId: shipmentId,
                   modifiedAt: modifiedAt,
@@ -1010,36 +1000,39 @@ async function pollCycle(): Promise<{
                   requestData: shipment,
                   retryCount: failureCount,
                   failedAt: new Date(),
-                }).onConflictDoNothing(); // Don't fail if already exists
+                }).onConflictDoNothing();
                 
-                // Mark as dead-lettered in Redis
                 await markShipmentAsDeadLettered(shipmentId, modifiedAt);
                 await clearShipmentSyncFailureCount(shipmentId, modifiedAt);
                 
-                // IMPORTANT: Dead-lettered shipments don't block cursor advancement
-                // Treat them as "processed" for cursor purposes
                 successTimestamps.push(modifiedAt);
                 logger.info(`[UnifiedSync] Shipment ${shipmentId} moved to dead-letter queue, cursor can advance past it`, withOrder(shipment.order_number, shipmentId));
               } catch (dlErr) {
                 console.error(`[UnifiedSync] Failed to dead-letter shipment ${shipmentId}:`, dlErr);
-                // If dead-lettering fails, still track as failure to block cursor
                 if (!earliestFailureTimestamp || modifiedAt < earliestFailureTimestamp) {
                   earliestFailureTimestamp = modifiedAt;
                 }
               }
             } else {
-              // Not yet at dead-letter threshold - track as failure to block cursor
               logger.info(`[UnifiedSync] Shipment ${shipmentId} failed (attempt ${failureCount}/${MAX_SYNC_FAILURES_BEFORE_DEADLETTER})`, withOrder(shipment.order_number, shipmentId));
               if (!earliestFailureTimestamp || modifiedAt < earliestFailureTimestamp) {
                 earliestFailureTimestamp = modifiedAt;
               }
             }
           } else {
-            // No shipmentId or modifiedAt - can't track properly, just log
             logger.info(`[UnifiedSync] Shipment missing ID or modified_at, cannot track failure`);
           }
         }
+      };
+
+      // Run with bounded concurrency
+      const active: Promise<void>[] = [];
+      for (const shipment of pageResult.shipments) {
+        const p = processShipmentItem(shipment).then(() => { active.splice(active.indexOf(p), 1); });
+        active.push(p);
+        if (active.length >= SYNC_CONCURRENCY) await Promise.race(active);
       }
+      await Promise.all(active);
       
       logger.info(`[UnifiedSync] Page ${currentPage}: processed ${pageResult.shipments.length} shipments (${totalErrored} errors so far)`);
       
