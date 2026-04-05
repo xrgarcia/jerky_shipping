@@ -1213,13 +1213,6 @@ export default function Fingerprints() {
     }
   };
 
-  const handleRefreshAll = () => {
-    refetchUncategorized();
-    refetchFingerprints();
-    refetchSessionPreview();
-    refetchLiveSessions();
-  };
-
   const toggleSessionExpand = async (sessionId: string) => {
     const newExpanded = new Set(expandedSessions);
     if (newExpanded.has(sessionId)) {
@@ -1288,15 +1281,6 @@ export default function Fingerprints() {
             Prepare orders for picking: categorize products, assign packaging, and build sessions
           </p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleRefreshAll}
-          data-testid="button-refresh"
-        >
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Refresh
-        </Button>
       </div>
 
       {/* Summary Stats */}
