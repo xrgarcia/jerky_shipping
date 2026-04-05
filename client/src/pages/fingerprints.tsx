@@ -2675,9 +2675,10 @@ export default function Fingerprints() {
                               if (optionalTags.length === 0) {
                                 return <span className="text-muted-foreground/50">-</span>;
                               }
-                              const sortedTags = [...optionalTags].sort((a, b) =>
-                                (TAG_PRIORITY[a.name] ?? 50) - (TAG_PRIORITY[b.name] ?? 50)
-                              );
+                              const sortedTags = [...optionalTags].sort((a, b) => {
+                                const diff = (TAG_PRIORITY[a.name] ?? 50) - (TAG_PRIORITY[b.name] ?? 50);
+                                return diff !== 0 ? diff : a.name.localeCompare(b.name);
+                              });
                               return (
                                 <div className="flex flex-wrap gap-1">
                                   {sortedTags.slice(0, 4).map((tag, idx) => {
