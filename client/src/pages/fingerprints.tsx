@@ -2696,9 +2696,11 @@ export default function Fingerprints() {
                                   {sortedTags.length > 4 && (
                                     <Popover>
                                       <PopoverTrigger asChild>
-                                        <Badge variant="secondary" className="text-xs px-1.5 py-0 cursor-pointer" data-testid={`badge-overflow-${order.orderNumber}`}>
-                                          +{sortedTags.length - 4}
-                                        </Badge>
+                                        <button type="button" data-testid={`badge-overflow-${order.orderNumber}`}>
+                                          <Badge variant="secondary" className="text-xs px-1.5 py-0 cursor-pointer">
+                                            +{sortedTags.length - 4}
+                                          </Badge>
+                                        </button>
                                       </PopoverTrigger>
                                       <PopoverContent className="w-auto p-2" align="start">
                                         <div className="flex flex-col gap-1">
