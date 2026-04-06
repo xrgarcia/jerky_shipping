@@ -56,6 +56,13 @@ export const TAG_COLORS: Record<string, { bg: string; text: string; border: stri
   'TODAY':                         { bg: 'bg-blue-50',   text: 'text-blue-600',   border: 'border-blue-200' },
 };
 
+export const HIDDEN_DISPLAY_TAGS = new Set([
+  'All Orders',
+  'READY FOR SHIPDOT',
+  'Gift',
+  'Backorder',
+]);
+
 export const DEFAULT_UNCHECKED_TAGS = new Set([
   'KIKI Membership - 20th',
   'KIKI + KOOZIE',
