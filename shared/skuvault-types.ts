@@ -590,9 +590,9 @@ export const qcSaleSchema = z.object({
   AllItemsPassedExceptNFP: z.boolean().nullable().optional(),
   isSingleWarehouse: z.boolean().nullable().optional(),
   isTransferSale: z.boolean().nullable().optional(),
-  PassedItems: z.array(qcPassedItemSchema).nullable().optional(),
-  FailedItems: z.array(qcFailedItemSchema).nullable().optional(),
-  Items: z.array(qcExpectedItemSchema).nullable().optional(), // All expected items
+  PassedItems: z.array(qcPassedItemSchema.nullable()).nullable().optional(),
+  FailedItems: z.array(qcFailedItemSchema.nullable()).nullable().optional(),
+  Items: z.array(qcExpectedItemSchema.nullable()).nullable().optional(), // All expected items
 });
 
 export type QCSale = z.infer<typeof qcSaleSchema>;
