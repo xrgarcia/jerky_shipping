@@ -166,24 +166,26 @@ function AppContent() {
             >
               <SidebarTrigger data-testid="button-sidebar-toggle" className="text-white hover:bg-white/10" />
               {backlogCounts && (backlogCounts.backlog > 0 || backlogCounts.inProgress > 0) && (
-                <Link href="/reports/shipping-backlog">
-                  <div className="flex items-center gap-4 cursor-pointer hover-elevate rounded-md px-3 py-1.5" data-testid="toolbar-backlog-metrics">
-                    {backlogCounts.backlog > 0 && (
-                      <div className="flex items-center gap-1.5">
-                        <span className={`inline-block h-2 w-2 rounded-full ${backlogCounts.backlog > 20 ? 'bg-red-500' : backlogCounts.backlog > 5 ? 'bg-orange-400' : 'bg-yellow-400'}`} />
+                <div className="flex items-center gap-4" data-testid="toolbar-backlog-metrics">
+                  {backlogCounts.backlog > 0 && (
+                    <Link href="/reports/shipping-backlog">
+                      <div className="flex items-center gap-1.5 cursor-pointer hover-elevate rounded-md px-3 py-1.5">
+                        <span className="inline-block h-2 w-2 rounded-full bg-green-400" />
                         <span className="text-sm font-medium text-white" data-testid="text-toolbar-backlog">{backlogCounts.backlog}</span>
                         <span className="text-xs text-white/60">backlog</span>
                       </div>
-                    )}
-                    {backlogCounts.inProgress > 0 && (
-                      <div className="flex items-center gap-1.5">
-                        <span className="inline-block h-2 w-2 rounded-full bg-green-500" />
+                    </Link>
+                  )}
+                  {backlogCounts.inProgress > 0 && (
+                    <Link href="/shipments?viewMode=workflow&tab=in_progress">
+                      <div className="flex items-center gap-1.5 cursor-pointer hover-elevate rounded-md px-3 py-1.5">
+                        <span className="inline-block h-2 w-2 rounded-full bg-green-400" />
                         <span className="text-sm font-medium text-white" data-testid="text-toolbar-inprogress">{backlogCounts.inProgress}</span>
                         <span className="text-xs text-white/60">in progress</span>
                       </div>
-                    )}
-                  </div>
-                </Link>
+                    </Link>
+                  )}
+                </div>
               )}
             </header>
             <main className="flex-1 overflow-y-auto">

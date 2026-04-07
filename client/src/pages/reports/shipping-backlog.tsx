@@ -65,12 +65,12 @@ export default function ShippingBacklogReport() {
 
   const { data: counts, isLoading: countsLoading, isError: countsError } = useQuery<BacklogCounts>({
     queryKey: ["/api/reports/shipping-backlog/counts"],
-    refetchInterval: 60000,
+    refetchInterval: 30000,
   });
 
   const { data: orders, isLoading: ordersLoading, isError: ordersError } = useQuery<BacklogOrder[]>({
     queryKey: ["/api/reports/shipping-backlog"],
-    refetchInterval: 60000,
+    refetchInterval: 30000,
   });
 
   const handleSort = (field: SortField) => {
@@ -270,7 +270,7 @@ export default function ShippingBacklogReport() {
                     <SortHeader field="shipToName">Customer</SortHeader>
                     <SortHeader field="orderDate">Order Date</SortHeader>
                     <SortHeader field="ageDays">Age</SortHeader>
-                    <SortHeader field="shipToState">State</SortHeader>
+                    <SortHeader field="shipToState">Destination</SortHeader>
                     <SortHeader field="lifecyclePhase">Phase</SortHeader>
                     <SortHeader field="itemCount">Items</SortHeader>
                     <TableHead>Tags</TableHead>
@@ -306,8 +306,10 @@ export default function ShippingBacklogReport() {
                             {order.ageDays}d
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-muted-foreground" data-testid={`text-state-${order.orderNumber}`}>
-                          {order.shipToState || "—"}
+                        <TableCell className="text-muted-foreground whitespace-nowrap" data-testid={`text-destination-${order.orderNumber}`}>
+                          {order.shipToCity && order.shipToState
+                            ? `${order.shipToCity}, ${order.shipToState}`
+                            : order.shipToState || order.shipToCity || "—"}
                         </TableCell>
                         <TableCell className="text-sm" data-testid={`text-phase-${order.orderNumber}`}>
                           {formatPhase(order.lifecyclePhase, order.decisionSubphase)}
