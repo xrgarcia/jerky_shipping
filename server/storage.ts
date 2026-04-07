@@ -228,6 +228,8 @@ export interface IStorage {
   getShipmentItemsByExternalOrderItemId(externalOrderItemId: string): Promise<Array<ShipmentItem & { shipment: Shipment }>>;
   getBrokenShipments(startDate?: Date, endDate?: Date): Promise<Shipment[]>;
   getUserById(id: string): Promise<User | undefined>;
+  getShippingBacklogCounts(): Promise<{ backlog: number; oneDay: number; twoThreeDays: number; fourPlusDays: number; inProgress: number }>;
+  getShippingBacklogOrders(): Promise<any[]>;
 
   // Shopify Products
   upsertShopifyProduct(product: InsertShopifyProduct): Promise<ShopifyProduct>;
@@ -4075,6 +4077,108 @@ export class DatabaseStorage implements IStorage {
       .where(eq(chartNotes.id, id))
       .returning();
     return result.length > 0;
+  }
+
+  private _backlogConditions(isThe20th: boolean) {
+    const pipelinePhases = ['ready_for_skuvault', 'ready_to_pick', 'picking', 'packing_ready', 'on_dock', 'picking_issues', 'in_transit', 'delivered'];
+    const phaseCondition = sql`(${shipments.lifecyclePhase} IS NULL OR ${shipments.lifecyclePhase} NOT IN (${sql.join(pipelinePhases.map(p => sql`${p}`), sql`, `)}))`;
+    const notCancelled = sql`(${shipments.shipmentStatus} IS NULL OR ${shipments.shipmentStatus} != 'cancelled')`;
+    const noNotShippable = sql`NOT EXISTS (SELECT 1 FROM shipment_tags st WHERE st.shipment_id = ${shipments.id} AND st.name = 'NOT SHIPPABLE')`;
+    const conditions = [phaseCondition, notCancelled, noNotShippable];
+    if (!isThe20th) {
+      conditions.push(sql`NOT EXISTS (SELECT 1 FROM shipment_tags st WHERE st.shipment_id = ${shipments.id} AND st.name LIKE 'KIKI%')`);
+    }
+    return conditions;
+  }
+
+  async getShippingBacklogCounts(): Promise<{ backlog: number; oneDay: number; twoThreeDays: number; fourPlusDays: number; inProgress: number }> {
+    const todayCentral = sql`date_trunc('day', now() AT TIME ZONE 'America/Chicago')`;
+    const yesterdayCentral = sql`(${todayCentral} - interval '1 day')`;
+    const threeDaysAgoCentral = sql`(${todayCentral} - interval '3 days')`;
+
+    const centralDay = await db.execute(sql`SELECT extract(day FROM now() AT TIME ZONE 'America/Chicago')::int AS d`);
+    const isThe20th = (centralDay.rows[0] as any)?.d === 20;
+
+    const base = this._backlogConditions(isThe20th);
+    const inProgressPhases = ['ready_for_skuvault', 'ready_to_pick', 'picking', 'packing_ready', 'on_dock', 'picking_issues'];
+
+    const backlogResult = await db
+      .select({ count: count() })
+      .from(shipments)
+      .where(and(sql`${shipments.orderDate} < ${todayCentral}`, ...base));
+
+    const oneDayResult = await db
+      .select({ count: count() })
+      .from(shipments)
+      .where(and(sql`${shipments.orderDate} >= ${yesterdayCentral}`, sql`${shipments.orderDate} < ${todayCentral}`, ...base));
+
+    const twoThreeDaysResult = await db
+      .select({ count: count() })
+      .from(shipments)
+      .where(and(sql`${shipments.orderDate} >= ${threeDaysAgoCentral}`, sql`${shipments.orderDate} < ${yesterdayCentral}`, ...base));
+
+    const fourPlusDaysResult = await db
+      .select({ count: count() })
+      .from(shipments)
+      .where(and(sql`${shipments.orderDate} < ${threeDaysAgoCentral}`, ...base));
+
+    const inProgressResult = await db
+      .select({ count: count() })
+      .from(shipments)
+      .where(sql`${shipments.lifecyclePhase} IN (${sql.join(inProgressPhases.map(p => sql`${p}`), sql`, `)})`);
+
+    return {
+      backlog: Number(backlogResult[0]?.count) || 0,
+      oneDay: Number(oneDayResult[0]?.count) || 0,
+      twoThreeDays: Number(twoThreeDaysResult[0]?.count) || 0,
+      fourPlusDays: Number(fourPlusDaysResult[0]?.count) || 0,
+      inProgress: Number(inProgressResult[0]?.count) || 0,
+    };
+  }
+
+  async getShippingBacklogOrders(): Promise<any[]> {
+    const todayCentral = sql`date_trunc('day', now() AT TIME ZONE 'America/Chicago')`;
+
+    const centralDay = await db.execute(sql`SELECT extract(day FROM now() AT TIME ZONE 'America/Chicago')::int AS d`);
+    const isThe20th = (centralDay.rows[0] as any)?.d === 20;
+
+    const base = this._backlogConditions(isThe20th);
+
+    const rows = await db
+      .select({
+        id: shipments.id,
+        orderNumber: shipments.orderNumber,
+        shipToName: shipments.shipToName,
+        orderDate: shipments.orderDate,
+        shipToCity: shipments.shipToCity,
+        shipToState: shipments.shipToState,
+        lifecyclePhase: shipments.lifecyclePhase,
+        decisionSubphase: shipments.decisionSubphase,
+        itemCount: sql<number>`(SELECT COUNT(*) FROM shipment_items si WHERE si.shipment_id = ${shipments.id})`,
+        ageDays: sql<number>`extract(day FROM (${todayCentral} - ${shipments.orderDate}))::int`,
+      })
+      .from(shipments)
+      .where(and(sql`${shipments.orderDate} < ${todayCentral}`, ...base))
+      .orderBy(asc(shipments.orderDate));
+
+    const shipmentIds = rows.map(r => r.id);
+    let tagsMap = new Map<string, Array<{ name: string; color: string | null }>>();
+    if (shipmentIds.length > 0) {
+      const allTags = await db
+        .select({ shipmentId: shipmentTags.shipmentId, name: shipmentTags.name, color: shipmentTags.color })
+        .from(shipmentTags)
+        .where(inArray(shipmentTags.shipmentId, shipmentIds));
+      for (const tag of allTags) {
+        if (!tagsMap.has(tag.shipmentId)) tagsMap.set(tag.shipmentId, []);
+        tagsMap.get(tag.shipmentId)!.push({ name: tag.name, color: tag.color });
+      }
+    }
+
+    return rows.map(row => ({
+      ...row,
+      ageDays: Number(row.ageDays) || 0,
+      tags: tagsMap.get(row.id) || [],
+    }));
   }
 }
 

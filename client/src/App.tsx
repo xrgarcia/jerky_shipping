@@ -1,4 +1,4 @@
-import { Switch, Route, Redirect, useLocation } from "wouter";
+import { Switch, Route, Redirect, useLocation, Link } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -27,6 +27,7 @@ import PackingLogsReport from "@/pages/reports/packing-logs";
 import QcValidationReport from "@/pages/reports/qc-validation";
 import ValidateOrderDetails from "@/pages/reports/validate-order-details";
 import FingerprintsReport from "@/pages/reports/fingerprints";
+import ShippingBacklogReport from "@/pages/reports/shipping-backlog";
 import ShipmentsDLQReport from "@/pages/reports/shipments-dlq";
 import KitMappingsReport from "@/pages/reports/kit-mappings";
 import Sessions from "@/pages/sessions";
@@ -65,6 +66,12 @@ function AppContent() {
     onLogout: () => {
       queryClient.clear();
     },
+    enabled: isAuthenticated,
+  });
+
+  const { data: backlogCounts } = useQuery<{ backlog: number; inProgress: number }>({
+    queryKey: ["/api/reports/shipping-backlog/counts"],
+    refetchInterval: 60000,
     enabled: isAuthenticated,
   });
 
@@ -115,6 +122,7 @@ function AppContent() {
       <Route path="/reports/packing-logs" component={PackingLogsReport} />
       <Route path="/reports/qc-validation" component={QcValidationReport} />
       <Route path="/reports/validate-orders" component={ValidateOrderDetails} />
+      <Route path="/reports/shipping-backlog" component={ShippingBacklogReport} />
       <Route path="/reports/fingerprints" component={FingerprintsReport} />
       <Route path="/reports/shipments-dlq" component={ShipmentsDLQReport} />
       <Route path="/reports/kit-mappings" component={KitMappingsReport} />
@@ -157,6 +165,26 @@ function AppContent() {
               style={{ background: '#1a1a1a' }}
             >
               <SidebarTrigger data-testid="button-sidebar-toggle" className="text-white hover:bg-white/10" />
+              {backlogCounts && (backlogCounts.backlog > 0 || backlogCounts.inProgress > 0) && (
+                <Link href="/reports/shipping-backlog">
+                  <div className="flex items-center gap-4 cursor-pointer hover-elevate rounded-md px-3 py-1.5" data-testid="toolbar-backlog-metrics">
+                    {backlogCounts.backlog > 0 && (
+                      <div className="flex items-center gap-1.5">
+                        <span className={`inline-block h-2 w-2 rounded-full ${backlogCounts.backlog > 20 ? 'bg-red-500' : backlogCounts.backlog > 5 ? 'bg-orange-400' : 'bg-yellow-400'}`} />
+                        <span className="text-sm font-medium text-white" data-testid="text-toolbar-backlog">{backlogCounts.backlog}</span>
+                        <span className="text-xs text-white/60">backlog</span>
+                      </div>
+                    )}
+                    {backlogCounts.inProgress > 0 && (
+                      <div className="flex items-center gap-1.5">
+                        <span className="inline-block h-2 w-2 rounded-full bg-green-500" />
+                        <span className="text-sm font-medium text-white" data-testid="text-toolbar-inprogress">{backlogCounts.inProgress}</span>
+                        <span className="text-xs text-white/60">in progress</span>
+                      </div>
+                    )}
+                  </div>
+                </Link>
+              )}
             </header>
             <main className="flex-1 overflow-y-auto">
               {router}

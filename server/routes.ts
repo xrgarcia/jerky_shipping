@@ -4583,6 +4583,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/reports/shipping-backlog/counts", requireAuth, async (req, res) => {
+    try {
+      const counts = await storage.getShippingBacklogCounts();
+      res.json(counts);
+    } catch (error) {
+      console.error("Error fetching shipping backlog counts:", error);
+      res.status(500).json({ error: "Failed to fetch shipping backlog counts" });
+    }
+  });
+
+  app.get("/api/reports/shipping-backlog", requireAuth, async (req, res) => {
+    try {
+      const orders = await storage.getShippingBacklogOrders();
+      res.json(orders);
+    } catch (error) {
+      console.error("Error fetching shipping backlog:", error);
+      res.status(500).json({ error: "Failed to fetch shipping backlog" });
+    }
+  });
+
   app.get("/api/reports/summary", requireAuth, async (req, res) => {
     try {
       const { startDate, endDate } = req.query;

@@ -215,6 +215,11 @@ export function AppSidebar() {
       icon: Store,
     },
     {
+      title: "Shipping Backlog",
+      url: "/reports/shipping-backlog",
+      icon: AlertTriangle,
+    },
+    {
       title: "Packed Shipments",
       url: "/reports/packed-shipments",
       icon: PackageCheck,
