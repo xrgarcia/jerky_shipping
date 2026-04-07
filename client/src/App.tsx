@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { Switch, Route, Redirect, useLocation, Link } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
@@ -71,9 +72,56 @@ function AppContent() {
 
   const { data: backlogCounts } = useQuery<{ backlog: number; inProgress: number }>({
     queryKey: ["/api/reports/shipping-backlog/counts"],
-    refetchInterval: 60000,
     enabled: isAuthenticated,
   });
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    let ws: WebSocket | null = null;
+    let reconnectTimeout: ReturnType<typeof setTimeout>;
+    let reconnectAttempts = 0;
+    let isMounted = true;
+
+    const connect = () => {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${protocol}//${window.location.host}/ws?room=orders`;
+      try {
+        ws = new WebSocket(wsUrl);
+      } catch {
+        return;
+      }
+
+      ws.onopen = () => { reconnectAttempts = 0; };
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === 'order_update') {
+            queryClient.invalidateQueries({ queryKey: ["/api/reports/shipping-backlog/counts"] });
+          }
+        } catch {}
+      };
+
+      ws.onclose = (event) => {
+        if (event.code === 1008 || event.code === 1011) return;
+        if (event.code === 1006 && reconnectAttempts > 3) return;
+        if (isMounted) {
+          const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000);
+          reconnectAttempts++;
+          reconnectTimeout = setTimeout(connect, delay);
+        }
+      };
+    };
+
+    connect();
+
+    return () => {
+      isMounted = false;
+      if (reconnectTimeout) clearTimeout(reconnectTimeout);
+      if (ws) ws.close();
+    };
+  }, [isAuthenticated]);
 
   const sidebarStyle = {
     "--sidebar-width": "20rem",

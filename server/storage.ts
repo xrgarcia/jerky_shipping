@@ -4080,7 +4080,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   private _backlogConditions(isThe20th: boolean) {
-    const pipelinePhases = ['ready_for_skuvault', 'ready_to_pick', 'picking', 'packing_ready', 'on_dock', 'picking_issues', 'in_transit', 'delivered'];
+    const pipelinePhases = ['ready_for_skuvault', 'ready_to_pick', 'picking', 'packing_ready', 'on_dock', 'in_transit', 'delivered'];
     const phaseCondition = sql`(${shipments.lifecyclePhase} IS NULL OR ${shipments.lifecyclePhase} NOT IN (${sql.join(pipelinePhases.map(p => sql`${p}`), sql`, `)}))`;
     const notCancelled = sql`(${shipments.shipmentStatus} IS NULL OR ${shipments.shipmentStatus} != 'cancelled')`;
     const noNotShippable = sql`NOT EXISTS (SELECT 1 FROM shipment_tags st WHERE st.shipment_id = ${shipments.id} AND st.name = 'NOT SHIPPABLE')`;
@@ -4100,7 +4100,7 @@ export class DatabaseStorage implements IStorage {
     const isThe20th = (centralDay.rows[0] as any)?.d === 20;
 
     const base = this._backlogConditions(isThe20th);
-    const inProgressPhases = ['ready_for_skuvault', 'ready_to_pick', 'picking', 'packing_ready', 'on_dock', 'picking_issues'];
+    const inProgressPhases = ['ready_for_skuvault', 'ready_to_pick', 'picking', 'packing_ready', 'on_dock'];
 
     const backlogResult = await db
       .select({ count: count() })
