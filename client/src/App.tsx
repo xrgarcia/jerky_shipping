@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { Switch, Route, Redirect, useLocation, Link } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
@@ -93,6 +93,10 @@ function AppContent() {
       }
 
       ws.onopen = () => { reconnectAttempts = 0; };
+
+      ws.onerror = (error) => {
+        console.error('Toolbar WebSocket error:', error);
+      };
 
       ws.onmessage = (event) => {
         try {

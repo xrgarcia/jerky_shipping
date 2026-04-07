@@ -4155,7 +4155,7 @@ export class DatabaseStorage implements IStorage {
         lifecyclePhase: shipments.lifecyclePhase,
         decisionSubphase: shipments.decisionSubphase,
         itemCount: sql<number>`(SELECT COUNT(*) FROM shipment_items si WHERE si.shipment_id = ${shipments.id})`,
-        ageDays: sql<number>`extract(day FROM (${todayCentral} - ${shipments.orderDate}))::int`,
+        ageDays: sql<number>`(date_trunc('day', now() AT TIME ZONE 'America/Chicago')::date - date_trunc('day', ${shipments.orderDate} AT TIME ZONE 'America/Chicago')::date)`,
       })
       .from(shipments)
       .where(and(sql`${shipments.orderDate} < ${todayCentral}`, ...base))
