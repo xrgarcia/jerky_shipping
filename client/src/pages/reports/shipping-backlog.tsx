@@ -1,9 +1,17 @@
-import { useState, useMemo } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useSearch } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -12,7 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { AlertTriangle, Clock, Package, Loader2, Search, ArrowUpDown, RefreshCw } from "lucide-react";
+import { AlertTriangle, Clock, Package, Loader2, Search, ArrowUpDown, RefreshCw, ChevronLeft, ChevronRight } from "lucide-react";
 import { Link } from "wouter";
 import { queryClient } from "@/lib/queryClient";
 
@@ -38,8 +46,17 @@ interface BacklogOrder {
   tags: Array<{ name: string; color: string | null }>;
 }
 
+interface BacklogResponse {
+  orders: BacklogOrder[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
 type SortField = "orderNumber" | "shipToName" | "orderDate" | "ageDays" | "shipToState" | "lifecyclePhase" | "itemCount";
 type SortDir = "asc" | "desc";
+type AgeFilter = "all" | "oneDay" | "twoThreeDays" | "fourPlusDays";
 
 function formatPhase(phase: string | null, subphase: string | null): string {
   if (!phase) return "—";
@@ -58,20 +75,95 @@ function ageBadgeVariant(days: number): "default" | "secondary" | "destructive" 
 }
 
 export default function ShippingBacklogReport() {
-  const [search, setSearch] = useState("");
+  const searchParams = useSearch();
+  const [isInitialized, setIsInitialized] = useState(false);
+  const lastSyncedSearchRef = useRef<string>('');
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
   const [sortField, setSortField] = useState<SortField>("ageDays");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
-  const [ageFilter, setAgeFilter] = useState<"all" | "1" | "2-3" | "4+">("all");
+  const [ageFilter, setAgeFilter] = useState<AgeFilter>("all");
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  useEffect(() => {
+    const currentSearch = searchParams.startsWith('?') ? searchParams.slice(1) : searchParams;
+    if (lastSyncedSearchRef.current === currentSearch && isInitialized) return;
+
+    const params = new URLSearchParams(currentSearch);
+    setPage(parseInt(params.get('page') || '1'));
+    setPageSize(parseInt(params.get('pageSize') || '25'));
+    setSortField((params.get('sortBy') as SortField) || 'ageDays');
+    setSortDir((params.get('sortOrder') as SortDir) || 'desc');
+    setAgeFilter((params.get('ageFilter') as AgeFilter) || 'all');
+    const urlSearch = params.get('search') || '';
+    setSearch(urlSearch);
+    setDebouncedSearch(urlSearch);
+
+    lastSyncedSearchRef.current = currentSearch;
+    setIsInitialized(true);
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (!isInitialized) return;
+
+    const params = new URLSearchParams();
+    if (debouncedSearch) params.set('search', debouncedSearch);
+    if (ageFilter !== 'all') params.set('ageFilter', ageFilter);
+    if (page !== 1) params.set('page', page.toString());
+    if (pageSize !== 25) params.set('pageSize', pageSize.toString());
+    if (sortField !== 'ageDays') params.set('sortBy', sortField);
+    if (sortDir !== 'desc') params.set('sortOrder', sortDir);
+
+    const newSearch = params.toString();
+    const currentSearch = searchParams.startsWith('?') ? searchParams.slice(1) : searchParams;
+
+    if (currentSearch !== newSearch) {
+      lastSyncedSearchRef.current = newSearch;
+      const newUrl = newSearch ? `?${newSearch}` : '';
+      window.history.replaceState({}, '', `/reports/shipping-backlog${newUrl}`);
+    }
+  }, [debouncedSearch, ageFilter, page, pageSize, sortField, sortDir, isInitialized]);
+
+  const handleSearchChange = useCallback((value: string) => {
+    setSearch(value);
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    searchTimeoutRef.current = setTimeout(() => {
+      setDebouncedSearch(value);
+      setPage(1);
+    }, 300);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    };
+  }, []);
 
   const { data: counts, isLoading: countsLoading, isError: countsError } = useQuery<BacklogCounts>({
     queryKey: ["/api/reports/shipping-backlog/counts"],
     refetchInterval: 30000,
   });
 
-  const { data: orders, isLoading: ordersLoading, isError: ordersError } = useQuery<BacklogOrder[]>({
-    queryKey: ["/api/reports/shipping-backlog"],
+  const queryParams = new URLSearchParams();
+  queryParams.set('page', page.toString());
+  queryParams.set('pageSize', pageSize.toString());
+  queryParams.set('sortBy', sortField);
+  queryParams.set('sortOrder', sortDir);
+  if (debouncedSearch) queryParams.set('search', debouncedSearch);
+  if (ageFilter !== 'all') queryParams.set('ageFilter', ageFilter);
+
+  const { data: backlogData, isLoading: ordersLoading, isError: ordersError } = useQuery<BacklogResponse>({
+    queryKey: ['/api/reports/shipping-backlog', page, pageSize, sortField, sortDir, debouncedSearch, ageFilter],
+    queryFn: () => fetch(`/api/reports/shipping-backlog?${queryParams.toString()}`, { credentials: 'include' }).then(r => r.json()),
     refetchInterval: 30000,
   });
+
+  const orders = backlogData?.orders ?? [];
+  const total = backlogData?.total ?? 0;
+  const totalPages = backlogData?.totalPages ?? 0;
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -80,52 +172,26 @@ export default function ShippingBacklogReport() {
       setSortField(field);
       setSortDir(field === "ageDays" ? "desc" : "asc");
     }
+    setPage(1);
   };
 
-  const filteredOrders = useMemo(() => {
-    if (!orders) return [];
-    let filtered = orders;
+  const handleAgeFilter = (filter: AgeFilter) => {
+    setAgeFilter(prev => prev === filter ? "all" : filter);
+    setPage(1);
+  };
 
-    if (ageFilter === "1") {
-      filtered = filtered.filter(o => o.ageDays === 1);
-    } else if (ageFilter === "2-3") {
-      filtered = filtered.filter(o => o.ageDays >= 2 && o.ageDays <= 3);
-    } else if (ageFilter === "4+") {
-      filtered = filtered.filter(o => o.ageDays >= 4);
-    }
-
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      filtered = filtered.filter(o =>
-        o.orderNumber.toLowerCase().includes(q) ||
-        (o.shipToName && o.shipToName.toLowerCase().includes(q)) ||
-        (o.shipToCity && o.shipToCity.toLowerCase().includes(q)) ||
-        (o.shipToState && o.shipToState.toLowerCase().includes(q)) ||
-        o.tags.some(t => t.name.toLowerCase().includes(q))
-      );
-    }
-
-    filtered = [...filtered].sort((a, b) => {
-      let cmp = 0;
-      switch (sortField) {
-        case "orderNumber": cmp = a.orderNumber.localeCompare(b.orderNumber); break;
-        case "shipToName": cmp = (a.shipToName || "").localeCompare(b.shipToName || ""); break;
-        case "orderDate": cmp = new Date(a.orderDate).getTime() - new Date(b.orderDate).getTime(); break;
-        case "ageDays": cmp = a.ageDays - b.ageDays; break;
-        case "shipToState": cmp = (a.shipToState || "").localeCompare(b.shipToState || ""); break;
-        case "lifecyclePhase": cmp = (a.lifecyclePhase || "").localeCompare(b.lifecyclePhase || ""); break;
-        case "itemCount": cmp = a.itemCount - b.itemCount; break;
-      }
-      return sortDir === "asc" ? cmp : -cmp;
-    });
-
-    return filtered;
-  }, [orders, search, sortField, sortDir, ageFilter]);
+  const handlePageSizeChange = (value: string) => {
+    setPageSize(parseInt(value));
+    setPage(1);
+  };
 
   const handleRefresh = () => {
     queryClient.invalidateQueries({ queryKey: ["/api/reports/shipping-backlog/counts"] });
     queryClient.invalidateQueries({ queryKey: ["/api/reports/shipping-backlog"] });
   };
+
+  const startRow = total > 0 ? (page - 1) * pageSize + 1 : 0;
+  const endRow = Math.min(page * pageSize, total);
 
   const SortHeader = ({ field, children }: { field: SortField; children: React.ReactNode }) => (
     <TableHead>
@@ -169,7 +235,7 @@ export default function ShippingBacklogReport() {
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <Card
             className={`cursor-pointer ${ageFilter === "all" ? "ring-2 ring-primary" : ""}`}
-            onClick={() => setAgeFilter("all")}
+            onClick={() => { setAgeFilter("all"); setPage(1); }}
             data-testid="card-backlog-total"
           >
             <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
@@ -182,8 +248,8 @@ export default function ShippingBacklogReport() {
           </Card>
 
           <Card
-            className={`cursor-pointer ${ageFilter === "1" ? "ring-2 ring-primary" : ""}`}
-            onClick={() => setAgeFilter(ageFilter === "1" ? "all" : "1")}
+            className={`cursor-pointer ${ageFilter === "oneDay" ? "ring-2 ring-primary" : ""}`}
+            onClick={() => handleAgeFilter("oneDay")}
             data-testid="card-backlog-1day"
           >
             <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
@@ -196,8 +262,8 @@ export default function ShippingBacklogReport() {
           </Card>
 
           <Card
-            className={`cursor-pointer ${ageFilter === "2-3" ? "ring-2 ring-primary" : ""}`}
-            onClick={() => setAgeFilter(ageFilter === "2-3" ? "all" : "2-3")}
+            className={`cursor-pointer ${ageFilter === "twoThreeDays" ? "ring-2 ring-primary" : ""}`}
+            onClick={() => handleAgeFilter("twoThreeDays")}
             data-testid="card-backlog-2-3days"
           >
             <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
@@ -210,8 +276,8 @@ export default function ShippingBacklogReport() {
           </Card>
 
           <Card
-            className={`cursor-pointer ${ageFilter === "4+" ? "ring-2 ring-primary" : ""}`}
-            onClick={() => setAgeFilter(ageFilter === "4+" ? "all" : "4+")}
+            className={`cursor-pointer ${ageFilter === "fourPlusDays" ? "ring-2 ring-primary" : ""}`}
+            onClick={() => handleAgeFilter("fourPlusDays")}
             data-testid="card-backlog-4plus"
           >
             <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
@@ -244,7 +310,7 @@ export default function ShippingBacklogReport() {
             <Input
               placeholder="Search orders..."
               value={search}
-              onChange={e => setSearch(e.target.value)}
+              onChange={e => handleSearchChange(e.target.value)}
               className="pl-8"
               data-testid="input-search-backlog"
             />
@@ -277,14 +343,14 @@ export default function ShippingBacklogReport() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredOrders.length === 0 ? (
+                  {orders.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                        {search || ageFilter !== "all" ? "No orders match the current filters" : "No backlog orders found"}
+                        {debouncedSearch || ageFilter !== "all" ? "No orders match the current filters" : "No backlog orders found"}
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredOrders.map(order => (
+                    orders.map(order => (
                       <TableRow key={order.id} data-testid={`row-backlog-${order.orderNumber}`}>
                         <TableCell>
                           <Link href={`/shipments/${order.id}`}>
@@ -336,9 +402,50 @@ export default function ShippingBacklogReport() {
                   )}
                 </TableBody>
               </Table>
-              {filteredOrders.length > 0 && (
-                <div className="px-4 py-3 text-sm text-muted-foreground border-t">
-                  Showing {filteredOrders.length} order{filteredOrders.length !== 1 ? "s" : ""}
+
+              {total > 0 && (
+                <div className="flex items-center justify-between flex-wrap gap-3 px-4 py-3 border-t">
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm text-muted-foreground" data-testid="text-pagination-info">
+                      Showing {startRow}–{endRow} of {total} order{total !== 1 ? "s" : ""}
+                    </span>
+                    <Select value={pageSize.toString()} onValueChange={handlePageSizeChange}>
+                      <SelectTrigger className="w-[80px]" data-testid="select-page-size">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="25">25</SelectItem>
+                        <SelectItem value="50">50</SelectItem>
+                        <SelectItem value="100">100</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <span className="text-sm text-muted-foreground">per page</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={page <= 1}
+                      onClick={() => setPage(p => p - 1)}
+                      data-testid="button-prev-page"
+                    >
+                      <ChevronLeft className="h-4 w-4 mr-1" />
+                      Previous
+                    </Button>
+                    <span className="text-sm text-muted-foreground" data-testid="text-page-number">
+                      Page {page} of {totalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={page >= totalPages}
+                      onClick={() => setPage(p => p + 1)}
+                      data-testid="button-next-page"
+                    >
+                      Next
+                      <ChevronRight className="h-4 w-4 ml-1" />
+                    </Button>
+                  </div>
                 </div>
               )}
             </div>

@@ -4595,8 +4595,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/reports/shipping-backlog", requireAuth, async (req, res) => {
     try {
-      const orders = await storage.getShippingBacklogOrders();
-      res.json(orders);
+      const allowedSortBy = ['orderNumber', 'shipToName', 'orderDate', 'ageDays', 'shipToState', 'lifecyclePhase', 'itemCount'];
+      const allowedAgeFilters = ['oneDay', 'twoThreeDays', 'fourPlusDays'];
+      const allowedPageSizes = [25, 50, 100];
+
+      const rawPage = parseInt(req.query.page as string);
+      const rawPageSize = parseInt(req.query.pageSize as string);
+      const rawSortBy = req.query.sortBy as string;
+      const rawSortOrder = req.query.sortOrder as string;
+      const rawAgeFilter = req.query.ageFilter as string;
+
+      const filters = {
+        page: Number.isFinite(rawPage) && rawPage >= 1 ? rawPage : 1,
+        pageSize: allowedPageSizes.includes(rawPageSize) ? rawPageSize : 25,
+        sortBy: allowedSortBy.includes(rawSortBy) ? rawSortBy : 'orderDate',
+        sortOrder: (rawSortOrder === 'desc' ? 'desc' : 'asc') as 'asc' | 'desc',
+        search: req.query.search ? String(req.query.search).slice(0, 200) : undefined,
+        ageFilter: allowedAgeFilters.includes(rawAgeFilter) ? rawAgeFilter : undefined,
+      };
+      const { orders, total } = await storage.getShippingBacklogOrders(filters);
+      res.json({
+        orders,
+        total,
+        page: filters.page,
+        pageSize: filters.pageSize,
+        totalPages: Math.ceil(total / filters.pageSize),
+      });
     } catch (error) {
       console.error("Error fetching shipping backlog:", error);
       res.status(500).json({ error: "Failed to fetch shipping backlog" });

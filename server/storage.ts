@@ -1,4 +1,4 @@
-import { eq, ne, desc, or, ilike, and, sql, isNull, isNotNull, gte, lte, inArray, asc, count, exists } from "drizzle-orm";
+import { eq, ne, desc, or, ilike, and, sql, isNull, isNotNull, gte, lte, inArray, asc, count, exists, type SQL } from "drizzle-orm";
 import { SHIPPABLE_TAGS } from './utils/shippable-tags';
 import { db } from "./db";
 import {
@@ -229,7 +229,14 @@ export interface IStorage {
   getBrokenShipments(startDate?: Date, endDate?: Date): Promise<Shipment[]>;
   getUserById(id: string): Promise<User | undefined>;
   getShippingBacklogCounts(): Promise<{ backlog: number; oneDay: number; twoThreeDays: number; fourPlusDays: number; inProgress: number }>;
-  getShippingBacklogOrders(): Promise<any[]>;
+  getShippingBacklogOrders(filters?: {
+    page?: number;
+    pageSize?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+    search?: string;
+    ageFilter?: string;
+  }): Promise<{ orders: any[]; total: number }>;
 
   // Shopify Products
   upsertShopifyProduct(product: InsertShopifyProduct): Promise<ShopifyProduct>;
@@ -4136,13 +4143,64 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
-  async getShippingBacklogOrders(): Promise<any[]> {
+  async getShippingBacklogOrders(filters: {
+    page?: number;
+    pageSize?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+    search?: string;
+    ageFilter?: string;
+  } = {}): Promise<{ orders: any[]; total: number }> {
     const todayCentral = sql`date_trunc('day', now() AT TIME ZONE 'America/Chicago')`;
+    const yesterdayCentral = sql`(${todayCentral} - interval '1 day')`;
+    const threeDaysAgoCentral = sql`(${todayCentral} - interval '3 days')`;
 
     const centralDay = await db.execute(sql`SELECT extract(day FROM now() AT TIME ZONE 'America/Chicago')::int AS d`);
     const isThe20th = (centralDay.rows[0] as any)?.d === 20;
 
     const base = this._backlogConditions(isThe20th);
+    const conditions: SQL[] = [...base];
+
+    if (filters.ageFilter === 'oneDay') {
+      conditions.push(sql`${shipments.orderDate} >= ${yesterdayCentral}`);
+      conditions.push(sql`${shipments.orderDate} < ${todayCentral}`);
+    } else if (filters.ageFilter === 'twoThreeDays') {
+      conditions.push(sql`${shipments.orderDate} >= ${threeDaysAgoCentral}`);
+      conditions.push(sql`${shipments.orderDate} < ${yesterdayCentral}`);
+    } else if (filters.ageFilter === 'fourPlusDays') {
+      conditions.push(sql`${shipments.orderDate} < ${threeDaysAgoCentral}`);
+    } else {
+      conditions.push(sql`${shipments.orderDate} < ${todayCentral}`);
+    }
+
+    if (filters.search) {
+      const term = `%${filters.search}%`;
+      conditions.push(sql`(${shipments.orderNumber} ILIKE ${term} OR ${shipments.shipToName} ILIKE ${term} OR ${shipments.shipToCity} ILIKE ${term} OR ${shipments.shipToState} ILIKE ${term})`);
+    }
+
+    const countResult = await db
+      .select({ count: count() })
+      .from(shipments)
+      .where(and(...conditions));
+    const total = Number(countResult[0]?.count) || 0;
+
+    const sortColumnMap: Record<string, any> = {
+      orderNumber: shipments.orderNumber,
+      shipToName: shipments.shipToName,
+      orderDate: shipments.orderDate,
+      ageDays: shipments.orderDate,
+      shipToState: shipments.shipToState,
+      lifecyclePhase: shipments.lifecyclePhase,
+      itemCount: sql`(SELECT COUNT(*) FROM shipment_items si WHERE si.shipment_id = ${shipments.id})`,
+    };
+    const sortCol = sortColumnMap[filters.sortBy ?? 'orderDate'] ?? shipments.orderDate;
+    const dirFn = filters.sortBy === 'ageDays'
+      ? (filters.sortOrder === 'asc' ? desc : asc)
+      : (filters.sortOrder === 'desc' ? desc : asc);
+
+    const page = filters.page ?? 1;
+    const pageSize = filters.pageSize ?? 25;
+    const offset = (page - 1) * pageSize;
 
     const rows = await db
       .select({
@@ -4158,8 +4216,10 @@ export class DatabaseStorage implements IStorage {
         ageDays: sql<number>`(date_trunc('day', now() AT TIME ZONE 'America/Chicago')::date - date_trunc('day', ${shipments.orderDate} AT TIME ZONE 'America/Chicago')::date)`,
       })
       .from(shipments)
-      .where(and(sql`${shipments.orderDate} < ${todayCentral}`, ...base))
-      .orderBy(asc(shipments.orderDate));
+      .where(and(...conditions))
+      .orderBy(dirFn(sortCol))
+      .limit(pageSize)
+      .offset(offset);
 
     const shipmentIds = rows.map(r => r.id);
     let tagsMap = new Map<string, Array<{ name: string; color: string | null }>>();
@@ -4174,11 +4234,14 @@ export class DatabaseStorage implements IStorage {
       }
     }
 
-    return rows.map(row => ({
-      ...row,
-      ageDays: Number(row.ageDays) || 0,
-      tags: tagsMap.get(row.id) || [],
-    }));
+    return {
+      orders: rows.map(row => ({
+        ...row,
+        ageDays: Number(row.ageDays) || 0,
+        tags: tagsMap.get(row.id) || [],
+      })),
+      total,
+    };
   }
 }
 
