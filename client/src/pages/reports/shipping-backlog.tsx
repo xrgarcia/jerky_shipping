@@ -384,17 +384,12 @@ export default function ShippingBacklogReport() {
                           {order.itemCount}
                         </TableCell>
                         <TableCell>
-                          <div className="flex flex-wrap gap-1">
-                            {order.tags.slice(0, 3).map(tag => (
-                              <Badge key={tag.name} variant="outline" className="text-xs">
+                          <div className="flex flex-wrap gap-1.5">
+                            {order.tags.map(tag => (
+                              <Badge key={tag.name} variant="secondary" className="text-xs">
                                 {tag.name}
                               </Badge>
                             ))}
-                            {order.tags.length > 3 && (
-                              <Badge variant="outline" className="text-xs">
-                                +{order.tags.length - 3}
-                              </Badge>
-                            )}
                           </div>
                         </TableCell>
                       </TableRow>
