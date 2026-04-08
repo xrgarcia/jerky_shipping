@@ -1339,34 +1339,11 @@ export class DatabaseStorage implements IStorage {
             )
           );
           break;
-        case 'in_progress':
-          // In Progress: Orders truly in progress (Ready to Pick + Picking + Packing Ready)
-          // Must match EXACTLY the sum of lifecycle tabs:
-          // - Ready to Pick: sessionStatus='new', no tracking
-          // - Picking: sessionStatus='active', no tracking
-          // - Packing Ready: sessionStatus='closed', no tracking, shipmentStatus='pending', not cancelled
-          conditions.push(
-            or(
-              // Ready to Pick
-              and(
-                eq(shipments.sessionStatus, 'new'),
-                isNull(shipments.trackingNumber)
-              ),
-              // Picking
-              and(
-                eq(shipments.sessionStatus, 'active'),
-                isNull(shipments.trackingNumber)
-              ),
-              // Packing Ready (requires pending shipment status)
-              and(
-                eq(shipments.sessionStatus, 'closed'),
-                isNull(shipments.trackingNumber),
-                eq(shipments.shipmentStatus, 'pending'),
-                ne(shipments.status, 'cancelled')
-              )
-            )
-          );
+        case 'in_progress': {
+          const inProgressPhases = ['ready_for_skuvault', 'ready_to_pick', 'picking', 'packing_ready', 'on_dock'];
+          conditions.push(inArray(shipments.lifecyclePhase, inProgressPhases));
           break;
+        }
         case 'shipped':
           // On the Way: Label purchased AND in transit (matches On the Dock lifecycle)
           // shipment_status = 'label_purchased' AND fulfillment_status = 'IT' (In Transit)
@@ -1627,32 +1604,11 @@ export class DatabaseStorage implements IStorage {
       .from(shipments)
       .where(eq(shipments.lifecyclePhase, 'ready_to_session'));
 
-    // In Progress: Orders truly in progress (Ready to Pick + Picking + Packing Ready)
-    // Must match EXACTLY the sum of lifecycle tabs
+    const inProgressPhases = ['ready_for_skuvault', 'ready_to_pick', 'picking', 'packing_ready', 'on_dock'];
     const inProgressResult = await db
       .select({ count: count() })
       .from(shipments)
-      .where(
-        or(
-          // Ready to Pick: sessionStatus='new', no tracking
-          and(
-            eq(shipments.sessionStatus, 'new'),
-            isNull(shipments.trackingNumber)
-          ),
-          // Picking: sessionStatus='active', no tracking
-          and(
-            eq(shipments.sessionStatus, 'active'),
-            isNull(shipments.trackingNumber)
-          ),
-          // Packing Ready: sessionStatus='closed', no tracking, shipmentStatus='pending', not cancelled
-          and(
-            eq(shipments.sessionStatus, 'closed'),
-            isNull(shipments.trackingNumber),
-            eq(shipments.shipmentStatus, 'pending'),
-            ne(shipments.status, 'cancelled')
-          )
-        )
-      );
+      .where(inArray(shipments.lifecyclePhase, inProgressPhases));
 
     // On the Way: Label purchased AND in transit (matches On the Dock lifecycle)
     const shippedResult = await db

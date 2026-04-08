@@ -1541,7 +1541,7 @@ export default function Shipments() {
         case 'ready_to_fulfill':
           return 'Orders entering the prep pipeline - tagged for fulfillment, awaiting hydration and packaging';
         case 'in_progress':
-          return 'Orders truly in progress - Ready to Pick + Picking + Packing Ready';
+          return 'Orders in progress — Ready for SkuVault + Ready to Pick + Picking + Packing Ready + On Dock';
         case 'shipped':
           return 'Orders with labels purchased and in transit to customer';
         case 'all':
