@@ -1345,14 +1345,7 @@ export class DatabaseStorage implements IStorage {
           break;
         }
         case 'shipped':
-          // On the Way: Label purchased AND in transit (matches On the Dock lifecycle)
-          // shipment_status = 'label_purchased' AND fulfillment_status = 'IT' (In Transit)
-          conditions.push(
-            and(
-              eq(shipments.shipmentStatus, 'label_purchased'),
-              eq(shipments.status, 'IT')
-            )
-          );
+          conditions.push(eq(shipments.lifecyclePhase, 'in_transit'));
           break;
         case 'all':
           // All: No additional filter, shows everything
@@ -1610,16 +1603,10 @@ export class DatabaseStorage implements IStorage {
       .from(shipments)
       .where(inArray(shipments.lifecyclePhase, inProgressPhases));
 
-    // On the Way: Label purchased AND in transit (matches On the Dock lifecycle)
     const shippedResult = await db
       .select({ count: count() })
       .from(shipments)
-      .where(
-        and(
-          eq(shipments.shipmentStatus, 'label_purchased'),
-          eq(shipments.status, 'IT')
-        )
-      );
+      .where(eq(shipments.lifecyclePhase, 'in_transit'));
 
     // All: Total count
     const allResult = await db
