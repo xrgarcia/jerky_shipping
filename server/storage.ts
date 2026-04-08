@@ -4175,7 +4175,7 @@ export class DatabaseStorage implements IStorage {
 
     if (filters.search) {
       const term = `%${filters.search}%`;
-      conditions.push(sql`(${shipments.orderNumber} ILIKE ${term} OR ${shipments.shipToName} ILIKE ${term} OR ${shipments.shipToCity} ILIKE ${term} OR ${shipments.shipToState} ILIKE ${term})`);
+      conditions.push(sql`(${shipments.orderNumber} ILIKE ${term} OR ${shipments.shipToName} ILIKE ${term} OR ${shipments.shipToCity} ILIKE ${term} OR ${shipments.shipToState} ILIKE ${term} OR EXISTS (SELECT 1 FROM shipment_tags st WHERE st.shipment_id = ${shipments.id} AND st.name ILIKE ${term}))`);
     }
 
     const countResult = await db
