@@ -4089,7 +4089,7 @@ export class DatabaseStorage implements IStorage {
   private _backlogConditions(isThe20th: boolean) {
     const pipelinePhases = ['ready_for_skuvault', 'ready_to_pick', 'picking', 'packing_ready', 'on_dock', 'in_transit', 'delivered'];
     const phaseCondition = sql`(${shipments.lifecyclePhase} IS NOT NULL AND ${shipments.lifecyclePhase} NOT IN (${sql.join(pipelinePhases.map(p => sql`${p}`), sql`, `)}))`;
-    const excludeTerminalStatuses = sql`(${shipments.shipmentStatus} IS NOT NULL AND ${shipments.shipmentStatus} NOT IN ('cancelled', 'label_purchased'))`;
+    const excludeTerminalStatuses = sql`(${shipments.shipmentStatus} IS NOT NULL AND ${shipments.shipmentStatus} NOT IN ('cancelled', 'label_purchased', 'orphaned'))`;
     const noNotShippable = sql`NOT EXISTS (SELECT 1 FROM shipment_tags st WHERE st.shipment_id = ${shipments.id} AND st.name = 'NOT SHIPPABLE')`;
     const conditions = [phaseCondition, excludeTerminalStatuses, noNotShippable];
     if (!isThe20th) {
