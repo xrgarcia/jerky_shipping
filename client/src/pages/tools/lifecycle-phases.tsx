@@ -13,6 +13,7 @@ import {
   Clock,
   Cpu,
   Eye,
+  GitMerge,
   Hammer,
   Inbox,
   Search,
@@ -22,6 +23,7 @@ import {
   RotateCcw,
   Skull,
   Truck,
+  Users,
   XCircle,
   Zap,
 } from "lucide-react";
@@ -61,6 +63,7 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
+import { MergeGroupDialog } from "@/components/merge-group-dialog";
 
 type PhaseCount = {
   lifecycle_phase: string;
@@ -2644,6 +2647,331 @@ function QcExplosionTab() {
   );
 }
 
+interface MergeGroupStats {
+  groups: {
+    detected: number;
+    mergeStarted: number;
+    mergeComplete: number;
+    allSessioned: number;
+    total: number;
+  };
+  queue: {
+    queued: number;
+    processing: number;
+    completed: number;
+    failed: number;
+    deadLetter: number;
+  };
+}
+
+interface MergeGroup {
+  id: number;
+  groupKey: string;
+  state: string;
+  memberCount: number;
+  parentShipmentId: string | null;
+  matchEmail: string;
+  matchAddress: string;
+  matchCity: string;
+  matchState: string;
+  matchZip: string;
+  detectedAt: string;
+  closedAt: string | null;
+  createdAt: string;
+}
+
+interface MergeGroupsResponse {
+  groups: MergeGroup[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+const MERGE_STATE_BADGE: Record<string, { className: string; label: string }> = {
+  detected: { className: "border-amber-400 text-amber-500 dark:text-amber-400", label: "Detected" },
+  merge_started: { className: "border-amber-500 text-amber-600 dark:text-amber-400", label: "Merge Started" },
+  merge_complete: { className: "border-green-600 text-green-700 dark:text-green-400", label: "Merge Complete" },
+  all_sessioned: { className: "border-muted-foreground text-muted-foreground", label: "All Sessioned" },
+};
+
+function MergeGroupsTab() {
+  const [page, setPage] = useState(1);
+  const [stateFilter, setStateFilter] = useState("all");
+  const [sortBy, setSortBy] = useState("detectedAt");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+
+  const { data: stats, isLoading: statsLoading } = useQuery<MergeGroupStats>({
+    queryKey: ["/api/merge-groups/stats"],
+    refetchInterval: 5000,
+  });
+
+  const { data: groupsData, isLoading: groupsLoading } = useQuery<MergeGroupsResponse>({
+    queryKey: ["/api/merge-groups", page, stateFilter, sortBy, sortOrder],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: "25",
+        sortBy,
+        sortOrder,
+      });
+      if (stateFilter !== "all") params.set("state", stateFilter);
+      const res = await fetch(`/api/merge-groups?${params}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch merge groups");
+      return res.json();
+    },
+    refetchInterval: 5000,
+  });
+
+  function toggleSort(column: string) {
+    if (sortBy === column) {
+      setSortOrder(prev => prev === "asc" ? "desc" : "asc");
+    } else {
+      setSortBy(column);
+      setSortOrder("desc");
+    }
+    setPage(1);
+  }
+
+  function SortableHeader({ column, children }: { column: string; children: React.ReactNode }) {
+    const isActive = sortBy === column;
+    return (
+      <TableHead
+        className="cursor-pointer select-none"
+        onClick={() => toggleSort(column)}
+        data-testid={`sort-mg-${column}`}
+      >
+        <div className="flex items-center gap-1">
+          {children}
+          <ArrowUpDown className={`h-3 w-3 ${isActive ? "text-foreground" : "text-muted-foreground/50"}`} />
+        </div>
+      </TableHead>
+    );
+  }
+
+  return (
+    <div className="space-y-4 py-4" data-testid="merge-groups-view">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <Card data-testid="card-mg-detected">
+          <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Detected</CardTitle>
+            <Search className="h-4 w-4 text-amber-500" />
+          </CardHeader>
+          <CardContent>
+            {statsLoading ? <Skeleton className="h-8 w-16" /> : (
+              <div className="text-2xl font-bold text-amber-500" data-testid="text-mg-detected">{stats?.groups.detected ?? 0}</div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card data-testid="card-mg-merge-started">
+          <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Merge Started</CardTitle>
+            <GitMerge className="h-4 w-4 text-amber-600" />
+          </CardHeader>
+          <CardContent>
+            {statsLoading ? <Skeleton className="h-8 w-16" /> : (
+              <div className="text-2xl font-bold text-amber-600" data-testid="text-mg-merge-started">{stats?.groups.mergeStarted ?? 0}</div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card data-testid="card-mg-merge-complete">
+          <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Merge Complete</CardTitle>
+            <CheckCircle2 className="h-4 w-4 text-green-600" />
+          </CardHeader>
+          <CardContent>
+            {statsLoading ? <Skeleton className="h-8 w-16" /> : (
+              <div className="text-2xl font-bold text-green-600" data-testid="text-mg-merge-complete">{stats?.groups.mergeComplete ?? 0}</div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card data-testid="card-mg-all-sessioned">
+          <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">All Sessioned</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            {statsLoading ? <Skeleton className="h-8 w-16" /> : (
+              <div className="text-2xl font-bold" data-testid="text-mg-all-sessioned">{stats?.groups.allSessioned ?? 0}</div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card data-testid="card-mg-queue-depth">
+          <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Queue Depth</CardTitle>
+            <Inbox className="h-4 w-4 text-blue-500" />
+          </CardHeader>
+          <CardContent>
+            {statsLoading ? <Skeleton className="h-8 w-16" /> : (
+              <>
+                <div className="text-2xl font-bold text-blue-500" data-testid="text-mg-queue-depth">{stats?.queue.queued ?? 0}</div>
+                <p className="text-xs text-muted-foreground">{stats?.queue.processing ?? 0} processing</p>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card data-testid="card-mg-groups">
+        <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 flex-wrap">
+          <CardTitle className="text-sm font-medium">Merge Groups</CardTitle>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Select value={stateFilter} onValueChange={(v) => { setStateFilter(v); setPage(1); }}>
+              <SelectTrigger className="w-[160px]" data-testid="select-mg-state-filter">
+                <SelectValue placeholder="State" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All States</SelectItem>
+                <SelectItem value="detected">Detected</SelectItem>
+                <SelectItem value="merge_started">Merge Started</SelectItem>
+                <SelectItem value="merge_complete">Merge Complete</SelectItem>
+                <SelectItem value="all_sessioned">All Sessioned</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                queryClient.invalidateQueries({ queryKey: ["/api/merge-groups"] });
+                queryClient.invalidateQueries({ queryKey: ["/api/merge-groups/stats"] });
+              }}
+              data-testid="button-refresh-mg"
+            >
+              <RefreshCw className="h-3 w-3 mr-1" />
+              Refresh
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {groupsLoading ? (
+            <div className="space-y-2">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Skeleton key={i} className="h-8 w-full" />
+              ))}
+            </div>
+          ) : !groupsData?.groups?.length ? (
+            <p className="text-sm text-muted-foreground" data-testid="text-mg-empty">No merge groups found</p>
+          ) : (
+            <>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <SortableHeader column="id">ID</SortableHeader>
+                      <SortableHeader column="state">State</SortableHeader>
+                      <SortableHeader column="memberCount">Members</SortableHeader>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Address</TableHead>
+                      <SortableHeader column="detectedAt">Detected</SortableHeader>
+                      <TableHead>Closed</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {groupsData.groups.map((group) => {
+                      const stateMeta = MERGE_STATE_BADGE[group.state] ?? { className: "", label: group.state };
+                      return (
+                        <TableRow
+                          key={group.id}
+                          className="cursor-pointer"
+                          onClick={() => {
+                            setSelectedGroupId(group.id);
+                            setDialogOpen(true);
+                          }}
+                          data-testid={`row-mg-group-${group.id}`}
+                        >
+                          <TableCell className="font-mono text-xs" data-testid={`text-mg-id-${group.id}`}>
+                            #{group.id}
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant="outline"
+                              className={`no-default-active-elevate text-xs ${stateMeta.className}`}
+                            >
+                              {stateMeta.label}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-sm tabular-nums" data-testid={`text-mg-members-${group.id}`}>
+                            {group.memberCount}
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate">
+                            {group.matchEmail || "—"}
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate">
+                            {group.matchAddress ? `${group.matchAddress}, ${group.matchCity}` : "—"}
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                            {group.detectedAt
+                              ? formatDistanceToNow(new Date(group.detectedAt), { addSuffix: true })
+                              : "—"}
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                            {group.closedAt
+                              ? formatDistanceToNow(new Date(group.closedAt), { addSuffix: true })
+                              : "—"}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {groupsData.pagination.totalPages > 1 && (
+                <div className="flex items-center justify-between gap-2 pt-4">
+                  <p className="text-xs text-muted-foreground">
+                    Showing {((page - 1) * 25) + 1}-{Math.min(page * 25, groupsData.pagination.total)} of {groupsData.pagination.total}
+                  </p>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      size="icon"
+                      variant="outline"
+                      disabled={page <= 1}
+                      onClick={() => setPage(p => p - 1)}
+                      data-testid="button-mg-prev"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <span className="text-sm px-2">
+                      {page} / {groupsData.pagination.totalPages}
+                    </span>
+                    <Button
+                      size="icon"
+                      variant="outline"
+                      disabled={page >= groupsData.pagination.totalPages}
+                      onClick={() => setPage(p => p + 1)}
+                      data-testid="button-mg-next"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      <MergeGroupDialog
+        groupId={selectedGroupId}
+        open={dialogOpen}
+        onOpenChange={(open) => {
+          setDialogOpen(open);
+          if (!open) setSelectedGroupId(null);
+        }}
+      />
+    </div>
+  );
+}
+
 export default function LifecyclePhases() {
   const { data: countsData, isLoading: countsLoading } = useQuery<{
     counts: PhaseCount[];
@@ -2688,6 +3016,9 @@ export default function LifecyclePhases() {
           <TabsTrigger value="session-builder" data-testid="tab-session-builder">
             Session Builder
           </TabsTrigger>
+          <TabsTrigger value="merge-groups" data-testid="tab-merge-groups">
+            Merge Groups
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="state-machine">
@@ -2717,6 +3048,10 @@ export default function LifecyclePhases() {
 
         <TabsContent value="session-builder">
           <SessionBuilderTab />
+        </TabsContent>
+
+        <TabsContent value="merge-groups">
+          <MergeGroupsTab />
         </TabsContent>
       </Tabs>
     </div>

@@ -5372,6 +5372,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
       const sortColumnMap: Record<string, any> = {
+        id: mergeGroups.id,
         detectedAt: mergeGroups.detectedAt,
         state: mergeGroups.state,
         memberCount: mergeGroups.memberCount,
