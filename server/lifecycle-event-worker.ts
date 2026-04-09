@@ -52,6 +52,7 @@ import { shipments, shipmentTags, packagingTypes, featureFlags, fingerprintModel
 import { eq, and } from 'drizzle-orm';
 import { DECISION_SUBPHASES } from '@shared/schema';
 import { READY_FOR_SHIPDOT_TAG } from '@shared/constants';
+import { enqueueMergeGroupEvalIfNeeded } from './services/merge-group-queue';
 
 // Feature flag helper - checks if a feature is enabled in the database
 async function isFeatureFlagEnabled(key: string): Promise<boolean> {
@@ -521,6 +522,16 @@ async function processEvent(event: LifecycleEvent): Promise<boolean> {
     
     if (needsRetry) {
       return false;
+    }
+
+    // ================================================================
+    // UNIVERSAL SIDE EFFECTS — fire on every lifecycle evaluation
+    // ================================================================
+
+    try {
+      await enqueueMergeGroupEvalIfNeeded(event.shipmentId, event.orderNumber);
+    } catch (mergeError: any) {
+      log(`Merge group eval enqueue failed for ${orderRef}: ${mergeError.message}`, 'warn');
     }
 
     // Record transition in ring buffer
