@@ -9,6 +9,13 @@ const EXPONENTIAL_BACKOFF_BASE_MS = 5000;
 const MAX_BACKOFF_MS = 300000;
 const STALE_THRESHOLD_MS = 5 * 60 * 1000;
 
+const MERGEABLE_PHASES = [
+  'ready_to_fulfill',
+  'ready_to_session',
+  'fulfillment_prep',
+  'ready_for_skuvault',
+];
+
 let workerRunning = false;
 
 function log(msg: string, level: 'info' | 'warn' | 'error' = 'info', ctx?: Record<string, any>) {
@@ -274,7 +281,7 @@ async function evaluateMergeGroup(triggerShipmentId: string): Promise<void> {
     .where(eq(shipments.id, triggerShipmentId)).limit(1);
   if (!trigger) return;
 
-  if (trigger.lifecyclePhase && ['cancelled', 'merged_child'].includes(trigger.lifecyclePhase)) return;
+  if (trigger.lifecyclePhase && !MERGEABLE_PHASES.includes(trigger.lifecyclePhase)) return;
 
   let groupId = trigger.mergeGroupId;
   if (groupId) {
@@ -312,7 +319,7 @@ async function evaluateMergeGroup(triggerShipmentId: string): Promise<void> {
       ne(shipments.id, triggerShipmentId),
       or(
         isNull(shipments.lifecyclePhase),
-        notInArray(shipments.lifecyclePhase, ['cancelled', 'merged_child'])
+        inArray(shipments.lifecyclePhase, MERGEABLE_PHASES)
       ),
       or(
         isNull(shipments.mergeGroupId),
