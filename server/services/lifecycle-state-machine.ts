@@ -89,6 +89,7 @@ export interface ShipmentLifecycleData {
   shipmentId?: string | null;       // ShipStation shipment ID (for rate check eligibility)
   shipToPostalCode?: string | null; // Destination postal code (for rate check eligibility)
   serviceCode?: string | null;      // Shipping service code (for rate check eligibility)
+  isMergedChild?: boolean;          // Whether shipment is a confirmed child in a completed merge group
 }
 
 // Status codes where tracking status (status field) takes precedence over shipmentStatus
@@ -137,6 +138,13 @@ export function deriveLifecyclePhase(shipment: ShipmentLifecycleData): Lifecycle
   // CANCELLED: Order has been cancelled - terminal state
   if (status === 'CANCELLED') {
     return { phase: LIFECYCLE_PHASES.CANCELLED, subphase: null };
+  }
+
+  // MERGED_CHILD: Order's items were merged into a parent shipment — terminal
+  // After CANCELLED because cancelled overrides merge status.
+  // Before DELIVERED because a merged child's tracking data is from the parent — irrelevant.
+  if (shipment.isMergedChild) {
+    return { phase: LIFECYCLE_PHASES.MERGED_CHILD, subphase: null };
   }
   
   // DELIVERED: Package has been delivered
@@ -308,6 +316,7 @@ export function getPhaseDisplayName(phase: LifecyclePhase): string {
     [LIFECYCLE_PHASES.CANCELLED]: 'Cancelled',
     [LIFECYCLE_PHASES.PROBLEM]: 'Problem',
     [LIFECYCLE_PHASES.PICKING_ISSUES]: 'Picking Issues',
+    [LIFECYCLE_PHASES.MERGED_CHILD]: 'Merged Child',
   };
   return displayNames[phase] || phase;
 }
@@ -397,6 +406,7 @@ export function getLifecycleProgress(state: LifecycleState): number {
     [LIFECYCLE_PHASES.CANCELLED]: 100, // Terminal state
     [LIFECYCLE_PHASES.PROBLEM]: 100, // Terminal state
     [LIFECYCLE_PHASES.PICKING_ISSUES]: 50, // Same as picking (it's a branch)
+    [LIFECYCLE_PHASES.MERGED_CHILD]: 100, // Terminal state
   };
   
   let baseProgress = phaseWeights[phase];

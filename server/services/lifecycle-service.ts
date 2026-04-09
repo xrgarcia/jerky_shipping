@@ -122,6 +122,7 @@ export async function updateShipmentLifecycleFromData(
     shipmentId: shipmentData?.shipmentId ?? shipment.shipmentId,
     shipToPostalCode: shipmentData?.shipToPostalCode ?? shipment.shipToPostalCode,
     serviceCode: shipmentData?.serviceCode ?? shipment.serviceCode,
+    isMergedChild: shipment.mergeRole === 'child',
   };
 
   // Derive the correct lifecycle state
@@ -154,7 +155,8 @@ export async function updateShipmentLifecycleFromData(
       currentPhase === LIFECYCLE_PHASES.DELIVERED ||
       currentPhase === LIFECYCLE_PHASES.CANCELLED ||
       currentPhase === LIFECYCLE_PHASES.IN_TRANSIT ||
-      currentPhase === LIFECYCLE_PHASES.PROBLEM
+      currentPhase === LIFECYCLE_PHASES.PROBLEM ||
+      currentPhase === LIFECYCLE_PHASES.MERGED_CHILD
     ) {
       blocked = true;
     }
