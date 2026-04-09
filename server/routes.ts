@@ -14694,6 +14694,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           shipToAddressLine1: shipments.shipToAddressLine1,
           shipToCity: shipments.shipToCity,
           shipToPostalCode: shipments.shipToPostalCode,
+          mergeGroupId: shipments.mergeGroupId,
         })
         .from(shipments)
         .leftJoin(fingerprints, eq(shipments.fingerprintId, fingerprints.id))
@@ -15067,6 +15068,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         return {
+          id: order.id,
           orderNumber: order.orderNumber,
           shipmentId: order.shipmentId,
           readyToSession,
@@ -15080,6 +15082,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           duplicateOf,
           needsPackageSync,
           packagingTypeName: order.packagingTypeName || null,
+          mergeGroupId: order.mergeGroupId || null,
         };
       });
 

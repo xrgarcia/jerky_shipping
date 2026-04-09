@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { MergeGroupBadge } from "@/components/merge-group-badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
@@ -310,6 +311,7 @@ interface SkuShipmentsResponse {
 }
 
 interface ReadyToSessionOrder {
+  id: string;
   orderNumber: string;
   shipmentId: string | null;
   readyToSession: boolean;
@@ -323,6 +325,7 @@ interface ReadyToSessionOrder {
   duplicateOf: string | null;
   needsPackageSync: boolean;
   packagingTypeName: string | null;
+  mergeGroupId: number | null;
 }
 
 interface ReadyToSessionOrdersResponse {
@@ -2643,6 +2646,12 @@ export default function Fingerprints() {
                                 >
                                   duplicate: {order.duplicateOf}
                                 </Badge>
+                              )}
+                              {order.mergeGroupId && order.id && (
+                                <MergeGroupBadge
+                                  shipmentId={order.id}
+                                  mergeGroupId={order.mergeGroupId}
+                                />
                               )}
                             </div>
                           </td>
