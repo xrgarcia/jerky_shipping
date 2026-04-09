@@ -325,16 +325,30 @@ async function evaluateMergeGroup(triggerShipmentId: string): Promise<void> {
 
   if (matches.length === 0) return;
 
-  const [newGroup] = await db.insert(mergeGroups).values({
-    groupKey: key,
-    state: 'detected',
-    memberCount: matches.length + 1,
-    matchEmail: trigger.shipToEmail?.toUpperCase() || '',
-    matchAddress: trigger.shipToAddressLine1?.toUpperCase() || '',
-    matchCity: trigger.shipToCity?.toUpperCase() || '',
-    matchState: trigger.shipToState?.toUpperCase() || '',
-    matchZip: trigger.shipToPostalCode?.toUpperCase() || '',
-  }).returning();
+  let newGroup;
+  try {
+    [newGroup] = await db.insert(mergeGroups).values({
+      groupKey: key,
+      state: 'detected',
+      memberCount: matches.length + 1,
+      matchEmail: trigger.shipToEmail?.toUpperCase() || '',
+      matchAddress: trigger.shipToAddressLine1?.toUpperCase() || '',
+      matchCity: trigger.shipToCity?.toUpperCase() || '',
+      matchState: trigger.shipToState?.toUpperCase() || '',
+      matchZip: trigger.shipToPostalCode?.toUpperCase() || '',
+    }).returning();
+  } catch (err: any) {
+    if (err.code === '23505') {
+      const [existing] = await db.select().from(mergeGroups)
+        .where(eq(mergeGroups.groupKey, key)).limit(1);
+      if (existing) {
+        await addMemberIfNew(existing.id, trigger);
+        await deriveGroupState(existing.id);
+        return;
+      }
+    }
+    throw err;
+  }
 
   const allShipments = [trigger, ...matches];
   for (const s of allShipments) {
