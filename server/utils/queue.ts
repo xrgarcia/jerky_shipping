@@ -989,7 +989,8 @@ export type LifecycleEventReason =
   | 'backfill'             // Batch backfill operation
   | 'stale_audit'          // Stale shipment audit detected orphaned/missing shipment
   | 'qc_explosion_complete' // QC explosion queue worker completed successfully
-  | 'rate_check_skipped';   // Rate check skipped due to customer method config (disabled or weight out of range)
+  | 'rate_check_skipped'    // Rate check skipped due to customer method config (disabled or weight out of range)
+  | 'merge_child';          // Triggered when merge group confirms this shipment is a child
 
 export interface LifecycleEvent {
   shipmentId: string;           // Internal shipment UUID (primary key)

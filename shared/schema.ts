@@ -32,6 +32,7 @@ export const LIFECYCLE_PHASES = {
   CANCELLED: 'cancelled',                    // Order cancelled - terminal state
   PROBLEM: 'problem',                        // Shipment problem (SP/UN/EX) - terminal state, becomes customer service issue
   PICKING_ISSUES: 'picking_issues',          // Exception requiring supervisor attention
+  MERGED_CHILD: 'merged_child',              // Terminal — order merged into parent shipment
 } as const;
 
 export type LifecyclePhase = typeof LIFECYCLE_PHASES[keyof typeof LIFECYCLE_PHASES];
@@ -80,6 +81,7 @@ export const LIFECYCLE_TRANSITIONS: Record<LifecyclePhase, LifecyclePhase[]> = {
   [LIFECYCLE_PHASES.CANCELLED]: [], // Terminal state
   [LIFECYCLE_PHASES.PROBLEM]: [], // Terminal state
   [LIFECYCLE_PHASES.PICKING_ISSUES]: [LIFECYCLE_PHASES.READY_TO_PICK, LIFECYCLE_PHASES.PICKING], // Can be resolved back
+  [LIFECYCLE_PHASES.MERGED_CHILD]: [], // Terminal state
 };
 
 /**
@@ -390,6 +392,8 @@ export const shipments = pgTable("shipments", {
   rateCheckError: text("rate_check_error"), // Error message if rate check failed
   fulfillmentSessionId: integer("fulfillment_session_id"), // FK to fulfillment_sessions table (Ship.'s optimized session grouping)
   smartSessionSpot: integer("smart_session_spot"), // Cart position (1-28) within the smart session
+  mergeGroupId: integer("merge_group_id"),
+  mergeRole: text("merge_role"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
@@ -446,6 +450,7 @@ export const shipments = pgTable("shipments", {
   fulfillmentSessionIdIdx: index("shipments_fulfillment_session_id_idx").on(table.fulfillmentSessionId).where(sql`${table.fulfillmentSessionId} IS NOT NULL`),
   // Rate check tracking index
   rateCheckStatusIdx: index("shipments_rate_check_status_idx").on(table.rateCheckStatus).where(sql`${table.rateCheckStatus} IS NOT NULL`),
+  mergeGroupIdx: index("shipments_merge_group_idx").on(table.mergeGroupId).where(sql`${table.mergeGroupId} IS NOT NULL`),
 }));
 
 export const insertShipmentSchema = createInsertSchema(shipments).omit({
@@ -1925,6 +1930,75 @@ export const insertShipstationWriteQueueSchema = createInsertSchema(shipstationW
 
 export type InsertShipstationWriteQueue = z.infer<typeof insertShipstationWriteQueueSchema>;
 export type ShipstationWriteQueue = typeof shipstationWriteQueue.$inferSelect;
+
+export const mergeGroups = pgTable("merge_groups", {
+  id: serial("id").primaryKey(),
+  groupKey: text("group_key").notNull().unique(),
+  state: text("state").notNull().default("detected"),
+  parentShipmentId: varchar("parent_shipment_id").references(() => shipments.id),
+  memberCount: integer("member_count").notNull().default(0),
+  matchEmail: text("match_email").notNull(),
+  matchAddress: text("match_address").notNull(),
+  matchCity: text("match_city").notNull(),
+  matchState: text("match_state").notNull(),
+  matchZip: text("match_zip").notNull(),
+  detectedAt: timestamp("detected_at").notNull().defaultNow(),
+  mergeStartedAt: timestamp("merge_started_at"),
+  mergeCompleteAt: timestamp("merge_complete_at"),
+  closedAt: timestamp("closed_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  groupKeyIdx: uniqueIndex("merge_groups_group_key_idx").on(table.groupKey),
+  stateIdx: index("merge_groups_state_idx").on(table.state),
+  parentShipmentIdx: index("merge_groups_parent_shipment_idx").on(table.parentShipmentId),
+}));
+
+export const insertMergeGroupSchema = createInsertSchema(mergeGroups).omit({ id: true, createdAt: true });
+export type InsertMergeGroup = z.infer<typeof insertMergeGroupSchema>;
+export type MergeGroup = typeof mergeGroups.$inferSelect;
+
+export const mergeGroupMembers = pgTable("merge_group_members", {
+  id: serial("id").primaryKey(),
+  mergeGroupId: integer("merge_group_id").notNull().references(() => mergeGroups.id),
+  shipmentId: varchar("shipment_id").notNull().references(() => shipments.id),
+  orderNumber: text("order_number").notNull(),
+  role: text("role").notNull().default("undetermined"),
+  originalItemCount: integer("original_item_count").notNull(),
+  originalItems: jsonb("original_items").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  groupIdx: index("mgm_group_idx").on(table.mergeGroupId),
+  shipmentIdx: uniqueIndex("mgm_shipment_idx").on(table.shipmentId),
+}));
+
+export const insertMergeGroupMemberSchema = createInsertSchema(mergeGroupMembers).omit({ id: true, createdAt: true });
+export type InsertMergeGroupMember = z.infer<typeof insertMergeGroupMemberSchema>;
+export type MergeGroupMember = typeof mergeGroupMembers.$inferSelect;
+
+export const mergeGroupQueue = pgTable("merge_group_queue", {
+  id: serial("id").primaryKey(),
+  shipmentId: text("shipment_id").notNull(),
+  orderNumber: text("order_number"),
+  status: text("status").notNull().default("queued"),
+  retryCount: integer("retry_count").notNull().default(0),
+  maxRetries: integer("max_retries").notNull().default(5),
+  lastError: text("last_error"),
+  nextRetryAt: timestamp("next_retry_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  processedAt: timestamp("processed_at"),
+  completedAt: timestamp("completed_at"),
+}, (table) => ({
+  statusIdx: index("mgq_status_idx").on(table.status),
+  statusCreatedIdx: index("mgq_status_created_idx").on(table.status, table.createdAt),
+  nextRetryIdx: index("mgq_next_retry_idx").on(table.nextRetryAt),
+  shipmentStatusIdx: index("mgq_shipment_status_idx").on(table.shipmentId, table.status),
+}));
+
+export const insertMergeGroupQueueSchema = createInsertSchema(mergeGroupQueue).omit({ id: true, createdAt: true });
+export type InsertMergeGroupQueue = z.infer<typeof insertMergeGroupQueueSchema>;
+export type MergeGroupQueue = typeof mergeGroupQueue.$inferSelect;
 
 export const sessionBuildQueue = pgTable("session_build_queue", {
   id: serial("id").primaryKey(),
