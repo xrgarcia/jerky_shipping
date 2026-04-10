@@ -1,5 +1,5 @@
 import { db } from '../db';
-import { shipments, shipmentItems, mergeGroups, mergeGroupMembers, mergeGroupQueue } from '@shared/schema';
+import { shipments, shipmentItems, shipmentQcItems, mergeGroups, mergeGroupMembers, mergeGroupQueue } from '@shared/schema';
 import type { Shipment } from '@shared/schema';
 import { eq, and, or, lte, asc, inArray, notInArray, isNull, ne, sql } from 'drizzle-orm';
 import logger from '../utils/logger';
@@ -248,7 +248,27 @@ async function deriveGroupState(groupId: number): Promise<void> {
 
     log(`Group ${groupId} → merge_complete (parent: ${parentCandidate.member.orderNumber})`);
 
+    const parentShipmentId = parentCandidate.member.shipmentId;
+    const parentOrderNumber = parentCandidate.member.orderNumber;
+
+    await db.delete(shipmentQcItems)
+      .where(eq(shipmentQcItems.shipmentId, parentShipmentId));
+
+    await db.update(shipments).set({
+      fingerprintStatus: null,
+      fingerprintId: null,
+      packagingTypeId: null,
+      rateCheckStatus: null,
+      rateCheckError: null,
+      rateCheckAttemptedAt: null,
+      updatedAt: now,
+    }).where(eq(shipments.id, parentShipmentId));
+
+    log(`Reset parent ${parentOrderNumber} decision pipeline for re-hydration`);
+
     const { queueLifecycleEvaluation } = await import('./lifecycle-service');
+    await queueLifecycleEvaluation(parentShipmentId, 'merge_parent_reset', parentOrderNumber);
+
     for (const d of memberData) {
       if (d.member.shipmentId !== parentCandidate.member.shipmentId) {
         await queueLifecycleEvaluation(d.member.shipmentId, 'merge_child', d.member.orderNumber);
