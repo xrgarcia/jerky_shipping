@@ -13641,6 +13641,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           SELECT COUNT(*) as cnt
           FROM shipments
           WHERE lifecycle_phase = 'ready_to_session'
+            AND NOT EXISTS (
+              SELECT 1 FROM merge_group_members mgm
+              JOIN merge_groups mg ON mg.id = mgm.merge_group_id
+              WHERE mgm.shipment_id = shipments.id
+                AND mgm.role = 'child'
+                AND mg.state = 'merge_started'
+            )
         ),
         live_count AS (
           SELECT COUNT(*) as cnt
