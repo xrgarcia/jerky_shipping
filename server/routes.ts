@@ -14718,6 +14718,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   )
                 )
             )),
+            sql`NOT EXISTS (
+              SELECT 1 FROM merge_group_members mgm
+              JOIN merge_groups mg ON mg.id = mgm.merge_group_id
+              WHERE mgm.shipment_id = ${shipments.id}
+                AND mgm.role = 'child'
+                AND mg.state = 'merge_started'
+            )`,
           )
         )
         .orderBy(asc(shipments.orderNumber));
