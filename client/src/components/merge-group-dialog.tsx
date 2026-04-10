@@ -80,7 +80,7 @@ export function MergeGroupDialog({ groupId, open, onOpenChange }: MergeGroupDial
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl" data-testid="dialog-merge-group">
+      <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col" data-testid="dialog-merge-group">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 flex-wrap" data-testid="text-merge-group-title">
             Merge Group #{groupId}
@@ -96,13 +96,13 @@ export function MergeGroupDialog({ groupId, open, onOpenChange }: MergeGroupDial
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         ) : data ? (
-          <div className="space-y-4">
+          <div className="space-y-4 flex-1 min-h-0 flex flex-col">
             <div className="text-sm text-muted-foreground">
               {data.group.matchAddress}, {data.group.matchCity}, {data.group.matchState} {data.group.matchZip}
             </div>
 
-            <ScrollArea className="max-h-[400px]">
-              <table className="w-full text-sm" data-testid="table-merge-members">
+            <ScrollArea className="flex-1 min-h-0">
+              <table className="w-full" data-testid="table-merge-members">
                 <thead>
                   <tr className="border-b text-left text-muted-foreground">
                     <th className="py-2 px-3">Order</th>
@@ -136,10 +136,10 @@ export function MergeGroupDialog({ groupId, open, onOpenChange }: MergeGroupDial
                         {member.currentTotalQuantity}
                       </td>
                       <td className="py-2 px-3">
-                        <span className="text-muted-foreground">{member.shipmentStatus || '—'}</span>
+                        {member.shipmentStatus || '—'}
                       </td>
                       <td className="py-2 px-3">
-                        <span className="text-muted-foreground">{member.lifecyclePhase || '—'}</span>
+                        {member.lifecyclePhase || '—'}
                       </td>
                     </tr>
                   ))}
