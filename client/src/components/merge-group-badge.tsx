@@ -48,7 +48,7 @@ export function MergeGroupBadge({ shipmentId, mergeGroupId }: MergeGroupBadgePro
           data-testid={`badge-merge-group-${shipmentId}`}
         >
           <GitMerge className="h-3 w-3" />
-          Merge ({memberCount})
+          ({memberCount})
         </Badge>
       </button>
       <MergeGroupDialog
