@@ -293,6 +293,30 @@ async function deriveGroupState(groupId: number): Promise<void> {
     }
 
     log(`Group ${groupId} → merge_started (parent candidate: ${parentCandidate.member.orderNumber})`);
+
+    if (group.state === 'detected') {
+      const parentShipmentId = parentCandidate.member.shipmentId;
+      const parentOrderNumber = parentCandidate.member.orderNumber;
+
+      await db.delete(shipmentQcItems)
+        .where(eq(shipmentQcItems.shipmentId, parentShipmentId));
+
+      await db.update(shipments).set({
+        fingerprintStatus: null,
+        fingerprintId: null,
+        packagingTypeId: null,
+        assignedStationId: null,
+        rateCheckStatus: null,
+        rateCheckError: null,
+        rateCheckAttemptedAt: null,
+        updatedAt: new Date(),
+      }).where(eq(shipments.id, parentShipmentId));
+
+      log(`Reset parent ${parentOrderNumber} decision pipeline for re-hydration (merge_started)`);
+
+      const { queueLifecycleEvaluation } = await import('./lifecycle-service');
+      await queueLifecycleEvaluation(parentShipmentId, 'merge_parent_reset', parentOrderNumber);
+    }
   }
 }
 
