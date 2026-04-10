@@ -145,18 +145,29 @@ export function MergeGroupDialog({ groupId, open, onOpenChange }: MergeGroupDial
                   ))}
                 </tbody>
                 <tfoot>
-                  <tr className="border-t font-medium">
-                    <td className="py-2 px-3">Total</td>
-                    <td className="py-2 px-3"></td>
-                    <td className="py-2 px-3 tabular-nums">
-                      {data.members.reduce((sum, m) => sum + m.currentItemCount, 0)}
-                    </td>
-                    <td className="py-2 px-3 tabular-nums">
-                      {data.members.reduce((sum, m) => sum + m.currentTotalQuantity, 0)}
-                    </td>
-                    <td className="py-2 px-3"></td>
-                    <td className="py-2 px-3"></td>
-                  </tr>
+                  {(() => {
+                    const hasParent = data.members.some(m => m.role === "parent");
+                    const membersForTotal = hasParent
+                      ? data.members.filter(m => m.role !== "parent")
+                      : data.members;
+                    return (
+                      <tr className="border-t font-medium">
+                        <td className="py-2 px-3">Expected</td>
+                        <td className="py-2 px-3"></td>
+                        <td className="py-2 px-3 tabular-nums">
+                          {membersForTotal.reduce((sum, m) => sum + m.originalItemCount, 0)}
+                        </td>
+                        <td className="py-2 px-3 tabular-nums">
+                          {membersForTotal.reduce((sum, m) => {
+                            const items = m.originalItems as Array<{ sku: string; quantity: number }>;
+                            return sum + items.reduce((s, i) => s + i.quantity, 0);
+                          }, 0)}
+                        </td>
+                        <td className="py-2 px-3"></td>
+                        <td className="py-2 px-3"></td>
+                      </tr>
+                    );
+                  })()}
                 </tfoot>
               </table>
             </ScrollArea>
