@@ -23,6 +23,7 @@ interface MergeGroupMember {
   trackingNumber: string | null;
   sessionId: string | null;
   currentItemCount: number;
+  currentTotalQuantity: number;
 }
 
 interface MergeGroupDetail {
@@ -107,6 +108,7 @@ export function MergeGroupDialog({ groupId, open, onOpenChange }: MergeGroupDial
                     <th className="py-2 px-3">Order</th>
                     <th className="py-2 px-3">Role</th>
                     <th className="py-2 px-3">Items</th>
+                    <th className="py-2 px-3">Qty</th>
                     <th className="py-2 px-3">Status</th>
                     <th className="py-2 px-3">Lifecycle</th>
                   </tr>
@@ -130,6 +132,9 @@ export function MergeGroupDialog({ groupId, open, onOpenChange }: MergeGroupDial
                       <td className="py-2 px-3 tabular-nums">
                         {member.currentItemCount}
                       </td>
+                      <td className="py-2 px-3 tabular-nums">
+                        {member.currentTotalQuantity}
+                      </td>
                       <td className="py-2 px-3">
                         <span className="text-muted-foreground">{member.shipmentStatus || '—'}</span>
                       </td>
@@ -139,6 +144,20 @@ export function MergeGroupDialog({ groupId, open, onOpenChange }: MergeGroupDial
                     </tr>
                   ))}
                 </tbody>
+                <tfoot>
+                  <tr className="border-t font-medium">
+                    <td className="py-2 px-3">Total</td>
+                    <td className="py-2 px-3"></td>
+                    <td className="py-2 px-3 tabular-nums">
+                      {data.members.reduce((sum, m) => sum + m.currentItemCount, 0)}
+                    </td>
+                    <td className="py-2 px-3 tabular-nums">
+                      {data.members.reduce((sum, m) => sum + m.currentTotalQuantity, 0)}
+                    </td>
+                    <td className="py-2 px-3"></td>
+                    <td className="py-2 px-3"></td>
+                  </tr>
+                </tfoot>
               </table>
             </ScrollArea>
           </div>

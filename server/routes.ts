@@ -5342,9 +5342,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .from(shipmentItems)
           .where(eq(shipmentItems.shipmentId, m.shipmentId));
 
+        const physical = currentItems.filter(i => i.sku !== null);
         return {
           ...m,
-          currentItemCount: currentItems.filter(i => i.sku !== null).length,
+          currentItemCount: physical.length,
+          currentTotalQuantity: physical.reduce((sum, i) => sum + i.quantity, 0),
         };
       }));
 
