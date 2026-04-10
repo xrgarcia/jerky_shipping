@@ -14892,28 +14892,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       };
 
-      // Build duplicate address detection map - O(n) hash map approach
-      // Normalize address: lowercase(name + address1 + city + zip)
-      const normalizeAddress = (name: string | null, address1: string | null, city: string | null, zip: string | null): string => {
-        return [name, address1, city, zip]
-          .map(s => (s || '').toLowerCase().trim())
-          .join('|');
-      };
-      
-      // First pass: map normalized address -> first order number seen
-      const addressToFirstOrder = new Map<string, string>();
-      for (const order of readyToSessionOrders) {
-        const addressKey = normalizeAddress(
-          order.shipToName,
-          order.shipToAddressLine1,
-          order.shipToCity,
-          order.shipToPostalCode
-        );
-        if (addressKey && !addressToFirstOrder.has(addressKey)) {
-          addressToFirstOrder.set(addressKey, order.orderNumber);
-        }
-      }
-
       // Evaluate each order's session readiness and provide actionable reason
       const ordersWithStatus = readyToSessionOrders.map(order => {
         let readyToSession = false;
@@ -15013,19 +14991,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Get tags for this order
         const orderTags = tagsByShipment.get(order.id) || [];
         
-        // Check for duplicate address - if this order's address matches another order,
-        // and that other order is not this order, mark as duplicate
-        const addressKey = normalizeAddress(
-          order.shipToName,
-          order.shipToAddressLine1,
-          order.shipToCity,
-          order.shipToPostalCode
-        );
-        const firstOrderWithAddress = addressToFirstOrder.get(addressKey);
-        const duplicateOf = (firstOrderWithAddress && firstOrderWithAddress !== order.orderNumber) 
-          ? firstOrderWithAddress 
-          : null;
-        
         // Build actionUrl for direct navigation based on actionTab
         let actionUrl: string | null = null;
         if (!readyToSession && actionTab) {
@@ -15080,7 +15045,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           stationName: stationInfo?.name || null,
           stationType: stationInfo?.stationType || null,
           tags: orderTags,
-          duplicateOf,
           needsPackageSync,
           packagingTypeName: order.packagingTypeName || null,
           mergeGroupId: order.mergeGroupId || null,
