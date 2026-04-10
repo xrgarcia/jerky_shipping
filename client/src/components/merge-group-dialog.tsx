@@ -80,7 +80,7 @@ export function MergeGroupDialog({ groupId, open, onOpenChange }: MergeGroupDial
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col" data-testid="dialog-merge-group">
+      <DialogContent className="max-w-2xl max-h-[80vh]" data-testid="dialog-merge-group">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 flex-wrap" data-testid="text-merge-group-title">
             Merge Group #{groupId}
@@ -96,12 +96,12 @@ export function MergeGroupDialog({ groupId, open, onOpenChange }: MergeGroupDial
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         ) : data ? (
-          <div className="space-y-4 flex-1 min-h-0 flex flex-col">
+          <div className="space-y-4">
             <div className="text-sm text-muted-foreground">
               {data.group.matchAddress}, {data.group.matchCity}, {data.group.matchState} {data.group.matchZip}
             </div>
 
-            <ScrollArea className="flex-1 min-h-0">
+            <ScrollArea className="max-h-[50vh] overflow-y-auto">
               <table className="w-full" data-testid="table-merge-members">
                 <thead>
                   <tr className="border-b text-left text-muted-foreground">
