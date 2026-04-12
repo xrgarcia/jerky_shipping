@@ -295,9 +295,6 @@ async function initializeAfterListen(storage: any) {
     const { startQcExplosionQueueWorker } = await import("./services/qc-explosion-queue");
     startQcExplosionQueueWorker();
 
-    // Start merge group queue worker (detect and evaluate duplicate order merge groups)
-    const { startMergeGroupQueueWorker } = await import("./services/merge-group-queue");
-    startMergeGroupQueueWorker();
     
     // Start PO recommendations cache warmer (runs every 6 hours)
     const { startPOCacheWarmer } = await import("./po-cache-warmer");
@@ -419,13 +416,11 @@ async function initializeAfterListen(storage: any) {
     const { stopShipStationWriteQueueWorker } = await import("./services/shipstation-write-queue");
     const { stopRateCheckQueueWorker } = await import("./services/rate-check-queue");
     const { stopQcExplosionQueueWorker } = await import("./services/qc-explosion-queue");
-    const { stopMergeGroupQueueWorker } = await import("./services/merge-group-queue");
     const { stopLifecycleWorker } = await import("./lifecycle-event-worker");
     stopSessionBuildQueueWorker();
     stopShipStationWriteQueueWorker();
     stopRateCheckQueueWorker();
     stopQcExplosionQueueWorker();
-    stopMergeGroupQueueWorker();
     stopLifecycleWorker();
     log("All workers stopped");
     process.exit(0);

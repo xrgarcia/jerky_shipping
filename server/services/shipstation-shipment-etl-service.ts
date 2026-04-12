@@ -328,7 +328,6 @@ export class ShipStationShipmentETLService {
       if (itemsChanged) {
         logger.info(`[ETL] ITEM CHANGE DETECTED for shipment ${shipmentId}`, withOrder(orderNumber, String(shipmentId), { oldItems: existingFingerprint, newItems: incomingFingerprint }));
 
-        // Invalidate QC items - delete existing ones so hydrator will re-run
         const deletedQcItems = await db
           .delete(shipmentQcItems)
           .where(eq(shipmentQcItems.shipmentId, shipmentId))
@@ -338,13 +337,20 @@ export class ShipStationShipmentETLService {
           logger.info(`[ETL] Deleted ${deletedQcItems.length} QC items for re-hydration`, withOrder(orderNumber, String(shipmentId)));
         }
 
-        // Reset fingerprint so it gets recalculated
         await db
           .update(shipments)
-          .set({ fingerprintId: null })
+          .set({
+            fingerprintId: null,
+            fingerprintStatus: null,
+            packagingTypeId: null,
+            assignedStationId: null,
+            rateCheckStatus: null,
+            rateCheckError: null,
+            rateCheckAttemptedAt: null,
+          })
           .where(eq(shipments.id, shipmentId));
 
-        logger.info(`[ETL] Reset fingerprintId for re-calculation`, withOrder(orderNumber, String(shipmentId)));
+        logger.info(`[ETL] Full pipeline reset for re-hydration (items changed)`, withOrder(orderNumber, String(shipmentId)));
       }
 
       // Delete existing entries for this shipment (ensure clean state)

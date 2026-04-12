@@ -89,7 +89,6 @@ export interface ShipmentLifecycleData {
   shipmentId?: string | null;       // ShipStation shipment ID (for rate check eligibility)
   shipToPostalCode?: string | null; // Destination postal code (for rate check eligibility)
   serviceCode?: string | null;      // Shipping service code (for rate check eligibility)
-  isMergedChild?: boolean;          // Whether shipment is a confirmed child in a completed merge group
 }
 
 // Status codes where tracking status (status field) takes precedence over shipmentStatus
@@ -140,12 +139,6 @@ export function deriveLifecyclePhase(shipment: ShipmentLifecycleData): Lifecycle
     return { phase: LIFECYCLE_PHASES.CANCELLED, subphase: null };
   }
 
-  // MERGED_CHILD: Order's items were merged into a parent shipment — terminal
-  // After CANCELLED because cancelled overrides merge status.
-  // Before DELIVERED because a merged child's tracking data is from the parent — irrelevant.
-  if (shipment.isMergedChild) {
-    return { phase: LIFECYCLE_PHASES.MERGED_CHILD, subphase: null };
-  }
   
   // DELIVERED: Package has been delivered
   if (status && DELIVERED_STATUSES.includes(status)) {

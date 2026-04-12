@@ -3,7 +3,6 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { MergeGroupBadge } from "@/components/merge-group-badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
@@ -2635,15 +2634,7 @@ export default function Fingerprints() {
                             />
                           </td>
                           <td className="py-2 px-3 font-mono text-sm">
-                            <div className="flex items-center gap-2">
-                              {order.orderNumber}
-                              {order.mergeGroupId && order.id && (
-                                <MergeGroupBadge
-                                  shipmentId={order.id}
-                                  mergeGroupId={order.mergeGroupId}
-                                />
-                              )}
-                            </div>
+                            {order.orderNumber}
                           </td>
                           <td className="py-2 px-3 text-sm">
                             {order.stationType ? (
