@@ -16,6 +16,9 @@ const MERGEABLE_PHASES = [
   'ready_for_skuvault',
 ];
 
+// Maximum time window for grouping orders to the same address.
+// 72 hours covers Fri–Sun orders for Monday warehouse processing.
+// Also used as hardcoded INTERVAL in the matches query — keep in sync.
 const MAX_MERGE_WINDOW_HOURS = 72;
 
 let workerRunning = false;
@@ -350,6 +353,8 @@ async function evaluateMergeGroup(triggerShipmentId: string): Promise<void> {
     )).limit(1);
 
   if (existingGroup) {
+    // Time boundary: don't add orders to groups detected more than MAX_MERGE_WINDOW_HOURS ago.
+    // Prevents repeat customers' historical orders from inflating the group.
     const hoursSinceDetection = (Date.now() - new Date(existingGroup.detectedAt).getTime()) / (1000 * 60 * 60);
     if (hoursSinceDetection > MAX_MERGE_WINDOW_HOURS) {
       log(`Skipping add to group ${existingGroup.id} — detected ${hoursSinceDetection.toFixed(1)}h ago, exceeds ${MAX_MERGE_WINDOW_HOURS}h window`, 'info', { groupId: existingGroup.id, triggerShipmentId });
@@ -379,8 +384,11 @@ async function evaluateMergeGroup(triggerShipmentId: string): Promise<void> {
             .where(notInArray(mergeGroups.state, ['merge_complete', 'all_sessioned']))
         )
       ),
-      sql`${shipments.orderDate} > ${trigger.orderDate}::timestamptz - INTERVAL '${sql.raw(String(MAX_MERGE_WINDOW_HOURS))} hours'`,
-      sql`${shipments.orderDate} < ${trigger.orderDate}::timestamptz + INTERVAL '${sql.raw(String(MAX_MERGE_WINDOW_HOURS))} hours'`,
+      // Time boundary: only group orders placed within MAX_MERGE_WINDOW_HOURS (72h) of each other.
+      // Covers Fri–Sun weekend orders for Monday processing.
+      // Uses hardcoded INTERVAL to avoid sql.raw() — keep in sync with MAX_MERGE_WINDOW_HOURS constant.
+      sql`${shipments.orderDate} > ${trigger.orderDate}::timestamptz - INTERVAL '72 hours'`,
+      sql`${shipments.orderDate} < ${trigger.orderDate}::timestamptz + INTERVAL '72 hours'`,
     ));
 
   if (matches.length === 0) return;
