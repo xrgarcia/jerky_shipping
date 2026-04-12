@@ -1,7 +1,7 @@
 import { db } from '../db';
 import { shipments, shipmentItems, shipmentQcItems, mergeGroups, mergeGroupMembers, mergeGroupQueue } from '@shared/schema';
 import type { Shipment } from '@shared/schema';
-import { eq, and, or, lte, asc, inArray, notInArray, isNull, ne, sql } from 'drizzle-orm';
+import { eq, and, or, lte, asc, desc, inArray, notInArray, isNull, ne, sql } from 'drizzle-orm';
 import logger from '../utils/logger';
 
 const POLL_INTERVAL_MS = 5000;
@@ -353,13 +353,27 @@ async function evaluateMergeGroup(triggerShipmentId: string): Promise<void> {
     )).limit(1);
 
   if (existingGroup) {
-    // Time boundary: don't add orders to groups detected more than MAX_MERGE_WINDOW_HOURS ago.
-    // Prevents repeat customers' historical orders from inflating the group.
-    const hoursSinceDetection = (Date.now() - new Date(existingGroup.detectedAt).getTime()) / (1000 * 60 * 60);
-    if (hoursSinceDetection > MAX_MERGE_WINDOW_HOURS) {
-      log(`Skipping add to group ${existingGroup.id} — detected ${hoursSinceDetection.toFixed(1)}h ago, exceeds ${MAX_MERGE_WINDOW_HOURS}h window`, 'info', { groupId: existingGroup.id, triggerShipmentId });
-      return;
+    // Time boundary: only add orders whose order_date is within MAX_MERGE_WINDOW_HOURS
+    // of the group's most recent member. Uses order dates (not detection time) to stay
+    // consistent with the new-group matches query.
+    const [newestMember] = await db
+      .select({ orderDate: shipments.orderDate })
+      .from(mergeGroupMembers)
+      .innerJoin(shipments, eq(mergeGroupMembers.shipmentId, shipments.id))
+      .where(eq(mergeGroupMembers.mergeGroupId, existingGroup.id))
+      .orderBy(desc(shipments.orderDate))
+      .limit(1);
+
+    if (newestMember?.orderDate && trigger.orderDate) {
+      const hoursBetweenOrders = Math.abs(
+        new Date(trigger.orderDate).getTime() - new Date(newestMember.orderDate).getTime()
+      ) / (1000 * 60 * 60);
+      if (hoursBetweenOrders > MAX_MERGE_WINDOW_HOURS) {
+        log(`Skipping add to group ${existingGroup.id} — order date gap ${hoursBetweenOrders.toFixed(1)}h exceeds ${MAX_MERGE_WINDOW_HOURS}h window`, 'info', { groupId: existingGroup.id, triggerShipmentId });
+        return;
+      }
     }
+
     await addMemberIfNew(existingGroup.id, trigger);
     await deriveGroupState(existingGroup.id);
     return;
