@@ -51,7 +51,7 @@ const LABEL_FETCH_RETRY_MAX = 2; // Max retries for label fetch per shipment
 const MAX_SYNC_FAILURES_BEFORE_DEADLETTER = 3; // Dead-letter after this many failed attempts
 const MAX_POLL_DURATION_MS = 15 * 60 * 1000; // 15 minute maximum poll duration - self-healing timeout
 const STALE_AUDIT_BATCH_SIZE = 5; // Max shipments to audit per poll cycle (conservative to save rate limits)
-const STALE_AUDIT_MIN_AGE_HOURS = 48; // Only audit shipments not updated in 48+ hours
+const STALE_AUDIT_MIN_AGE_HOURS = 4; // Audit shipments not updated in 4+ hours — catches orphaned merge children quickly
 const STALE_AUDIT_INTERVAL_MS = 15 * 60 * 1000; // Run stale audit at most every 15 minutes
 const CURSOR_OVERLAP_SECONDS = 1200; // 20-minute overlap to catch delayed ShipStation modifications (merges, tag changes)
 
