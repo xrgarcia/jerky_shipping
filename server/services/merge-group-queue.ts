@@ -330,6 +330,8 @@ async function evaluateMergeGroup(triggerShipmentId: string): Promise<void> {
     .where(eq(shipments.id, triggerShipmentId)).limit(1);
   if (!trigger) return;
 
+  if (trigger.shipmentStatus === 'cancelled' || trigger.shipmentStatus === 'orphaned') return;
+
   if (trigger.lifecyclePhase && !MERGEABLE_PHASES.includes(trigger.lifecyclePhase)) return;
 
   let groupId = trigger.mergeGroupId;
@@ -353,6 +355,8 @@ async function evaluateMergeGroup(triggerShipmentId: string): Promise<void> {
     )).limit(1);
 
   if (existingGroup) {
+    if (trigger.shipmentStatus === 'cancelled' || trigger.shipmentStatus === 'orphaned') return;
+
     // Time boundary: only add orders whose order_date is within MAX_MERGE_WINDOW_HOURS
     // of the group's most recent member. Uses order dates (not detection time) to stay
     // consistent with the new-group matches query.
@@ -387,6 +391,7 @@ async function evaluateMergeGroup(triggerShipmentId: string): Promise<void> {
       sql`UPPER(${shipments.shipToState}) = ${trigger.shipToState?.toUpperCase()}`,
       sql`UPPER(${shipments.shipToPostalCode}) = ${trigger.shipToPostalCode?.toUpperCase()}`,
       ne(shipments.id, triggerShipmentId),
+      sql`(${shipments.shipmentStatus} IS NULL OR ${shipments.shipmentStatus} NOT IN ('cancelled', 'orphaned'))`,
       or(
         isNull(shipments.lifecyclePhase),
         inArray(shipments.lifecyclePhase, MERGEABLE_PHASES)
