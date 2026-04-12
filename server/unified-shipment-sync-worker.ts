@@ -53,6 +53,7 @@ const MAX_POLL_DURATION_MS = 15 * 60 * 1000; // 15 minute maximum poll duration 
 const STALE_AUDIT_BATCH_SIZE = 5; // Max shipments to audit per poll cycle (conservative to save rate limits)
 const STALE_AUDIT_MIN_AGE_HOURS = 48; // Only audit shipments not updated in 48+ hours
 const STALE_AUDIT_INTERVAL_MS = 15 * 60 * 1000; // Run stale audit at most every 15 minutes
+const CURSOR_OVERLAP_SECONDS = 1200; // 20-minute overlap to catch delayed ShipStation modifications (merges, tag changes)
 
 // Worker state
 let isPolling = false;
@@ -1086,9 +1087,11 @@ async function pollCycle(): Promise<{
     
     const latestDate = new Date(latestSuccessTimestamp);
     
-    // Only apply overlap when fully caught up and no failures
+    // Safety overlap: re-check shipments modified in the last 20 minutes.
+    // ShipStation operations like order merges can take 15+ minutes to complete,
+    // and tag changes don't always bump modified_at immediately.
     if (!hasMorePages && !earliestFailureTimestamp) {
-      latestDate.setSeconds(latestDate.getSeconds() - 120);
+      latestDate.setSeconds(latestDate.getSeconds() - CURSOR_OVERLAP_SECONDS);
     }
     const safeCursor = latestDate.toISOString();
     
