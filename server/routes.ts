@@ -13417,6 +13417,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           SELECT COUNT(*) as cnt
           FROM shipments
           WHERE lifecycle_phase = 'ready_to_session'
+            AND fulfillment_session_id IS NULL
+            AND shipment_status NOT IN ('cancelled', 'orphaned')
+            AND NOT EXISTS (
+              SELECT 1 FROM shipment_tags st
+              WHERE st.shipment_id = shipments.id AND st.name = 'NOT SHIPPABLE'
+            )
         ),
         live_count AS (
           SELECT COUNT(*) as cnt
@@ -14483,7 +14489,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           and(
             eq(shipments.lifecyclePhase, 'ready_to_session'),
             isNull(shipments.fulfillmentSessionId),
-            ne(shipments.shipmentStatus, 'cancelled'),
+            sql`${shipments.shipmentStatus} NOT IN ('cancelled', 'orphaned')`,
             not(exists(
               db.select({ id: shipmentTags.id })
                 .from(shipmentTags)

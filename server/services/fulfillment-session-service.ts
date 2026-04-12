@@ -269,6 +269,7 @@ export class FulfillmentSessionService {
       isNotNull(shipments.packagingTypeId),
       isNotNull(shipments.assignedStationId),
       isNull(shipments.fulfillmentSessionId),
+      sql`${shipments.shipmentStatus} NOT IN ('cancelled', 'orphaned')`,
     ];
 
     if (stationType) {
