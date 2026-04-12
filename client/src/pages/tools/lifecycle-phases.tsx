@@ -2704,6 +2704,18 @@ function MergeGroupsTab() {
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [isRestarting, setIsRestarting] = useState(false);
+  const { toast } = useToast();
+
+  const { data: workerStatus, isLoading: workerLoading } = useQuery<{
+    running: boolean;
+    queueDepth: number;
+    processing: number;
+    failed: number;
+  }>({
+    queryKey: ["/api/merge-group-worker-status"],
+    refetchInterval: 5000,
+  });
 
   const { data: stats, isLoading: statsLoading } = useQuery<MergeGroupStats>({
     queryKey: ["/api/merge-groups/stats"],
@@ -2755,7 +2767,92 @@ function MergeGroupsTab() {
 
   return (
     <div className="space-y-4 py-4" data-testid="merge-groups-view">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <Card data-testid="card-mg-worker-status">
+          <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Worker Status</CardTitle>
+            <Activity className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            {workerLoading ? (
+              <Skeleton className="h-6 w-20" />
+            ) : workerStatus?.running ? (
+              <Badge variant="default" className="no-default-active-elevate bg-green-600" data-testid="badge-mg-worker-running">
+                Running
+              </Badge>
+            ) : (
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="destructive" className="no-default-active-elevate" data-testid="badge-mg-worker-stopped">
+                  Stopped
+                </Badge>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={async () => {
+                    setIsRestarting(true);
+                    try {
+                      await apiRequest('POST', '/api/operations/restart-merge-group-worker');
+                      queryClient.invalidateQueries({ queryKey: ["/api/merge-group-worker-status"] });
+                      toast({
+                        title: "Worker Restarted",
+                        description: "Merge group queue worker has been restarted.",
+                      });
+                    } catch (err) {
+                      toast({
+                        title: "Failed to restart worker",
+                        description: err instanceof Error ? err.message : "Unknown error",
+                        variant: "destructive",
+                      });
+                    } finally {
+                      setIsRestarting(false);
+                    }
+                  }}
+                  disabled={isRestarting}
+                  data-testid="button-restart-merge-group-worker"
+                >
+                  <RefreshCw className={`h-3 w-3 mr-1 ${isRestarting ? "animate-spin" : ""}`} />
+                  {isRestarting ? "Restarting..." : "Restart"}
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card data-testid="card-mg-queue-depth">
+          <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Queue Depth</CardTitle>
+            <Layers className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            {workerLoading ? <Skeleton className="h-8 w-16" /> : (
+              <div className="text-2xl font-bold" data-testid="text-mg-queue-depth">{workerStatus?.queueDepth ?? 0}</div>
+            )}
+            {workerStatus && (workerStatus.processing > 0 || workerStatus.failed > 0) && (
+              <p className="text-xs text-muted-foreground mt-1">
+                {workerStatus.processing > 0 && `${workerStatus.processing} processing`}
+                {workerStatus.processing > 0 && workerStatus.failed > 0 && " · "}
+                {workerStatus.failed > 0 && `${workerStatus.failed} failed`}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card data-testid="card-mg-total-groups">
+          <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Groups</CardTitle>
+            <GitMerge className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            {statsLoading ? <Skeleton className="h-8 w-16" /> : (
+              <div className="text-2xl font-bold" data-testid="text-mg-total-groups">
+                {(stats?.groups.detected ?? 0) + (stats?.groups.mergeStarted ?? 0) + (stats?.groups.mergeComplete ?? 0) + (stats?.groups.allSessioned ?? 0)}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card data-testid="card-mg-detected">
           <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Detected</CardTitle>

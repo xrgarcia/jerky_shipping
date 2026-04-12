@@ -565,3 +565,7 @@ export function stopMergeGroupQueueWorker(): void {
   log('Stopping merge group queue worker');
   workerRunning = false;
 }
+
+export function isMergeGroupWorkerRunning(): boolean {
+  return workerRunning;
+}

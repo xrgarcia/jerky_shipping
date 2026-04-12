@@ -5120,6 +5120,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/merge-group-worker-status", requireAuth, async (req, res) => {
+    try {
+      const { isMergeGroupWorkerRunning, getMergeGroupQueueStats } = await import("./services/merge-group-queue");
+      const stats = await getMergeGroupQueueStats();
+      res.json({
+        running: isMergeGroupWorkerRunning(),
+        queueDepth: stats.queued,
+        processing: stats.processing,
+        failed: stats.failed,
+      });
+    } catch (error: any) {
+      console.error("Error getting merge group worker status:", error.message);
+      res.status(500).json({ error: "Failed to get merge group worker status" });
+    }
+  });
+
+  app.post("/api/operations/restart-merge-group-worker", requireAuth, async (req, res) => {
+    try {
+      const { stopMergeGroupQueueWorker, startMergeGroupQueueWorker } = await import("./services/merge-group-queue");
+      stopMergeGroupQueueWorker();
+      await new Promise(resolve => setTimeout(resolve, 500));
+      startMergeGroupQueueWorker();
+      res.json({ success: true, message: "Merge group queue worker restarted" });
+    } catch (error: any) {
+      console.error("Error restarting merge group worker:", error.message);
+      res.status(500).json({ error: "Failed to restart merge group worker" });
+    }
+  });
+
   app.post("/api/operations/restart-lifecycle-worker", requireAuth, async (req, res) => {
     try {
       const { stopLifecycleWorker, startLifecycleWorker } = await import("./lifecycle-event-worker");
