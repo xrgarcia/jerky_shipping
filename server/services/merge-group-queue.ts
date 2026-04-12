@@ -16,6 +16,8 @@ const MERGEABLE_PHASES = [
   'ready_for_skuvault',
 ];
 
+const MAX_MERGE_WINDOW_HOURS = 72;
+
 let workerRunning = false;
 
 function log(msg: string, level: 'info' | 'warn' | 'error' = 'info', ctx?: Record<string, any>) {
@@ -348,6 +350,11 @@ async function evaluateMergeGroup(triggerShipmentId: string): Promise<void> {
     )).limit(1);
 
   if (existingGroup) {
+    const hoursSinceDetection = (Date.now() - new Date(existingGroup.detectedAt).getTime()) / (1000 * 60 * 60);
+    if (hoursSinceDetection > MAX_MERGE_WINDOW_HOURS) {
+      log(`Skipping add to group ${existingGroup.id} — detected ${hoursSinceDetection.toFixed(1)}h ago, exceeds ${MAX_MERGE_WINDOW_HOURS}h window`, 'info', { groupId: existingGroup.id, triggerShipmentId });
+      return;
+    }
     await addMemberIfNew(existingGroup.id, trigger);
     await deriveGroupState(existingGroup.id);
     return;
@@ -371,7 +378,9 @@ async function evaluateMergeGroup(triggerShipmentId: string): Promise<void> {
           db.select({ id: mergeGroups.id }).from(mergeGroups)
             .where(notInArray(mergeGroups.state, ['merge_complete', 'all_sessioned']))
         )
-      )
+      ),
+      sql`${shipments.orderDate} > ${trigger.orderDate}::timestamptz - INTERVAL '${sql.raw(String(MAX_MERGE_WINDOW_HOURS))} hours'`,
+      sql`${shipments.orderDate} < ${trigger.orderDate}::timestamptz + INTERVAL '${sql.raw(String(MAX_MERGE_WINDOW_HOURS))} hours'`,
     ));
 
   if (matches.length === 0) return;
