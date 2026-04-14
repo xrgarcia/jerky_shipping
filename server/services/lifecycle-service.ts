@@ -154,7 +154,9 @@ export async function updateShipmentLifecycleFromData(
       currentPhase === LIFECYCLE_PHASES.DELIVERED ||
       currentPhase === LIFECYCLE_PHASES.CANCELLED ||
       currentPhase === LIFECYCLE_PHASES.IN_TRANSIT ||
-      currentPhase === LIFECYCLE_PHASES.PROBLEM
+      currentPhase === LIFECYCLE_PHASES.PROBLEM ||
+      currentPhase === LIFECYCLE_PHASES.MERGED ||
+      currentPhase === LIFECYCLE_PHASES.MERGED_CHILD
     ) {
       blocked = true;
     }

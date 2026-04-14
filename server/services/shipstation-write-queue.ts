@@ -1,7 +1,7 @@
 import { db } from '../db';
-import { shipstationWriteQueue, shipments } from '@shared/schema';
+import { shipstationWriteQueue, shipments, orderMerges } from '@shared/schema';
 import type { InsertShipstationWriteQueue } from '@shared/schema';
-import { eq, and, lte, or, isNull, asc, sql } from 'drizzle-orm';
+import { eq, and, lte, or, isNull, asc, sql, inArray } from 'drizzle-orm';
 import { resolveCarrierIdFromServiceCode } from '../utils/shipstation-api';
 import { sanitizeItemOptions } from '../utils/shipstation-helpers';
 import logger, { withOrder } from '../utils/logger';
@@ -342,6 +342,22 @@ async function runCallbackAction(job: typeof shipstationWriteQueue.$inferSelect,
         .set({ requiresManualPackage: false, packageAssignmentError: null })
         .where(eq(shipments.id, job.localShipmentId));
       log(`Callback: Cleared manual package flag for shipment ${job.localShipmentId}`, 'info', ctx);
+    } else if (job.callbackAction === 'mark_merge_complete') {
+      const parentShipmentId = job.shipmentId;
+      const mergeRows = await db
+        .update(orderMerges)
+        .set({ state: 'complete', completedAt: new Date(), updatedAt: new Date() })
+        .where(and(eq(orderMerges.parentShipmentId, parentShipmentId), eq(orderMerges.state, 'processing')))
+        .returning({ childLocalId: orderMerges.childLocalId });
+
+      if (mergeRows.length > 0) {
+        const childLocalIds = mergeRows.map(r => r.childLocalId);
+        await db
+          .update(shipments)
+          .set({ lifecyclePhase: 'merged', updatedAt: new Date() })
+          .where(inArray(shipments.id, childLocalIds));
+        log(`Callback: Merge complete — marked ${mergeRows.length} children as merged for parent ${parentShipmentId}`, 'info', ctx);
+      }
     }
   } catch (err: any) {
     log(`Callback action "${job.callbackAction}" failed for job #${job.id}: ${err.message}`, 'warn', ctx);
@@ -461,6 +477,17 @@ async function processNextJob(): Promise<boolean> {
             httpResponse: errResponseBody,
           })
           .where(eq(shipstationWriteQueue.id, job.id));
+
+        if (job.callbackAction === 'mark_merge_complete') {
+          try {
+            await db.update(orderMerges)
+              .set({ state: 'failed', lastError: `Write queue dead letter: ${errorMsg}`, updatedAt: new Date() })
+              .where(and(eq(orderMerges.parentShipmentId, job.shipmentId), eq(orderMerges.state, 'processing')));
+            log(`Marked merge rows as failed for parent ${job.shipmentId} (write queue dead letter)`, 'warn', jobCtx);
+          } catch (e) {
+            log(`Failed to mark merge rows as failed: ${e}`, 'error', jobCtx);
+          }
+        }
 
         if (job.localShipmentId) {
           try {

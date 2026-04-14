@@ -270,6 +270,7 @@ export class FulfillmentSessionService {
       isNotNull(shipments.assignedStationId),
       isNull(shipments.fulfillmentSessionId),
       sql`${shipments.shipmentStatus} NOT IN ('cancelled', 'orphaned')`,
+      sql`${shipments.lifecyclePhase} != 'merged'`,
     ];
 
     if (stationType) {

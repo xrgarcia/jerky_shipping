@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { reportingStorage } from "./reporting-storage";
 import { reportingSql } from "./reporting-db";
 import { db } from "./db";
-import { users, shipmentSyncFailures, shopifyOrderSyncFailures, orders, orderItems, shipments, orderRefunds, shipmentItems, shipmentTags, shipmentEvents, fingerprints, shipmentQcItems, fingerprintModels, slashbinKitComponentMappings, packagingTypes, slashbinOrders, slashbinOrderItems, slashbinProducts, slashbinProductVariants, shipmentRateAnalysis, featureFlags, shipstationWriteQueue, rateCheckQueue, qcExplosionQueue, sessionBuildQueue, mergeGroups, mergeGroupMembers, mergeGroupQueue } from "@shared/schema";
+import { users, shipmentSyncFailures, shopifyOrderSyncFailures, orders, orderItems, shipments, orderRefunds, shipmentItems, shipmentTags, shipmentEvents, fingerprints, shipmentQcItems, fingerprintModels, slashbinKitComponentMappings, packagingTypes, slashbinOrders, slashbinOrderItems, slashbinProducts, slashbinProductVariants, shipmentRateAnalysis, featureFlags, shipstationWriteQueue, rateCheckQueue, qcExplosionQueue, sessionBuildQueue, orderMerges } from "@shared/schema";
 import { eq, count, desc, asc, or, and, sql, gte, lte, ilike, isNotNull, isNull, ne, inArray, notInArray, exists, not, type SQL } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import { z } from "zod";
@@ -14479,7 +14479,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           shipToAddressLine1: shipments.shipToAddressLine1,
           shipToCity: shipments.shipToCity,
           shipToPostalCode: shipments.shipToPostalCode,
-          mergeGroupId: shipments.mergeGroupId,
         })
         .from(shipments)
         .leftJoin(fingerprints, eq(shipments.fingerprintId, fingerprints.id))
@@ -14831,7 +14830,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           tags: orderTags,
           needsPackageSync,
           packagingTypeName: order.packagingTypeName || null,
-          mergeGroupId: order.mergeGroupId || null,
         };
       });
 
@@ -16577,6 +16575,237 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ deleted });
     } catch (error: any) {
       res.status(500).json({ error: "Failed to delete preference" });
+    }
+  });
+
+  // ============================================================================
+  // Merge Engine — candidate detection and merge creation
+  // ============================================================================
+
+  app.get('/api/merge-candidates', requireAuth, async (req, res) => {
+    try {
+      const candidates = await db.execute(sql`
+        WITH shippable AS (
+          SELECT s.id, s.shipment_id, s.order_number, s.ship_to_email,
+                 s.ship_to_name, s.ship_to_address_line1, s.ship_to_city,
+                 s.ship_to_state, s.ship_to_postal_code, s.created_at,
+                 UPPER(COALESCE(s.ship_to_email, '') || '|' || COALESCE(s.ship_to_address_line1, '') || '|' || COALESCE(s.ship_to_city, '') || '|' || COALESCE(s.ship_to_state, '') || '|' || COALESCE(s.ship_to_postal_code, '')) AS group_key
+          FROM shipments s
+          WHERE s.shipment_status = 'pending'
+            AND EXISTS (
+              SELECT 1 FROM shipment_tags st
+              WHERE st.shipment_id = s.id AND st.name = 'READY FOR SHIP DOT'
+            )
+            AND NOT EXISTS (
+              SELECT 1 FROM order_merges om
+              WHERE om.child_shipment_id = s.shipment_id
+                AND om.state IN ('queued', 'processing')
+            )
+            AND (s.lifecycle_phase IS NULL OR s.lifecycle_phase NOT IN ('merged', 'merged_child'))
+        ),
+        groups AS (
+          SELECT group_key, COUNT(*) AS member_count
+          FROM shippable
+          GROUP BY group_key
+          HAVING COUNT(*) >= 2
+        )
+        SELECT sh.id, sh.shipment_id, sh.order_number, sh.ship_to_email,
+               sh.ship_to_name, sh.ship_to_address_line1, sh.ship_to_city,
+               sh.ship_to_state, sh.ship_to_postal_code, sh.created_at,
+               sh.group_key, g.member_count
+        FROM shippable sh
+        INNER JOIN groups g ON g.group_key = sh.group_key
+        ORDER BY g.member_count DESC, sh.group_key, sh.created_at ASC
+      `);
+
+      const groupMap = new Map<string, any>();
+
+      for (const row of candidates.rows as any[]) {
+        if (!groupMap.has(row.group_key)) {
+          groupMap.set(row.group_key, {
+            groupKey: row.group_key,
+            memberCount: parseInt(row.member_count),
+            shipments: [],
+          });
+        }
+
+        const items = await db
+          .select({
+            name: shipmentItems.name,
+            sku: shipmentItems.sku,
+            quantity: shipmentItems.quantity,
+          })
+          .from(shipmentItems)
+          .where(eq(shipmentItems.shipmentId, row.id));
+
+        const [orderData] = await db
+          .select({ salesChannel: orders.salesChannel })
+          .from(orders)
+          .innerJoin(shipments, eq(shipments.orderId, orders.id))
+          .where(eq(shipments.id, row.id))
+          .limit(1);
+
+        groupMap.get(row.group_key).shipments.push({
+          id: row.id,
+          shipmentId: row.shipment_id,
+          orderNumber: row.order_number,
+          salesChannel: orderData?.salesChannel || 'unknown',
+          email: row.ship_to_email,
+          shippingName: row.ship_to_name,
+          shippingAddress: row.ship_to_address_line1,
+          itemCount: items.length,
+          items,
+          createdAt: row.created_at,
+        });
+      }
+
+      res.json({ groups: Array.from(groupMap.values()) });
+    } catch (error: any) {
+      console.error('[MergeCandidates] Error:', error.message);
+      res.status(500).json({ error: 'Failed to fetch merge candidates' });
+    }
+  });
+
+  app.post('/api/merges', requireAuth, async (req, res) => {
+    try {
+      const { parentShipmentId, childShipmentIds, mergedBy } = req.body;
+
+      if (!parentShipmentId || !Array.isArray(childShipmentIds) || childShipmentIds.length === 0 || !mergedBy) {
+        return res.status(400).json({ error: 'parentShipmentId, childShipmentIds[], and mergedBy are required' });
+      }
+
+      if (childShipmentIds.includes(parentShipmentId)) {
+        return res.status(400).json({ error: 'parentShipmentId cannot appear in childShipmentIds' });
+      }
+
+      const uniqueChildIds = [...new Set(childShipmentIds as string[])];
+
+      const allIds = [parentShipmentId, ...uniqueChildIds];
+      const allShipments = await db
+        .select({
+          id: shipments.id,
+          shipmentId: shipments.shipmentId,
+          orderNumber: shipments.orderNumber,
+          shipmentStatus: shipments.shipmentStatus,
+          shipToEmail: shipments.shipToEmail,
+          shipToAddressLine1: shipments.shipToAddressLine1,
+          shipToCity: shipments.shipToCity,
+          shipToState: shipments.shipToState,
+          shipToPostalCode: shipments.shipToPostalCode,
+          lifecyclePhase: shipments.lifecyclePhase,
+          orderId: shipments.orderId,
+        })
+        .from(shipments)
+        .where(inArray(shipments.shipmentId, allIds));
+
+      const shipmentMap = new Map(allShipments.map(s => [s.shipmentId, s]));
+
+      const parent = shipmentMap.get(parentShipmentId);
+      if (!parent) {
+        return res.status(404).json({ error: `Parent shipment ${parentShipmentId} not found` });
+      }
+
+      if (parent.shipmentStatus !== 'pending') {
+        return res.status(400).json({ error: `Parent shipment status must be 'pending', got '${parent.shipmentStatus}'` });
+      }
+
+      const parentTags = await db
+        .select({ name: shipmentTags.name })
+        .from(shipmentTags)
+        .where(eq(shipmentTags.shipmentId, parent.id));
+      if (!parentTags.some(t => t.name === 'READY FOR SHIP DOT')) {
+        return res.status(400).json({ error: 'Parent shipment must have READY FOR SHIP DOT tag' });
+      }
+
+      const parentGroupKey = [parent.shipToEmail, parent.shipToAddressLine1, parent.shipToCity, parent.shipToState, parent.shipToPostalCode]
+        .map(v => (v || '').toUpperCase()).join('|');
+
+      const validatedChildren: Array<{ child: typeof parent; items: any[]; salesChannel: string }> = [];
+
+      for (const childSsId of uniqueChildIds) {
+        const child = shipmentMap.get(childSsId);
+        if (!child) {
+          return res.status(404).json({ error: `Child shipment ${childSsId} not found` });
+        }
+
+        if (child.shipmentStatus !== 'pending') {
+          return res.status(400).json({ error: `Child ${childSsId} status must be 'pending', got '${child.shipmentStatus}'` });
+        }
+
+        const childTags = await db
+          .select({ name: shipmentTags.name })
+          .from(shipmentTags)
+          .where(eq(shipmentTags.shipmentId, child.id));
+        if (!childTags.some(t => t.name === 'READY FOR SHIP DOT')) {
+          return res.status(400).json({ error: `Child ${childSsId} must have READY FOR SHIP DOT tag` });
+        }
+
+        const childGroupKey = [child.shipToEmail, child.shipToAddressLine1, child.shipToCity, child.shipToState, child.shipToPostalCode]
+          .map(v => (v || '').toUpperCase()).join('|');
+        if (childGroupKey !== parentGroupKey) {
+          return res.status(400).json({ error: `Child ${childSsId} does not match parent's group key` });
+        }
+
+        const childItems = await db
+          .select({
+            sku: shipmentItems.sku,
+            name: shipmentItems.name,
+            quantity: shipmentItems.quantity,
+            unit_price: shipmentItems.unitPrice,
+            image_url: shipmentItems.imageUrl,
+          })
+          .from(shipmentItems)
+          .where(eq(shipmentItems.shipmentId, child.id));
+
+        const [orderData] = child.orderId ? await db
+          .select({ salesChannel: orders.salesChannel })
+          .from(orders)
+          .where(eq(orders.id, child.orderId))
+          .limit(1) : [null];
+
+        validatedChildren.push({
+          child,
+          items: childItems,
+          salesChannel: orderData?.salesChannel || 'unknown',
+        });
+      }
+
+      const insertedIds: number[] = [];
+
+      await db.transaction(async (tx) => {
+        for (const { child, items, salesChannel } of validatedChildren) {
+          try {
+            const [inserted] = await tx.insert(orderMerges).values({
+              parentShipmentId: parentShipmentId,
+              parentLocalId: parent.id,
+              parentOrderNumber: parent.orderNumber,
+              childShipmentId: child.shipmentId,
+              childLocalId: child.id,
+              childOrderNumber: child.orderNumber,
+              childSalesChannel: salesChannel,
+              childExternalOrderId: null,
+              childItemsSnapshot: items,
+              state: 'queued',
+              mergedBy,
+            }).returning({ id: orderMerges.id });
+            insertedIds.push(inserted.id);
+          } catch (err: any) {
+            if (err.code === '23505' && err.constraint?.includes('child_active')) {
+              throw new Error(`CONFLICT:Child ${child.shipmentId} is already in an active merge`);
+            }
+            throw err;
+          }
+        }
+      });
+
+      console.log(`[MergeEngine] Created merge: parent ${parentShipmentId} (${parent.orderNumber}) with ${uniqueChildIds.length} children by ${mergedBy}`);
+      res.status(202).json({ mergeIds: insertedIds });
+    } catch (error: any) {
+      if (error.message?.startsWith('CONFLICT:')) {
+        return res.status(409).json({ error: error.message.replace('CONFLICT:', '') });
+      }
+      console.error('[MergeEngine] Error creating merge:', error.message);
+      res.status(500).json({ error: 'Failed to create merge' });
     }
   });
 

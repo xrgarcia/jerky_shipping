@@ -310,6 +310,7 @@ export function getPhaseDisplayName(phase: LifecyclePhase): string {
     [LIFECYCLE_PHASES.PROBLEM]: 'Problem',
     [LIFECYCLE_PHASES.PICKING_ISSUES]: 'Picking Issues',
     [LIFECYCLE_PHASES.MERGED_CHILD]: 'Merged Child',
+    [LIFECYCLE_PHASES.MERGED]: 'Merged',
   };
   return displayNames[phase] || phase;
 }
@@ -400,6 +401,7 @@ export function getLifecycleProgress(state: LifecycleState): number {
     [LIFECYCLE_PHASES.PROBLEM]: 100, // Terminal state
     [LIFECYCLE_PHASES.PICKING_ISSUES]: 50, // Same as picking (it's a branch)
     [LIFECYCLE_PHASES.MERGED_CHILD]: 100, // Terminal state
+    [LIFECYCLE_PHASES.MERGED]: 100, // Terminal state
   };
   
   let baseProgress = phaseWeights[phase];

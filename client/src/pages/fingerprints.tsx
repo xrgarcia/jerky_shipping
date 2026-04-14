@@ -323,7 +323,6 @@ interface ReadyToSessionOrder {
   tags: { name: string; color: string | null }[];
   needsPackageSync: boolean;
   packagingTypeName: string | null;
-  mergeGroupId: number | null;
 }
 
 interface ReadyToSessionOrdersResponse {
