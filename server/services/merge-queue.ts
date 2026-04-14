@@ -58,26 +58,15 @@ async function processNextJob(): Promise<boolean> {
           throw new Error(`Parent shipment ${parentShipmentId} not found in ShipStation (404)`);
         }
 
-        const ssItems = currentShipment.data?.shipment_items || currentShipment.data?.items || [];
-        const consolidatedItems = [...ssItems.map((item: any) => ({
-          sku: item.sku || '',
-          name: item.name || '',
-          quantity: item.quantity || 1,
-          unit_price: item.unit_price ?? 0,
-          image_url: item.image_url || null,
-        }))];
+        const ssItems = currentShipment.data?.items || [];
+        const consolidatedItems = [...ssItems];
 
         for (const row of mergeRows) {
           const childItems = row.childItemsSnapshot as any[];
           if (Array.isArray(childItems)) {
             for (const ci of childItems) {
-              consolidatedItems.push({
-                sku: ci.sku || '',
-                name: ci.name || '',
-                quantity: ci.quantity || 1,
-                unit_price: ci.unit_price ?? ci.unitPrice ?? 0,
-                image_url: ci.image_url ?? ci.imageUrl ?? null,
-              });
+              const { order_item_id, line_item_key, ...rest } = ci;
+              consolidatedItems.push(rest);
             }
           }
         }

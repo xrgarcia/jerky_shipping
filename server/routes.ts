@@ -16730,6 +16730,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const parentGroupKey = [parent.shipToEmail, parent.shipToAddressLine1, parent.shipToCity, parent.shipToState, parent.shipToPostalCode]
         .map(v => (v || '').toUpperCase()).join('|');
 
+      const { fetchCurrentShipment } = await import("./services/shipstation-write-queue");
       const validatedChildren: Array<{ child: typeof parent; items: any[]; salesChannel: string }> = [];
 
       for (const childSsId of uniqueChildIds) {
@@ -16756,16 +16757,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ error: `Child ${childSsId} does not match parent's group key` });
         }
 
-        const childItems = await db
-          .select({
-            sku: shipmentItems.sku,
-            name: shipmentItems.name,
-            quantity: shipmentItems.quantity,
-            unit_price: shipmentItems.unitPrice,
-            image_url: shipmentItems.imageUrl,
-          })
-          .from(shipmentItems)
-          .where(eq(shipmentItems.shipmentId, child.id));
+        const childSsData = await fetchCurrentShipment(childSsId, child.orderNumber || undefined);
+        if (!childSsData) {
+          return res.status(404).json({ error: `Child shipment ${childSsId} not found in ShipStation` });
+        }
+        const childItems = childSsData.data?.items || [];
 
         const [orderData] = child.orderId ? await db
           .select({ salesChannel: orders.salesChannel })
