@@ -1,7 +1,7 @@
 import { db } from '../db';
 import { orderMerges, shipments, shipmentItems } from '@shared/schema';
 import { eq, and, sql, lte, asc, inArray } from 'drizzle-orm';
-import { enqueueShipStationWrite } from './shipstation-write-queue';
+import { enqueueShipStationWrite, fetchCurrentShipment } from './shipstation-write-queue';
 import { withSpan } from '../utils/tracing';
 
 const POLL_INTERVAL_MS = 5000;
@@ -53,23 +53,18 @@ async function processNextJob(): Promise<boolean> {
       log(`Processing merge: parent ${parentShipmentId} (${parentOrderNumber}) with ${mergeRows.length} children`);
 
       try {
-        const parentItems = await tx
-          .select({
-            sku: shipmentItems.sku,
-            name: shipmentItems.name,
-            quantity: shipmentItems.quantity,
-            unitPrice: shipmentItems.unitPrice,
-            imageUrl: shipmentItems.imageUrl,
-          })
-          .from(shipmentItems)
-          .where(eq(shipmentItems.shipmentId, parentLocalId));
+        const currentShipment = await fetchCurrentShipment(parentShipmentId, parentOrderNumber);
+        if (!currentShipment) {
+          throw new Error(`Parent shipment ${parentShipmentId} not found in ShipStation (404)`);
+        }
 
-        const consolidatedItems = [...parentItems.map(item => ({
+        const ssItems = currentShipment.data?.shipment_items || currentShipment.data?.items || [];
+        const consolidatedItems = [...ssItems.map((item: any) => ({
           sku: item.sku || '',
-          name: item.name,
-          quantity: item.quantity,
-          unit_price: item.unitPrice ? parseFloat(item.unitPrice) : 0,
-          image_url: item.imageUrl || null,
+          name: item.name || '',
+          quantity: item.quantity || 1,
+          unit_price: item.unit_price ?? 0,
+          image_url: item.image_url || null,
         }))];
 
         for (const row of mergeRows) {
@@ -120,7 +115,7 @@ async function processNextJob(): Promise<boolean> {
           if (newRetryCount >= row.maxRetries) {
             await tx.update(orderMerges)
               .set({
-                state: 'dead_letter',
+                state: 'failed',
                 lastError: errorMsg,
                 retryCount: newRetryCount,
                 updatedAt: now,

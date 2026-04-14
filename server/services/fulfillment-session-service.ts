@@ -270,7 +270,12 @@ export class FulfillmentSessionService {
       isNotNull(shipments.assignedStationId),
       isNull(shipments.fulfillmentSessionId),
       sql`${shipments.shipmentStatus} NOT IN ('cancelled', 'orphaned')`,
-      sql`${shipments.lifecyclePhase} != 'merged'`,
+      sql`${shipments.lifecyclePhase} NOT IN ('merged', 'merged_child')`,
+      sql`NOT EXISTS (
+        SELECT 1 FROM order_merges om
+        WHERE om.child_local_id = ${shipments.id}
+          AND om.state IN ('queued', 'processing')
+      )`,
     ];
 
     if (stationType) {

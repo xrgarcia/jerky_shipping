@@ -74,6 +74,32 @@ export interface EnqueueWriteOptions {
 }
 
 export async function enqueueShipStationWrite(options: EnqueueWriteOptions): Promise<number> {
+  const ctx = withOrder(options.orderNumber, options.shipmentId);
+
+  const existing = await db
+    .select({ id: shipstationWriteQueue.id })
+    .from(shipstationWriteQueue)
+    .where(
+      and(
+        eq(shipstationWriteQueue.shipmentId, options.shipmentId),
+        eq(shipstationWriteQueue.reason, options.reason),
+        or(
+          eq(shipstationWriteQueue.status, 'queued'),
+          eq(shipstationWriteQueue.status, 'processing'),
+          and(
+            eq(shipstationWriteQueue.status, 'failed'),
+            sql`${shipstationWriteQueue.nextRetryAt} IS NOT NULL`
+          )
+        )
+      )
+    )
+    .limit(1);
+
+  if (existing.length > 0) {
+    log(`Duplicate enqueue for ${options.shipmentId} (${options.reason}) — returning existing job #${existing[0].id}`, 'info', ctx);
+    return existing[0].id;
+  }
+
   const row: InsertShipstationWriteQueue = {
     shipmentId: options.shipmentId,
     patchPayload: options.patchPayload,
@@ -91,7 +117,7 @@ export async function enqueueShipStationWrite(options: EnqueueWriteOptions): Pro
   };
 
   const [inserted] = await db.insert(shipstationWriteQueue).values(row).returning({ id: shipstationWriteQueue.id });
-  log(`Enqueued write job #${inserted.id} for ${options.shipmentId} (${options.reason})`, 'info', withOrder(options.orderNumber, options.shipmentId));
+  log(`Enqueued write job #${inserted.id} for ${options.shipmentId} (${options.reason})`, 'info', ctx);
   return inserted.id;
 }
 
@@ -127,7 +153,7 @@ interface FetchResult {
   statusCode: number;
 }
 
-async function fetchCurrentShipment(shipmentId: string, orderNumber?: string): Promise<FetchResult | null> {
+export async function fetchCurrentShipment(shipmentId: string, orderNumber?: string): Promise<FetchResult | null> {
   if (!SHIPSTATION_API_KEY) {
     throw new Error('SHIPSTATION_API_KEY not configured');
   }

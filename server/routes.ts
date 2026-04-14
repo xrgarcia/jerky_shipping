@@ -13423,6 +13423,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
               SELECT 1 FROM shipment_tags st
               WHERE st.shipment_id = shipments.id AND st.name = 'NOT SHIPPABLE'
             )
+            AND NOT EXISTS (
+              SELECT 1 FROM order_merges om
+              WHERE om.child_local_id = shipments.id
+                AND om.state IN ('queued', 'processing')
+            )
         ),
         live_count AS (
           SELECT COUNT(*) as cnt
@@ -16790,7 +16795,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }).returning({ id: orderMerges.id });
             insertedIds.push(inserted.id);
           } catch (err: any) {
-            if (err.code === '23505' && err.constraint?.includes('child_active')) {
+            if (err.code === '23505' && err.constraint === 'order_merges_child_active_idx') {
               throw new Error(`CONFLICT:Child ${child.shipmentId} is already in an active merge`);
             }
             throw err;
