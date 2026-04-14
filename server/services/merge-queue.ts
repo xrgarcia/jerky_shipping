@@ -65,7 +65,14 @@ async function processNextJob(): Promise<boolean> {
           const childItems = row.childItemsSnapshot as any[];
           if (Array.isArray(childItems)) {
             for (const ci of childItems) {
-              const { order_item_id, line_item_key, ...rest } = ci;
+              const {
+                item_id,
+                sales_order_id,
+                sales_order_item_id,
+                external_order_id,
+                external_order_item_id,
+                ...rest
+              } = ci;
               consolidatedItems.push(rest);
             }
           }
