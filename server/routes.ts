@@ -14504,6 +14504,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   )
                 )
             )),
+            sql`NOT EXISTS (
+              SELECT 1 FROM order_merges om
+              WHERE om.child_local_id = ${shipments.id}
+                AND om.state IN ('queued', 'processing')
+            )`,
           )
         )
         .orderBy(asc(shipments.orderNumber));
@@ -16811,6 +16816,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       console.error('[MergeEngine] Error creating merge:', error.message);
       res.status(500).json({ error: 'Failed to create merge' });
+    }
+  });
+
+  app.get('/api/merge-queue', requireAuth, async (req, res) => {
+    try {
+      const statsResult = await db.execute(sql`
+        SELECT state, COUNT(*)::int as count
+        FROM order_merges
+        GROUP BY state
+        ORDER BY state
+      `);
+
+      const stats: Record<string, number> = {};
+      for (const row of statsResult.rows as any[]) {
+        stats[row.state] = row.count;
+      }
+
+      const recentResult = await db.execute(sql`
+        SELECT om.id, om.parent_shipment_id, om.parent_order_number,
+               om.child_shipment_id, om.child_order_number, om.child_sales_channel,
+               om.state, om.retry_count, om.max_retries, om.last_error,
+               om.merged_by, om.created_at, om.processed_at, om.completed_at, om.updated_at
+        FROM order_merges om
+        ORDER BY om.created_at DESC
+        LIMIT 50
+      `);
+
+      res.json({
+        stats,
+        recent: recentResult.rows,
+      });
+    } catch (error: any) {
+      console.error('[MergeQueue] Error fetching queue status:', error.message);
+      res.status(500).json({ error: 'Failed to fetch merge queue status' });
     }
   });
 
