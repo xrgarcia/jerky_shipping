@@ -125,31 +125,37 @@ function MergeCandidateCard({
   }));
   const [showConfirm, setShowConfirm] = useState(false);
 
-  const prevShipmentIdsRef = useRef<string>(
-    group.shipments.map((s) => s.shipmentId).sort().join(",")
+  const prevKnownIdsRef = useRef<Set<string>>(
+    new Set(group.shipments.map((s) => s.shipmentId))
   );
   useEffect(() => {
-    const currentKey = group.shipments.map((s) => s.shipmentId).sort().join(",");
-    if (currentKey !== prevShipmentIdsRef.current) {
-      prevShipmentIdsRef.current = currentKey;
-      setSelection((prev) => {
-        const currentIds = new Set(group.shipments.map((s) => s.shipmentId));
-        const next = new Set<string>();
-        for (const id of prev.selectedIds) {
-          if (currentIds.has(id)) next.add(id);
-        }
-        for (const s of group.shipments) {
-          if (!prev.selectedIds.has(s.shipmentId)) {
-            next.add(s.shipmentId);
-          }
-        }
-        const parentStillExists = currentIds.has(prev.parentShipmentId);
-        return {
-          parentShipmentId: parentStillExists ? prev.parentShipmentId : group.shipments[0]?.shipmentId || "",
-          selectedIds: next,
-        };
-      });
+    const currentIds = new Set(group.shipments.map((s) => s.shipmentId));
+    const newShipments: string[] = [];
+    for (const id of currentIds) {
+      if (!prevKnownIdsRef.current.has(id)) newShipments.push(id);
     }
+    const removedAny = [...prevKnownIdsRef.current].some((id) => !currentIds.has(id));
+
+    if (newShipments.length === 0 && !removedAny) return;
+
+    setSelection((prev) => {
+      const next = new Set<string>();
+      for (const id of prev.selectedIds) {
+        if (currentIds.has(id)) next.add(id);
+      }
+      for (const id of newShipments) {
+        next.add(id);
+      }
+      const parentStillExists = currentIds.has(prev.parentShipmentId);
+      return {
+        parentShipmentId: parentStillExists
+          ? prev.parentShipmentId
+          : group.shipments[0]?.shipmentId || "",
+        selectedIds: next,
+      };
+    });
+
+    prevKnownIdsRef.current = currentIds;
   }, [group.shipments]);
 
   const selectedChildren = group.shipments.filter(
