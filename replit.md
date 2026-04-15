@@ -48,6 +48,7 @@ The UI/UX features a warm earth-tone palette and large typography for warehouse 
 - **Stale Shipment Audit**: Maintenance job to identify and handle stuck shipments.
 - **ShipStation Write Queue**: PostgreSQL-backed queue for reliable, rate-limit-aware ShipStation shipment writes.
 - **QC Explosion Queue**: PostgreSQL-backed queue for queue-driven QC hydration.
+- **Merge Engine (GH #87/#88)**: Staff-initiated workflow for merging duplicate TikTok orders. Backend: `order_merges` table, merge queue worker, write queue callback. Frontend: `/merge-orders` page with candidate groups, parent selection, confirmation dialog, and queue observability. `mergedBy` derived server-side from session. Sidebar entry near Fulfillment Prep.
 
 ## External Dependencies
 - **Shopify Integration**: Admin API (2024-01) for order, product, and customer data synchronization, using webhooks.

@@ -50,6 +50,7 @@ import ExcludedSkus from "@/pages/excluded-skus";
 import ShippingMethods from "@/pages/shipping-methods";
 import Services from "@/pages/services";
 import Forecasting from "@/pages/forecasting";
+import MergeOrders from "@/pages/merge-orders";
 import type { User } from "@shared/schema";
 
 function AppContent() {
@@ -193,6 +194,7 @@ function AppContent() {
       <Route path="/collections" component={Collections} />
       <Route path="/packaging-types" component={PackagingTypes} />
       <Route path="/fulfillment-prep/:tab?/:subTab?" component={FulfillmentPrep} />
+      <Route path="/merge-orders" component={MergeOrders} />
       <Route path="/smart-sessions" component={SmartSessions} />
       <Route path="/smart-rate-check" component={SmartRateCheck} />
       <Route path="/forecasting/:tab?" component={Forecasting} />

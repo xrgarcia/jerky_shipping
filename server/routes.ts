@@ -16678,10 +16678,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/merges', requireAuth, async (req, res) => {
     try {
-      const { parentShipmentId, childShipmentIds, mergedBy } = req.body;
+      const { parentShipmentId, childShipmentIds } = req.body;
+      const mergedBy = req.user?.email || 'unknown';
 
-      if (!parentShipmentId || !Array.isArray(childShipmentIds) || childShipmentIds.length === 0 || !mergedBy) {
-        return res.status(400).json({ error: 'parentShipmentId, childShipmentIds[], and mergedBy are required' });
+      if (!parentShipmentId || !Array.isArray(childShipmentIds) || childShipmentIds.length === 0) {
+        return res.status(400).json({ error: 'parentShipmentId and childShipmentIds[] are required' });
       }
 
       if (childShipmentIds.includes(parentShipmentId)) {

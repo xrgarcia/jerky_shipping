@@ -32,7 +32,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Package, Truck, Database, Printer, User as UserIcon, LogOut, ChevronUp, ChevronRight, BarChart3, ListChecks, Activity, PackageCheck, ShoppingCart, Headset, Download, Monitor, Settings, AlertTriangle, Store, ClipboardList, PackageOpen, FileText, Layers, Boxes, FileSearch, DollarSign, Inbox, Zap, TrendingUp } from "lucide-react";
+import { Package, Truck, Database, Printer, User as UserIcon, LogOut, ChevronUp, ChevronRight, BarChart3, ListChecks, Activity, PackageCheck, ShoppingCart, Headset, Download, Monitor, Settings, AlertTriangle, Store, ClipboardList, PackageOpen, FileText, Layers, Boxes, FileSearch, DollarSign, Inbox, Zap, TrendingUp, GitMerge } from "lucide-react";
 import jerkyLogo from "@assets/image_1764264961124.png";
 import { useToast } from "@/hooks/use-toast";
 import type { User } from "@shared/schema";
@@ -120,6 +120,11 @@ export function AppSidebar() {
       title: "Fulfillment Prep",
       url: "/fulfillment-prep",
       icon: Layers,
+    },
+    {
+      title: "Merge Orders",
+      url: "/merge-orders",
+      icon: GitMerge,
     },
     {
       title: "Products",
