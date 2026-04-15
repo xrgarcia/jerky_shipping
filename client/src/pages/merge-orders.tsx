@@ -1,6 +1,7 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -37,7 +38,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Checkbox } from "@/components/ui/checkbox";
-import { GitMerge, Inbox, Loader2, CheckCircle2, XCircle, Clock, Package, AlertTriangle } from "lucide-react";
+import { GitMerge, Inbox, Loader2, CheckCircle2, XCircle, Clock, Package, AlertTriangle, Search, RotateCcw } from "lucide-react";
 
 interface MergeCandidateShipment {
   id: string;
@@ -64,20 +65,20 @@ interface MergeCandidatesResponse {
 
 interface MergeQueueRow {
   id: number;
-  parent_shipment_id: string;
-  parent_order_number: string;
-  child_shipment_id: string;
-  child_order_number: string;
-  child_sales_channel: string;
+  parentShipmentId: string;
+  parentOrderNumber: string;
+  childShipmentId: string;
+  childOrderNumber: string;
+  childSalesChannel: string;
   state: string;
-  retry_count: number;
-  max_retries: number;
-  last_error: string | null;
-  merged_by: string;
-  created_at: string;
-  processed_at: string | null;
-  completed_at: string | null;
-  updated_at: string;
+  retryCount: number;
+  maxRetries: number;
+  lastError: string | null;
+  mergedBy: string;
+  createdAt: string;
+  processedAt: string | null;
+  completedAt: string | null;
+  updatedAt: string;
 }
 
 interface MergeQueueResponse {
@@ -123,6 +124,33 @@ function MergeCandidateCard({
     selectedIds: new Set(group.shipments.map((s) => s.shipmentId)),
   }));
   const [showConfirm, setShowConfirm] = useState(false);
+
+  const prevShipmentIdsRef = useRef<string>(
+    group.shipments.map((s) => s.shipmentId).sort().join(",")
+  );
+  useEffect(() => {
+    const currentKey = group.shipments.map((s) => s.shipmentId).sort().join(",");
+    if (currentKey !== prevShipmentIdsRef.current) {
+      prevShipmentIdsRef.current = currentKey;
+      setSelection((prev) => {
+        const currentIds = new Set(group.shipments.map((s) => s.shipmentId));
+        const next = new Set<string>();
+        for (const id of prev.selectedIds) {
+          if (currentIds.has(id)) next.add(id);
+        }
+        for (const s of group.shipments) {
+          if (!prev.selectedIds.has(s.shipmentId)) {
+            next.add(s.shipmentId);
+          }
+        }
+        const parentStillExists = currentIds.has(prev.parentShipmentId);
+        return {
+          parentShipmentId: parentStillExists ? prev.parentShipmentId : group.shipments[0]?.shipmentId || "",
+          selectedIds: next,
+        };
+      });
+    }
+  }, [group.shipments]);
 
   const selectedChildren = group.shipments.filter(
     (s) =>
@@ -381,6 +409,22 @@ export default function MergeOrders() {
   }, [queueData?.recent, stateFilter]);
 
   const groups = candidatesData?.groups || [];
+  const [candidateSearch, setCandidateSearch] = useState("");
+
+  const filteredGroups = useMemo(() => {
+    if (!candidateSearch.trim()) return groups;
+    const q = candidateSearch.toLowerCase();
+    return groups.filter((g) =>
+      g.shipments.some(
+        (s) =>
+          s.orderNumber.toLowerCase().includes(q) ||
+          s.email.toLowerCase().includes(q) ||
+          s.shippingName.toLowerCase().includes(q)
+      )
+    );
+  }, [groups, candidateSearch]);
+
+  const totalDuplicateOrders = groups.reduce((sum, g) => sum + g.memberCount, 0);
 
   return (
     <div className="p-6 space-y-8 max-w-7xl mx-auto" data-testid="page-merge-orders">
@@ -409,7 +453,27 @@ export default function MergeOrders() {
           </Card>
         ) : (
           <div className="space-y-4">
-            {groups.map((group) => (
+            <div className="flex items-center gap-4 flex-wrap">
+              <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                <span data-testid="text-candidates-group-count">
+                  {groups.length} candidate group{groups.length !== 1 ? "s" : ""}
+                </span>
+                <span data-testid="text-candidates-order-count">
+                  {totalDuplicateOrders} duplicate orders
+                </span>
+              </div>
+              <div className="relative ml-auto">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search by name, email, or order #"
+                  value={candidateSearch}
+                  onChange={(e) => setCandidateSearch(e.target.value)}
+                  className="pl-9 w-64"
+                  data-testid="input-candidate-search"
+                />
+              </div>
+            </div>
+            {filteredGroups.map((group) => (
               <MergeCandidateCard
                 key={group.groupKey}
                 group={group}
@@ -419,6 +483,11 @@ export default function MergeOrders() {
                 isMerging={mergeMutation.isPending}
               />
             ))}
+            {filteredGroups.length === 0 && candidateSearch && (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                No groups match "{candidateSearch}"
+              </p>
+            )}
           </div>
         )}
       </section>
@@ -534,13 +603,13 @@ export default function MergeOrders() {
                 {filteredRecent.map((row) => (
                   <TableRow key={row.id} data-testid={`row-merge-queue-${row.id}`}>
                     <TableCell className="font-mono text-sm" data-testid={`text-mq-parent-${row.id}`}>
-                      {row.parent_order_number}
+                      {row.parentOrderNumber}
                     </TableCell>
                     <TableCell className="font-mono text-sm" data-testid={`text-mq-child-${row.id}`}>
-                      {row.child_order_number}
+                      {row.childOrderNumber}
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline">{row.child_sales_channel}</Badge>
+                      <Badge variant="outline">{row.childSalesChannel}</Badge>
                     </TableCell>
                     <TableCell>
                       <Badge
@@ -550,24 +619,37 @@ export default function MergeOrders() {
                         {row.state}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-sm">{row.merged_by}</TableCell>
+                    <TableCell className="text-sm">{row.mergedBy}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">
-                      {formatDate(row.created_at)}
+                      {formatDate(row.createdAt)}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
-                      {formatDate(row.processed_at)}
+                      {formatDate(row.processedAt)}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
-                      {formatDate(row.completed_at)}
+                      {formatDate(row.completedAt)}
                     </TableCell>
                     <TableCell>
-                      {row.last_error ? (
+                      {row.lastError ? (
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <AlertTriangle className="h-4 w-4 text-destructive cursor-default" />
+                            <div className="flex items-center gap-1.5">
+                              <AlertTriangle className="h-4 w-4 text-destructive cursor-default" />
+                              {row.state === "failed" && (
+                                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                  <RotateCcw className="h-3 w-3" />
+                                  Retry above
+                                </span>
+                              )}
+                            </div>
                           </TooltipTrigger>
                           <TooltipContent side="left" className="max-w-sm">
-                            <p className="text-xs break-all">{row.last_error}</p>
+                            <p className="text-xs break-all">{row.lastError}</p>
+                            {row.state === "failed" && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Children have been released back to candidates. Re-initiate the merge from the section above.
+                              </p>
+                            )}
                           </TooltipContent>
                         </Tooltip>
                       ) : (

@@ -16679,7 +16679,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/merges', requireAuth, async (req, res) => {
     try {
       const { parentShipmentId, childShipmentIds } = req.body;
-      const mergedBy = req.user?.email || 'unknown';
+      if (!req.user?.email) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+      const mergedBy = req.user.email;
 
       if (!parentShipmentId || !Array.isArray(childShipmentIds) || childShipmentIds.length === 0) {
         return res.status(400).json({ error: 'parentShipmentId and childShipmentIds[] are required' });
@@ -16840,10 +16843,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         LIMIT 50
       `);
 
-      res.json({
-        stats,
-        recent: recentResult.rows,
-      });
+      const recent = (recentResult.rows as any[]).map((row) => ({
+        id: row.id,
+        parentShipmentId: row.parent_shipment_id,
+        parentOrderNumber: row.parent_order_number,
+        childShipmentId: row.child_shipment_id,
+        childOrderNumber: row.child_order_number,
+        childSalesChannel: row.child_sales_channel,
+        state: row.state,
+        retryCount: row.retry_count,
+        maxRetries: row.max_retries,
+        lastError: row.last_error,
+        mergedBy: row.merged_by,
+        createdAt: row.created_at,
+        processedAt: row.processed_at,
+        completedAt: row.completed_at,
+        updatedAt: row.updated_at,
+      }));
+
+      res.json({ stats, recent });
     } catch (error: any) {
       console.error('[MergeQueue] Error fetching queue status:', error.message);
       res.status(500).json({ error: 'Failed to fetch merge queue status' });
