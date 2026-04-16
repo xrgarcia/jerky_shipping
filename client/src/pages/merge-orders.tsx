@@ -116,10 +116,12 @@ function MergeCandidateCard({
   group,
   onMerge,
   isMerging,
+  activeMergeIds,
 }: {
   group: MergeCandidateGroup;
   onMerge: (parentShipmentId: string, childShipmentIds: string[]) => void;
   isMerging: boolean;
+  activeMergeIds: Set<string>;
 }) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const toggleExpanded = (id: string) => {
@@ -234,7 +236,9 @@ function MergeCandidateCard({
           >
             {isMerging && <Loader2 className="h-3 w-3 animate-spin mr-1" />}
             <GitMerge className="h-3 w-3 mr-1" />
-            Merge {selectedChildren.length + 1} orders
+            {canMerge
+              ? `Merge ${selectedChildren.length + 1} orders`
+              : "Select orders to merge"}
           </Button>
         </CardHeader>
         <CardContent className="p-0">
@@ -252,14 +256,18 @@ function MergeCandidateCard({
             <TableBody>
               {group.shipments.map((shipment) => {
                 const isExpanded = expandedIds.has(shipment.shipmentId);
+                const isMergingThisRow = activeMergeIds.has(shipment.shipmentId);
                 return (
                 <Fragment key={shipment.shipmentId}>
-                <TableRow data-testid={`row-merge-candidate-${shipment.shipmentId}`}>
+                <TableRow
+                  data-testid={`row-merge-candidate-${shipment.shipmentId}`}
+                  className={isMergingThisRow ? "opacity-60" : undefined}
+                >
                   <TableCell className="pl-4">
                     <Checkbox
                       checked={selection.selectedIds.has(shipment.shipmentId)}
                       onCheckedChange={() => toggleShipment(shipment.shipmentId)}
-                      disabled={shipment.shipmentId === selection.parentShipmentId}
+                      disabled={shipment.shipmentId === selection.parentShipmentId || isMergingThisRow}
                       data-testid={`checkbox-select-${shipment.shipmentId}`}
                     />
                   </TableCell>
@@ -269,12 +277,25 @@ function MergeCandidateCard({
                       name={`parent-${group.groupKey}`}
                       checked={selection.parentShipmentId === shipment.shipmentId}
                       onChange={() => setParent(shipment.shipmentId)}
-                      className="accent-primary"
+                      disabled={isMergingThisRow}
+                      className="accent-primary disabled:opacity-50"
                       data-testid={`radio-parent-${shipment.shipmentId}`}
                     />
                   </TableCell>
                   <TableCell className="font-mono text-sm" data-testid={`text-order-number-${shipment.shipmentId}`}>
-                    {shipment.orderNumber}
+                    <div className="flex items-center gap-2">
+                      <span>{shipment.orderNumber}</span>
+                      {isMergingThisRow && (
+                        <Badge
+                          variant="secondary"
+                          className="gap-1 font-normal"
+                          data-testid={`badge-merging-${shipment.shipmentId}`}
+                        >
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          Merging
+                        </Badge>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell>
                     <ShipmentTagBadges tags={shipment.tags || []} testIdPrefix={shipment.shipmentId} />
@@ -447,11 +468,33 @@ export default function MergeOrders() {
       });
       return res.json();
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data: any, variables) => {
       toast({
         title: "Merge queued",
         description: `${data.mergeIds.length} child order(s) queued for merge.`,
       });
+
+      queryClient.setQueryData<MergeCandidatesResponse>(
+        ["/api/merge-candidates"],
+        (old) => {
+          if (!old) return old;
+          const mergedChildIds = new Set(variables.childShipmentIds);
+          const updatedGroups = old.groups
+            .map((group) => {
+              const remaining = group.shipments.filter(
+                (s) => !mergedChildIds.has(s.shipmentId)
+              );
+              return {
+                ...group,
+                shipments: remaining,
+                memberCount: remaining.length,
+              };
+            })
+            .filter((group) => group.shipments.length >= 2);
+          return { groups: updatedGroups };
+        }
+      );
+
       queryClient.invalidateQueries({ queryKey: ["/api/merge-candidates"] });
       queryClient.invalidateQueries({ queryKey: ["/api/merge-queue"] });
     },
@@ -471,6 +514,18 @@ export default function MergeOrders() {
 
   const stats = queueData?.stats || {};
   const totalJobs = Object.values(stats).reduce((a, b) => a + b, 0);
+
+  const activeMergeIds = useMemo(() => {
+    const ids = new Set<string>();
+    if (!queueData?.recent) return ids;
+    for (const row of queueData.recent) {
+      if (row.state === "queued" || row.state === "processing") {
+        ids.add(row.parentShipmentId);
+        ids.add(row.childShipmentId);
+      }
+    }
+    return ids;
+  }, [queueData?.recent]);
 
   const filteredRecent = useMemo(() => {
     if (!queueData?.recent) return [];
@@ -551,6 +606,7 @@ export default function MergeOrders() {
                   mergeMutation.mutate({ parentShipmentId, childShipmentIds })
                 }
                 isMerging={mergeMutation.isPending}
+                activeMergeIds={activeMergeIds}
               />
             ))}
             {filteredGroups.length === 0 && candidateSearch && (
