@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef, Fragment } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Input } from "@/components/ui/input";
@@ -38,7 +38,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Checkbox } from "@/components/ui/checkbox";
-import { GitMerge, Inbox, Loader2, CheckCircle2, XCircle, Clock, Package, AlertTriangle, Search, RotateCcw } from "lucide-react";
+import { GitMerge, Inbox, Loader2, CheckCircle2, XCircle, Clock, Package, AlertTriangle, Search, RotateCcw, ChevronRight, ChevronDown } from "lucide-react";
 import { ShipmentTagBadges } from "@/components/shipment-tag-badges";
 
 interface MergeCandidateShipment {
@@ -121,6 +121,15 @@ function MergeCandidateCard({
   onMerge: (parentShipmentId: string, childShipmentIds: string[]) => void;
   isMerging: boolean;
 }) {
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const toggleExpanded = (id: string) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
   const [selection, setSelection] = useState<GroupSelectionState>(() => ({
     parentShipmentId: group.shipments[0]?.shipmentId || "",
     selectedIds: new Set(group.shipments.map((s) => s.shipmentId)),
@@ -241,11 +250,11 @@ function MergeCandidateCard({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {group.shipments.map((shipment) => (
-                <TableRow
-                  key={shipment.shipmentId}
-                  data-testid={`row-merge-candidate-${shipment.shipmentId}`}
-                >
+              {group.shipments.map((shipment) => {
+                const isExpanded = expandedIds.has(shipment.shipmentId);
+                return (
+                <Fragment key={shipment.shipmentId}>
+                <TableRow data-testid={`row-merge-candidate-${shipment.shipmentId}`}>
                   <TableCell className="pl-4">
                     <Checkbox
                       checked={selection.selectedIds.has(shipment.shipmentId)}
@@ -271,28 +280,68 @@ function MergeCandidateCard({
                     <ShipmentTagBadges tags={shipment.tags || []} testIdPrefix={shipment.shipmentId} />
                   </TableCell>
                   <TableCell>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span className="cursor-default" data-testid={`text-item-count-${shipment.shipmentId}`}>
-                          {shipment.itemCount} item{shipment.itemCount !== 1 ? "s" : ""}
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent side="right" className="max-w-xs">
-                        <ul className="text-xs space-y-1">
-                          {shipment.items.map((item, idx) => (
-                            <li key={idx}>
-                              {item.quantity}x {item.sku} — {item.name}
-                            </li>
-                          ))}
-                        </ul>
-                      </TooltipContent>
-                    </Tooltip>
+                    <button
+                      type="button"
+                      onClick={() => toggleExpanded(shipment.shipmentId)}
+                      className="inline-flex items-center gap-1 text-sm hover-elevate active-elevate-2 rounded-md px-2 py-0.5 -mx-2"
+                      data-testid={`button-toggle-items-${shipment.shipmentId}`}
+                      aria-expanded={isExpanded}
+                      aria-controls={`items-detail-${shipment.shipmentId}`}
+                    >
+                      {isExpanded ? (
+                        <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                      ) : (
+                        <ChevronRight className="h-3 w-3 text-muted-foreground" />
+                      )}
+                      <span data-testid={`text-item-count-${shipment.shipmentId}`}>
+                        {shipment.itemCount} item{shipment.itemCount !== 1 ? "s" : ""}
+                      </span>
+                    </button>
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {formatDate(shipment.createdAt)}
                   </TableCell>
                 </TableRow>
-              ))}
+                {isExpanded && (
+                  <TableRow
+                    className="bg-muted/30 hover:bg-muted/30"
+                    data-testid={`row-items-expanded-${shipment.shipmentId}`}
+                  >
+                    <TableCell colSpan={6} className="py-2 px-4">
+                      <div id={`items-detail-${shipment.shipmentId}`} className="rounded-md border bg-background overflow-hidden">
+                        <table className="w-full text-xs">
+                          <thead className="bg-muted/50">
+                            <tr>
+                              <th className="text-left font-medium px-3 py-1.5 w-48">SKU</th>
+                              <th className="text-left font-medium px-3 py-1.5">Name</th>
+                              <th className="text-right font-medium px-3 py-1.5 w-16">Qty</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {shipment.items.length === 0 ? (
+                              <tr>
+                                <td colSpan={3} className="px-3 py-2 text-muted-foreground/60 text-center">
+                                  No items
+                                </td>
+                              </tr>
+                            ) : (
+                              shipment.items.map((item, idx) => (
+                                <tr key={idx} className="border-t" data-testid={`row-item-${shipment.shipmentId}-${idx}`}>
+                                  <td className="px-3 py-1.5 font-mono">{item.sku}</td>
+                                  <td className="px-3 py-1.5">{item.name}</td>
+                                  <td className="px-3 py-1.5 text-right tabular-nums">{item.quantity}</td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )}
+                </Fragment>
+                );
+              })}
             </TableBody>
           </Table>
         </CardContent>
