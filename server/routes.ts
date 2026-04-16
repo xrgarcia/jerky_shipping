@@ -16619,14 +16619,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
           FROM shippable
           GROUP BY group_key
           HAVING COUNT(*) >= 2
+        ),
+        candidate_shipments AS (
+          SELECT sh.id, sh.shipment_id, sh.order_number, sh.ship_to_email,
+                 sh.ship_to_name, sh.ship_to_address_line1, sh.ship_to_city,
+                 sh.ship_to_state, sh.ship_to_postal_code, sh.created_at,
+                 sh.group_key, g.member_count,
+                 COALESCE(o.sales_channel, 'unknown') AS sales_channel
+          FROM shippable sh
+          INNER JOIN groups g ON g.group_key = sh.group_key
+          LEFT JOIN shipments s2 ON s2.id = sh.id
+          LEFT JOIN orders o ON o.id = s2.order_id
+        ),
+        items_agg AS (
+          SELECT si.shipment_id,
+                 json_agg(json_build_object('name', si.name, 'sku', si.sku, 'quantity', si.quantity)) AS items
+          FROM shipment_items si
+          INNER JOIN candidate_shipments cs ON cs.id = si.shipment_id
+          GROUP BY si.shipment_id
         )
-        SELECT sh.id, sh.shipment_id, sh.order_number, sh.ship_to_email,
-               sh.ship_to_name, sh.ship_to_address_line1, sh.ship_to_city,
-               sh.ship_to_state, sh.ship_to_postal_code, sh.created_at,
-               sh.group_key, g.member_count
-        FROM shippable sh
-        INNER JOIN groups g ON g.group_key = sh.group_key
-        ORDER BY g.member_count DESC, sh.group_key, sh.created_at ASC
+        SELECT cs.id, cs.shipment_id, cs.order_number, cs.ship_to_email,
+               cs.ship_to_name, cs.ship_to_address_line1, cs.ship_to_city,
+               cs.ship_to_state, cs.ship_to_postal_code, cs.created_at,
+               cs.group_key, cs.member_count, cs.sales_channel,
+               COALESCE(ia.items, '[]'::json) AS items
+        FROM candidate_shipments cs
+        LEFT JOIN items_agg ia ON ia.shipment_id = cs.id
+        ORDER BY cs.member_count DESC, cs.group_key, cs.created_at ASC
       `);
 
       const groupMap = new Map<string, any>();
@@ -16641,27 +16660,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
 
-        const items = await db
-          .select({
-            name: shipmentItems.name,
-            sku: shipmentItems.sku,
-            quantity: shipmentItems.quantity,
-          })
-          .from(shipmentItems)
-          .where(eq(shipmentItems.shipmentId, row.id));
-
-        const [orderData] = await db
-          .select({ salesChannel: orders.salesChannel })
-          .from(orders)
-          .innerJoin(shipments, eq(shipments.orderId, orders.id))
-          .where(eq(shipments.id, row.id))
-          .limit(1);
+        const items = typeof row.items === 'string' ? JSON.parse(row.items) : (row.items || []);
 
         groupMap.get(row.group_key).shipments.push({
           id: row.id,
           shipmentId: row.shipment_id,
           orderNumber: row.order_number,
-          salesChannel: orderData?.salesChannel || 'unknown',
+          salesChannel: row.sales_channel || 'unknown',
           email: row.ship_to_email,
           shippingName: row.ship_to_name,
           shippingAddress: row.ship_to_address_line1,
