@@ -16625,11 +16625,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
                  sh.ship_to_name, sh.ship_to_address_line1, sh.ship_to_city,
                  sh.ship_to_state, sh.ship_to_postal_code, sh.created_at,
                  sh.group_key, g.member_count,
-                 COALESCE(o.sales_channel, 'unknown') AS sales_channel
+                 'unknown' AS sales_channel
           FROM shippable sh
           INNER JOIN groups g ON g.group_key = sh.group_key
-          LEFT JOIN shipments s2 ON s2.id = sh.id
-          LEFT JOIN orders o ON o.id = s2.order_id
         ),
         items_agg AS (
           SELECT si.shipment_id,
@@ -16774,16 +16772,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         const childItems = childSsData.data?.items || [];
 
-        const [orderData] = child.orderId ? await db
-          .select({ salesChannel: orders.salesChannel })
-          .from(orders)
-          .where(eq(orders.id, child.orderId))
-          .limit(1) : [null];
-
         validatedChildren.push({
           child,
           items: childItems,
-          salesChannel: orderData?.salesChannel || 'unknown',
+          salesChannel: 'unknown',
         });
       }
 
