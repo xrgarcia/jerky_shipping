@@ -20,11 +20,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { AlertTriangle, Clock, Package, Loader2, Search, ArrowUpDown, RefreshCw, ChevronLeft, ChevronRight } from "lucide-react";
 import { Link } from "wouter";
 import { queryClient } from "@/lib/queryClient";
-import { HIDDEN_DISPLAY_TAGS, TAG_COLORS, TAG_PRIORITY } from "@shared/constants";
+import { ShipmentTagBadges } from "@/components/shipment-tag-badges";
 
 interface BacklogCounts {
   backlog: number;
@@ -386,59 +385,7 @@ export default function ShippingBacklogReport() {
                           {order.itemCount}
                         </TableCell>
                         <TableCell>
-                          {(() => {
-                            const displayTags = order.tags.filter(t => !HIDDEN_DISPLAY_TAGS.has(t.name));
-                            if (displayTags.length === 0) {
-                              return <span className="text-muted-foreground/50">-</span>;
-                            }
-                            const sortedTags = [...displayTags].sort((a, b) => {
-                              const diff = (TAG_PRIORITY[a.name] ?? 50) - (TAG_PRIORITY[b.name] ?? 50);
-                              return diff !== 0 ? diff : a.name.localeCompare(b.name);
-                            });
-                            return (
-                              <div className="flex flex-wrap gap-1">
-                                {sortedTags.slice(0, 4).map((tag, idx) => {
-                                  const colors = TAG_COLORS[tag.name];
-                                  return (
-                                    <Badge
-                                      key={idx}
-                                      variant="outline"
-                                      className={`text-xs px-1.5 py-0 ${colors ? `${colors.bg} ${colors.text} ${colors.border}` : ''}`}
-                                    >
-                                      {tag.name}
-                                    </Badge>
-                                  );
-                                })}
-                                {sortedTags.length > 4 && (
-                                  <Popover>
-                                    <PopoverTrigger asChild>
-                                      <button type="button">
-                                        <Badge variant="secondary" className="text-xs px-1.5 py-0 cursor-pointer">
-                                          +{sortedTags.length - 4}
-                                        </Badge>
-                                      </button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-auto p-2" align="start">
-                                      <div className="flex flex-col gap-1">
-                                        {sortedTags.slice(4).map((tag, idx) => {
-                                          const colors = TAG_COLORS[tag.name];
-                                          return (
-                                            <Badge
-                                              key={idx}
-                                              variant="outline"
-                                              className={`text-xs px-1.5 py-0 ${colors ? `${colors.bg} ${colors.text} ${colors.border}` : ''}`}
-                                            >
-                                              {tag.name}
-                                            </Badge>
-                                          );
-                                        })}
-                                      </div>
-                                    </PopoverContent>
-                                  </Popover>
-                                )}
-                              </div>
-                            );
-                          })()}
+                          <ShipmentTagBadges tags={order.tags} />
                         </TableCell>
                       </TableRow>
                     ))

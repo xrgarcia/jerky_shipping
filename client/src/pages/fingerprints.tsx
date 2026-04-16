@@ -84,7 +84,8 @@ import {
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { UNIVERSAL_TAGS, DEFAULT_UNCHECKED_TAGS, HIDDEN_DISPLAY_TAGS, TAG_COLORS, TAG_PRIORITY } from "@shared/constants";
+import { UNIVERSAL_TAGS, DEFAULT_UNCHECKED_TAGS } from "@shared/constants";
+import { ShipmentTagBadges } from "@/components/shipment-tag-badges";
 
 interface FingerprintData {
   id: string;
@@ -2643,60 +2644,7 @@ export default function Fingerprints() {
                             )}
                           </td>
                           <td className="py-2 px-3 text-sm">
-                            {(() => {
-                              const optionalTags = order.tags || [];
-                              const displayTags = optionalTags.filter(t => !HIDDEN_DISPLAY_TAGS.has(t.name));
-                              if (displayTags.length === 0) {
-                                return <span className="text-muted-foreground/50">-</span>;
-                              }
-                              const sortedTags = [...displayTags].sort((a, b) => {
-                                const diff = (TAG_PRIORITY[a.name] ?? 50) - (TAG_PRIORITY[b.name] ?? 50);
-                                return diff !== 0 ? diff : a.name.localeCompare(b.name);
-                              });
-                              return (
-                                <div className="flex flex-wrap gap-1">
-                                  {sortedTags.slice(0, 4).map((tag, idx) => {
-                                    const colors = TAG_COLORS[tag.name];
-                                    return (
-                                      <Badge 
-                                        key={idx} 
-                                        variant="outline" 
-                                        className={`text-xs px-1.5 py-0 ${colors ? `${colors.bg} ${colors.text} ${colors.border}` : ''}`}
-                                      >
-                                        {tag.name}
-                                      </Badge>
-                                    );
-                                  })}
-                                  {sortedTags.length > 4 && (
-                                    <Popover>
-                                      <PopoverTrigger asChild>
-                                        <button type="button" data-testid={`badge-overflow-${order.orderNumber}`}>
-                                          <Badge variant="secondary" className="text-xs px-1.5 py-0 cursor-pointer">
-                                            +{sortedTags.length - 4}
-                                          </Badge>
-                                        </button>
-                                      </PopoverTrigger>
-                                      <PopoverContent className="w-auto p-2" align="start">
-                                        <div className="flex flex-col gap-1">
-                                          {sortedTags.slice(4).map((tag, idx) => {
-                                            const colors = TAG_COLORS[tag.name];
-                                            return (
-                                              <Badge
-                                                key={idx}
-                                                variant="outline"
-                                                className={`text-xs px-1.5 py-0 ${colors ? `${colors.bg} ${colors.text} ${colors.border}` : ''}`}
-                                              >
-                                                {tag.name}
-                                              </Badge>
-                                            );
-                                          })}
-                                        </div>
-                                      </PopoverContent>
-                                    </Popover>
-                                  )}
-                                </div>
-                              );
-                            })()}
+                            <ShipmentTagBadges tags={order.tags || []} testIdPrefix={order.orderNumber} />
                           </td>
                           <td className="py-2 px-3 text-center">
                             {order.readyToSession ? (
