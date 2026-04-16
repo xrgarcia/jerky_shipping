@@ -16668,8 +16668,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         const items = typeof row.items === 'string' ? JSON.parse(row.items) : (row.items || []);
-        const tags = (typeof row.tags === 'string' ? JSON.parse(row.tags) : (row.tags || []))
-          .filter((t: string) => t !== 'All Orders');
+        const tags = typeof row.tags === 'string' ? JSON.parse(row.tags) : (row.tags || []);
 
         groupMap.get(row.group_key).shipments.push({
           id: row.id,
