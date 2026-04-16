@@ -16605,7 +16605,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           WHERE s.shipment_status IN ('pending', 'on_hold')
             AND EXISTS (
               SELECT 1 FROM shipment_tags st
-              WHERE st.shipment_id = s.id AND st.name = ${READY_FOR_SHIPDOT_TAG}
+              WHERE st.shipment_id = s.id AND st.name = 'READY FOR SHIPDOT' -- Must match READY_FOR_SHIPDOT_TAG in shared/constants.ts
             )
             AND NOT EXISTS (
               SELECT 1 FROM order_merges om
@@ -16631,7 +16631,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const groupMap = new Map<string, any>();
 
-      for (const row of candidates.rows as any[]) {
+      const rows = (candidates.rows ?? candidates ?? []) as any[];
+      for (const row of rows) {
         if (!groupMap.has(row.group_key)) {
           groupMap.set(row.group_key, {
             groupKey: row.group_key,
