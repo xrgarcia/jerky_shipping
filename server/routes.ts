@@ -16631,9 +16631,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ),
         items_agg AS (
           SELECT si.shipment_id,
-                 json_agg(json_build_object('name', si.name, 'sku', si.sku, 'quantity', si.quantity)) AS items
+                 json_agg(json_build_object('name', si.name, 'sku', si.sku, 'quantity', si.quantity, 'unitPrice', si.unit_price)) AS items
           FROM shipment_items si
           INNER JOIN candidate_shipments cs ON cs.id = si.shipment_id
+          WHERE si.sku IS NOT NULL AND si.sku != ''
           GROUP BY si.shipment_id
         ),
         tags_agg AS (

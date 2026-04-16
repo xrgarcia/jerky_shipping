@@ -38,7 +38,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Checkbox } from "@/components/ui/checkbox";
-import { GitMerge, Inbox, Loader2, CheckCircle2, XCircle, Clock, Package, AlertTriangle, Search, RotateCcw, ChevronRight, ChevronDown } from "lucide-react";
+import { GitMerge, Inbox, Loader2, CheckCircle2, XCircle, Clock, Package, PackageOpen, AlertTriangle, Search, RotateCcw, ChevronUp, ChevronDown } from "lucide-react";
 import { ShipmentTagBadges } from "@/components/shipment-tag-badges";
 
 interface MergeCandidateShipment {
@@ -50,7 +50,7 @@ interface MergeCandidateShipment {
   shippingName: string;
   shippingAddress: string;
   itemCount: number;
-  items: Array<{ name: string; sku: string; quantity: number }>;
+  items: Array<{ name: string; sku: string; quantity: number; unitPrice?: string | number | null }>;
   tags: string[];
   createdAt: string;
 }
@@ -280,23 +280,26 @@ function MergeCandidateCard({
                     <ShipmentTagBadges tags={shipment.tags || []} testIdPrefix={shipment.shipmentId} />
                   </TableCell>
                   <TableCell>
-                    <button
+                    <Button
                       type="button"
+                      variant="ghost"
+                      size="sm"
                       onClick={() => toggleExpanded(shipment.shipmentId)}
-                      className="inline-flex items-center gap-1 text-sm hover-elevate active-elevate-2 rounded-md px-2 py-0.5 -mx-2"
+                      className="gap-2 -mx-2"
                       data-testid={`button-toggle-items-${shipment.shipmentId}`}
                       aria-expanded={isExpanded}
                       aria-controls={`items-detail-${shipment.shipmentId}`}
                     >
-                      {isExpanded ? (
-                        <ChevronDown className="h-3 w-3 text-muted-foreground" />
-                      ) : (
-                        <ChevronRight className="h-3 w-3 text-muted-foreground" />
-                      )}
-                      <span data-testid={`text-item-count-${shipment.shipmentId}`}>
+                      <PackageOpen className="h-4 w-4" />
+                      <span className="font-semibold" data-testid={`text-item-count-${shipment.shipmentId}`}>
                         {shipment.itemCount} item{shipment.itemCount !== 1 ? "s" : ""}
                       </span>
-                    </button>
+                      {isExpanded ? (
+                        <ChevronUp className="h-4 w-4" />
+                      ) : (
+                        <ChevronDown className="h-4 w-4" />
+                      )}
+                    </Button>
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {formatDate(shipment.createdAt)}
@@ -307,29 +310,41 @@ function MergeCandidateCard({
                     className="bg-muted/30 hover:bg-muted/30"
                     data-testid={`row-items-expanded-${shipment.shipmentId}`}
                   >
-                    <TableCell colSpan={6} className="py-2 px-4">
-                      <div id={`items-detail-${shipment.shipmentId}`} className="rounded-md border bg-background overflow-hidden">
-                        <table className="w-full text-xs">
-                          <thead className="bg-muted/50">
+                    <TableCell colSpan={6} className="py-4 px-6">
+                      <div id={`items-detail-${shipment.shipmentId}`} className="border rounded-md overflow-hidden bg-background">
+                        <table className="w-full">
+                          <thead className="bg-muted">
                             <tr>
-                              <th className="text-left font-medium px-3 py-1.5 w-48">SKU</th>
-                              <th className="text-left font-medium px-3 py-1.5">Name</th>
-                              <th className="text-right font-medium px-3 py-1.5 w-16">Qty</th>
+                              <th className="text-left px-4 py-3 font-semibold text-sm">SKU</th>
+                              <th className="text-left px-4 py-3 font-semibold text-sm">Product</th>
+                              <th className="text-center px-4 py-3 font-semibold text-sm">Quantity</th>
+                              <th className="text-right px-4 py-3 font-semibold text-sm">Unit Price</th>
                             </tr>
                           </thead>
-                          <tbody>
+                          <tbody className="divide-y">
                             {shipment.items.length === 0 ? (
                               <tr>
-                                <td colSpan={3} className="px-3 py-2 text-muted-foreground/60 text-center">
-                                  No items
+                                <td colSpan={4} className="px-4 py-6 text-center text-muted-foreground">
+                                  No items found for this shipment
                                 </td>
                               </tr>
                             ) : (
                               shipment.items.map((item, idx) => (
-                                <tr key={idx} className="border-t" data-testid={`row-item-${shipment.shipmentId}-${idx}`}>
-                                  <td className="px-3 py-1.5 font-mono">{item.sku}</td>
-                                  <td className="px-3 py-1.5">{item.name}</td>
-                                  <td className="px-3 py-1.5 text-right tabular-nums">{item.quantity}</td>
+                                <tr key={idx} className="hover-elevate" data-testid={`row-item-${shipment.shipmentId}-${idx}`}>
+                                  <td className="px-4 py-3">
+                                    <code className="text-sm font-mono bg-muted px-2 py-1 rounded">
+                                      {item.sku || 'N/A'}
+                                    </code>
+                                  </td>
+                                  <td className="px-4 py-3 text-sm">{item.name || 'Unknown Product'}</td>
+                                  <td className="px-4 py-3 text-center">
+                                    <span className="font-semibold">{item.quantity}</span>
+                                  </td>
+                                  <td className="px-4 py-3 text-right text-sm">
+                                    {item.unitPrice != null && item.unitPrice !== ''
+                                      ? `$${parseFloat(String(item.unitPrice)).toFixed(2)}`
+                                      : 'N/A'}
+                                  </td>
                                 </tr>
                               ))
                             )}
