@@ -16635,14 +16635,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
           FROM shipment_items si
           INNER JOIN candidate_shipments cs ON cs.id = si.shipment_id
           GROUP BY si.shipment_id
+        ),
+        tags_agg AS (
+          SELECT st.shipment_id,
+                 json_agg(st.name ORDER BY st.name) AS tags
+          FROM shipment_tags st
+          INNER JOIN candidate_shipments cs ON cs.id = st.shipment_id
+          GROUP BY st.shipment_id
         )
         SELECT cs.id, cs.shipment_id, cs.order_number, cs.ship_to_email,
                cs.ship_to_name, cs.ship_to_address_line1, cs.ship_to_city,
                cs.ship_to_state, cs.ship_to_postal_code, cs.created_at,
                cs.group_key, cs.member_count, cs.sales_channel,
-               COALESCE(ia.items, '[]'::json) AS items
+               COALESCE(ia.items, '[]'::json) AS items,
+               COALESCE(ta.tags, '[]'::json) AS tags
         FROM candidate_shipments cs
         LEFT JOIN items_agg ia ON ia.shipment_id = cs.id
+        LEFT JOIN tags_agg ta ON ta.shipment_id = cs.id
         ORDER BY cs.member_count DESC, cs.group_key, cs.created_at ASC
       `);
 
@@ -16659,6 +16668,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         const items = typeof row.items === 'string' ? JSON.parse(row.items) : (row.items || []);
+        const tags = (typeof row.tags === 'string' ? JSON.parse(row.tags) : (row.tags || []))
+          .filter((t: string) => t !== 'All Orders');
 
         groupMap.get(row.group_key).shipments.push({
           id: row.id,
@@ -16670,6 +16681,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           shippingAddress: row.ship_to_address_line1,
           itemCount: items.length,
           items,
+          tags,
           createdAt: row.created_at,
         });
       }

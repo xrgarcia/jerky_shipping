@@ -50,6 +50,7 @@ interface MergeCandidateShipment {
   shippingAddress: string;
   itemCount: number;
   items: Array<{ name: string; sku: string; quantity: number }>;
+  tags: string[];
   createdAt: string;
 }
 
@@ -233,7 +234,7 @@ function MergeCandidateCard({
                 <TableHead className="w-10 pl-4"></TableHead>
                 <TableHead className="w-16">Parent</TableHead>
                 <TableHead>Order #</TableHead>
-                <TableHead>Channel</TableHead>
+                <TableHead>Tags</TableHead>
                 <TableHead>Items</TableHead>
                 <TableHead>Created</TableHead>
               </TableRow>
@@ -266,9 +267,13 @@ function MergeCandidateCard({
                     {shipment.orderNumber}
                   </TableCell>
                   <TableCell>
-                    <Badge variant="outline" data-testid={`badge-channel-${shipment.shipmentId}`}>
-                      {shipment.salesChannel}
-                    </Badge>
+                    <div className="flex flex-wrap gap-1" data-testid={`tags-${shipment.shipmentId}`}>
+                      {(shipment.tags || []).map((tag) => (
+                        <Badge key={tag} variant="outline" className="text-xs">
+                          {tag}
+                        </Badge>
+                      ))}
+                    </div>
                   </TableCell>
                   <TableCell>
                     <Tooltip>
