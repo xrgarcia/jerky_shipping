@@ -19,6 +19,10 @@ function log(msg: string, level: 'info' | 'warn' | 'error' = 'info') {
   }
 }
 
+function isRealItem(item: any): boolean {
+  return item != null && item.sku != null && item.sku !== '';
+}
+
 async function processNextJob(): Promise<boolean> {
   return withSpan('merge_queue', 'merge_queue', 'process_job', async () => {
     return await db.transaction(async (tx) => {
@@ -59,12 +63,13 @@ async function processNextJob(): Promise<boolean> {
         }
 
         const ssItems = currentShipment.data?.items || [];
-        const consolidatedItems = [...ssItems];
+        const consolidatedItems = ssItems.filter(isRealItem);
 
         for (const row of mergeRows) {
           const childItems = row.childItemsSnapshot as any[];
           if (Array.isArray(childItems)) {
             for (const ci of childItems) {
+              if (!isRealItem(ci)) continue;
               const {
                 item_id,
                 sales_order_id,

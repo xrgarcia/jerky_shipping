@@ -374,7 +374,11 @@ async function runCallbackAction(job: typeof shipstationWriteQueue.$inferSelect,
         .update(orderMerges)
         .set({ state: 'complete', completedAt: new Date(), updatedAt: new Date() })
         .where(and(eq(orderMerges.parentShipmentId, parentShipmentId), eq(orderMerges.state, 'processing')))
-        .returning({ childLocalId: orderMerges.childLocalId });
+        .returning({
+          childLocalId: orderMerges.childLocalId,
+          childShipmentId: orderMerges.childShipmentId,
+          childOrderNumber: orderMerges.childOrderNumber,
+        });
 
       if (mergeRows.length > 0) {
         const childLocalIds = mergeRows.map(r => r.childLocalId);
@@ -382,7 +386,22 @@ async function runCallbackAction(job: typeof shipstationWriteQueue.$inferSelect,
           .update(shipments)
           .set({ lifecyclePhase: 'merged', updatedAt: new Date() })
           .where(inArray(shipments.id, childLocalIds));
-        log(`Callback: Merge complete — marked ${mergeRows.length} children as merged for parent ${parentShipmentId}`, 'info', ctx);
+
+        for (const row of mergeRows) {
+          try {
+            await enqueueShipStationWrite({
+              shipmentId: row.childShipmentId,
+              patchPayload: { items: [] },
+              reason: 'merge:clear_child_items',
+              localShipmentId: row.childLocalId,
+              orderNumber: row.childOrderNumber,
+            });
+          } catch (err: any) {
+            log(`Failed to enqueue clear_child_items for ${row.childShipmentId} (${row.childOrderNumber}): ${err.message}`, 'warn', withOrder(row.childOrderNumber, row.childShipmentId));
+          }
+        }
+
+        log(`Callback: Merge complete — marked ${mergeRows.length} children as merged and enqueued item clearing for parent ${parentShipmentId}`, 'info', ctx);
       }
     }
   } catch (err: any) {
