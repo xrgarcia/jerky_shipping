@@ -397,7 +397,7 @@ async function runCallbackAction(job: typeof shipstationWriteQueue.$inferSelect,
               orderNumber: row.childOrderNumber,
             });
           } catch (err: any) {
-            log(`Failed to enqueue clear_child_items for ${row.childShipmentId} (${row.childOrderNumber}): ${err.message}`, 'warn', withOrder(row.childOrderNumber, row.childShipmentId));
+            log(`ORPHAN RISK: Failed to enqueue clear_child_items for ${row.childShipmentId} (${row.childOrderNumber}): ${err.message} — child items remain in ShipStation and may need manual clearing`, 'error', withOrder(row.childOrderNumber, row.childShipmentId));
           }
         }
 
