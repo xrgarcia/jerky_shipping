@@ -28,6 +28,7 @@ import { skuVaultService, SkuVaultError, qcSaleCache } from "./services/skuvault
 import { getCacheWarmerMetrics, getInactiveSessionShipments, getShippableShipmentsForOrder } from "./services/qcsale-cache-warmer";
 import { analyzeShippableShipments, type ShippableShipmentsResult } from "./utils/shipment-eligibility";
 import { SHIPPABLE_TAGS } from "./utils/shippable-tags";
+import { READY_FOR_SHIPDOT_TAG } from "@shared/constants";
 import { qcPassItemRequestSchema, qcPassKitSaleItemRequestSchema } from "@shared/skuvault-types";
 import { fromZonedTime, toZonedTime, formatInTimeZone } from 'date-fns-tz';
 import { checkRateLimit } from "./utils/rate-limiter";
@@ -16601,10 +16602,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
                  s.ship_to_state, s.ship_to_postal_code, s.created_at,
                  UPPER(COALESCE(s.ship_to_email, '') || '|' || COALESCE(s.ship_to_address_line1, '') || '|' || COALESCE(s.ship_to_city, '') || '|' || COALESCE(s.ship_to_state, '') || '|' || COALESCE(s.ship_to_postal_code, '')) AS group_key
           FROM shipments s
-          WHERE s.shipment_status = 'pending'
+          WHERE s.shipment_status IN ('pending', 'on_hold')
             AND EXISTS (
               SELECT 1 FROM shipment_tags st
-              WHERE st.shipment_id = s.id AND st.name = 'READY FOR SHIP DOT'
+              WHERE st.shipment_id = s.id AND st.name = ${READY_FOR_SHIPDOT_TAG}
             )
             AND NOT EXISTS (
               SELECT 1 FROM order_merges om
@@ -16719,16 +16720,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: `Parent shipment ${parentShipmentId} not found` });
       }
 
-      if (parent.shipmentStatus !== 'pending') {
-        return res.status(400).json({ error: `Parent shipment status must be 'pending', got '${parent.shipmentStatus}'` });
+      if (!['pending', 'on_hold'].includes(parent.shipmentStatus || '')) {
+        return res.status(400).json({ error: `Parent shipment must be unshipped (pending or on_hold), got '${parent.shipmentStatus}'` });
       }
 
       const parentTags = await db
         .select({ name: shipmentTags.name })
         .from(shipmentTags)
         .where(eq(shipmentTags.shipmentId, parent.id));
-      if (!parentTags.some(t => t.name === 'READY FOR SHIP DOT')) {
-        return res.status(400).json({ error: 'Parent shipment must have READY FOR SHIP DOT tag' });
+      if (!parentTags.some(t => t.name === READY_FOR_SHIPDOT_TAG)) {
+        return res.status(400).json({ error: `Parent shipment must have ${READY_FOR_SHIPDOT_TAG} tag` });
       }
 
       const parentGroupKey = [parent.shipToEmail, parent.shipToAddressLine1, parent.shipToCity, parent.shipToState, parent.shipToPostalCode]
@@ -16743,16 +16744,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(404).json({ error: `Child shipment ${childSsId} not found` });
         }
 
-        if (child.shipmentStatus !== 'pending') {
-          return res.status(400).json({ error: `Child ${childSsId} status must be 'pending', got '${child.shipmentStatus}'` });
+        if (!['pending', 'on_hold'].includes(child.shipmentStatus || '')) {
+          return res.status(400).json({ error: `Child ${childSsId} must be unshipped (pending or on_hold), got '${child.shipmentStatus}'` });
         }
 
         const childTags = await db
           .select({ name: shipmentTags.name })
           .from(shipmentTags)
           .where(eq(shipmentTags.shipmentId, child.id));
-        if (!childTags.some(t => t.name === 'READY FOR SHIP DOT')) {
-          return res.status(400).json({ error: `Child ${childSsId} must have READY FOR SHIP DOT tag` });
+        if (!childTags.some(t => t.name === READY_FOR_SHIPDOT_TAG)) {
+          return res.status(400).json({ error: `Child ${childSsId} must have ${READY_FOR_SHIPDOT_TAG} tag` });
         }
 
         const childGroupKey = [child.shipToEmail, child.shipToAddressLine1, child.shipToCity, child.shipToState, child.shipToPostalCode]
